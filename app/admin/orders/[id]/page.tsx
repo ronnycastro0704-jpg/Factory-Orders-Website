@@ -10,6 +10,49 @@ type PageProps = {
   }>;
 };
 
+type OrderSelectionItem = {
+  id: string;
+  optionGroupNameSnapshot: string;
+  optionChoiceNameSnapshot: string;
+  priceDeltaSnapshot: unknown;
+};
+
+type OrderItemWithSelections = {
+  id: string;
+  productNameSnapshot: string;
+  basePriceSnapshot: unknown;
+  lineTotal: unknown;
+  selections: OrderSelectionItem[];
+};
+
+type OrderRevisionItem = {
+  id: string;
+  revisionNumber: number;
+  changeReason: string | null;
+  changedBy: string | null;
+  createdAt: Date;
+};
+
+type EmailLogItem = {
+  id: string;
+  eventType: string;
+  status: string;
+  recipient: string;
+  subject: string | null;
+  errorMessage: string | null;
+  createdAt: Date;
+};
+
+type SheetSyncLogItem = {
+  id: string;
+  status: string;
+  spreadsheetId: string | null;
+  worksheetName: string | null;
+  spreadsheetRowId: string | null;
+  errorMessage: string | null;
+  createdAt: Date;
+};
+
 export default async function AdminOrderDetailPage({ params }: PageProps) {
   const { id } = await params;
 
@@ -36,6 +79,11 @@ export default async function AdminOrderDetailPage({ params }: PageProps) {
   if (!order) {
     notFound();
   }
+
+  const typedItems = order.items as OrderItemWithSelections[];
+  const typedRevisions = order.revisions as OrderRevisionItem[];
+  const typedEmailLogs = order.emailLogs as EmailLogItem[];
+  const typedSheetSyncLogs = order.sheetSyncLogs as SheetSyncLogItem[];
 
   return (
     <main className="min-h-screen bg-slate-50 p-8 text-slate-900">
@@ -89,7 +137,7 @@ export default async function AdminOrderDetailPage({ params }: PageProps) {
               <h2 className="text-2xl font-semibold">Order Items</h2>
 
               <div className="mt-4 space-y-6">
-                {order.items.map((item) => (
+                {typedItems.map((item: OrderItemWithSelections) => (
                   <div
                     key={item.id}
                     className="rounded-2xl border bg-slate-50 p-5"
@@ -108,7 +156,7 @@ export default async function AdminOrderDetailPage({ params }: PageProps) {
                     </div>
 
                     <div className="space-y-3">
-                      {item.selections.map((selection) => (
+                      {item.selections.map((selection: OrderSelectionItem) => (
                         <div
                           key={selection.id}
                           className="flex items-center justify-between rounded-lg border bg-white px-4 py-3"
@@ -141,10 +189,10 @@ export default async function AdminOrderDetailPage({ params }: PageProps) {
               <h2 className="text-2xl font-semibold">Revision History</h2>
 
               <div className="mt-4 space-y-4">
-                {order.revisions.length === 0 ? (
+                {typedRevisions.length === 0 ? (
                   <p className="text-slate-500">No revisions yet.</p>
                 ) : (
-                  order.revisions.map((revision) => (
+                  typedRevisions.map((revision: OrderRevisionItem) => (
                     <div
                       key={revision.id}
                       className="rounded-xl border bg-slate-50 p-4"
@@ -171,10 +219,10 @@ export default async function AdminOrderDetailPage({ params }: PageProps) {
               <h2 className="text-2xl font-semibold">Email Logs</h2>
 
               <div className="mt-4 space-y-4">
-                {order.emailLogs.length === 0 ? (
+                {typedEmailLogs.length === 0 ? (
                   <p className="text-slate-500">No email logs yet.</p>
                 ) : (
-                  order.emailLogs.map((log) => (
+                  typedEmailLogs.map((log: EmailLogItem) => (
                     <div
                       key={log.id}
                       className="rounded-xl border bg-slate-50 p-4"
@@ -206,10 +254,10 @@ export default async function AdminOrderDetailPage({ params }: PageProps) {
               <h2 className="text-2xl font-semibold">Google Sheets Logs</h2>
 
               <div className="mt-4 space-y-4">
-                {order.sheetSyncLogs.length === 0 ? (
+                {typedSheetSyncLogs.length === 0 ? (
                   <p className="text-slate-500">No sheets sync logs yet.</p>
                 ) : (
-                  order.sheetSyncLogs.map((log) => (
+                  typedSheetSyncLogs.map((log: SheetSyncLogItem) => (
                     <div
                       key={log.id}
                       className="rounded-xl border bg-slate-50 p-4"
