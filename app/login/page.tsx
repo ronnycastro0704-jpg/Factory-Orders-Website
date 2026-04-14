@@ -1,6 +1,15 @@
 import LoginForm from "./login-form";
 
-export default function LoginPage() {
+type PageProps = {
+  searchParams: Promise<{
+    callbackUrl?: string;
+  }>;
+};
+
+export default async function LoginPage({ searchParams }: PageProps) {
+  const params = await searchParams;
+  const callbackUrl = params.callbackUrl || "/my/orders";
+
   return (
     <main className="min-h-screen bg-slate-50 p-8 text-slate-900">
       <div className="mx-auto max-w-md rounded-2xl border bg-white p-6 shadow-sm">
@@ -11,7 +20,7 @@ export default function LoginPage() {
         </p>
 
         <div className="mt-6">
-          <LoginForm />
+          <LoginForm callbackUrl={callbackUrl} />
         </div>
       </div>
     </main>
