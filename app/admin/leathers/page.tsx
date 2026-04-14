@@ -1,10 +1,18 @@
 import { prisma } from "../../../lib/prisma";
 import CreateLeatherForm from "./leather-form";
 
+type LeatherItem = {
+  id: string;
+  name: string;
+  slug: string;
+  grade: string;
+  imageUrl: string | null;
+};
+
 export default async function AdminLeathersPage() {
-  const leathers = await prisma.leather.findMany({
+  const leathers = (await prisma.leather.findMany({
     orderBy: { name: "asc" },
-  });
+  })) as LeatherItem[];
 
   return (
     <main className="min-h-screen bg-slate-50 p-8 text-slate-900">
@@ -41,7 +49,7 @@ export default async function AdminLeathersPage() {
               {leathers.length === 0 ? (
                 <p className="text-slate-500">No leathers yet.</p>
               ) : (
-                leathers.map((leather) => (
+                leathers.map((leather: LeatherItem) => (
                   <div
                     key={leather.id}
                     className="rounded-xl border bg-slate-50 p-4"
