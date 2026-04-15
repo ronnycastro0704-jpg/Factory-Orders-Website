@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "../../../../../lib/prisma";
 import { sendOrderNotification } from "../../../../../lib/email";
 import { appendOrderRow } from "../../../../../lib/sheets";
+import type { Prisma } from "@prisma/client";
 
 type RouteContext = {
   params: Promise<{
@@ -9,15 +10,18 @@ type RouteContext = {
   }>;
 };
 
-function buildSelectionsFromItem(
-  item: {
-    selections: {
-      optionGroupNameSnapshot: string;
-      optionChoiceNameSnapshot: string;
-      priceDeltaSnapshot: unknown;
-    }[];
-  }
-) {
+type SelectionSnapshot = {
+  optionGroupNameSnapshot: string;
+  optionChoiceNameSnapshot: string;
+  priceDeltaSnapshot: unknown;
+};
+
+type ItemWithSelections = {
+  productNameSnapshot: string;
+  selections: SelectionSnapshot[];
+};
+
+function buildSelectionsFromItem(item: ItemWithSelections) {
   const grouped = new Map<
     string,
     {
@@ -126,7 +130,7 @@ export async function POST(request: Request, context: RouteContext) {
     const nextStatus =
       action === "sent_to_factory" ? "SENT_TO_FACTORY" : "COMPLETED";
 
-    await prisma.$transaction(async (tx) => {
+await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       await tx.order.update({
         where: { id },
         data: {
@@ -225,7 +229,7 @@ export async function POST(request: Request, context: RouteContext) {
 
     try {
       await appendOrderRow({
-        eventType: action === "sent_to_factory" ? "updated" : "updated",
+        eventType: "updated",
         orderNumber: order.orderNumber,
         status: nextStatus,
         customerName: order.customerName,
