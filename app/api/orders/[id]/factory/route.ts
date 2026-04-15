@@ -2,9 +2,11 @@ import { NextResponse } from "next/server";
 import { prisma } from "../../../../../lib/prisma";
 import { sendOrderNotification } from "../../../../../lib/email";
 import { appendOrderRow } from "../../../../../lib/sheets";
-type TransactionClient = Parameters<
-  Exclude<Parameters<typeof prisma.$transaction>[0], any[]>
->[0];
+
+type TransactionClient = Omit<
+  typeof prisma,
+  "$connect" | "$disconnect" | "$on" | "$use" | "$extends"
+>;
 
 type RouteContext = {
   params: Promise<{

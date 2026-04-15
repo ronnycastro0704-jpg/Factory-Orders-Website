@@ -3,6 +3,11 @@ import { prisma } from "../../../../lib/prisma";
 import { sendOrderNotification } from "../../../../lib/email";
 import { appendOrderRow } from "../../../../lib/sheets";
 
+type TransactionClient = Omit<
+  typeof prisma,
+  "$connect" | "$disconnect" | "$on" | "$use" | "$extends"
+>;
+
 type RouteContext = {
   params: Promise<{
     id: string;
@@ -188,7 +193,7 @@ export async function PUT(request: Request, context: RouteContext) {
       total: Number(existingOrder.total),
     };
 
-    await prisma.$transaction(async (tx) => {
+await prisma.$transaction(async (tx: TransactionClient) => {
       await tx.order.update({
         where: { id },
         data: {
