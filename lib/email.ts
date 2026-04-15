@@ -58,13 +58,21 @@ function buildSelectionsText(selections: OrderSelection[]) {
   return selections
     .map((selection, index) => {
       const colorNumber = index + 1;
-      return [
+
+      const lines = [
         `SECTION ${colorNumber}: ${selection.groupName.toUpperCase()}`,
         `Style: ${selection.choiceLabel}`,
-        `Leather: ${selection.leatherName || "None"}${
-          selection.leatherGrade ? ` (${selection.leatherGrade})` : ""
-        }`,
-      ].join("\n");
+      ];
+
+      if (selection.leatherName) {
+        lines.push(
+          `Leather: ${selection.leatherName}${
+            selection.leatherGrade ? ` (${selection.leatherGrade})` : ""
+          }`
+        );
+      }
+
+      return lines.join("\n");
     })
     .join("\n\n");
 }
@@ -77,7 +85,7 @@ function buildSelectionsHtml(selections: OrderSelection[]) {
       const safeChoiceLabel = escapeHtml(selection.choiceLabel);
       const safeLeatherName = selection.leatherName
         ? escapeHtml(selection.leatherName)
-        : "None";
+        : "";
       const safeLeatherGrade = selection.leatherGrade
         ? escapeHtml(selection.leatherGrade)
         : "";
@@ -87,6 +95,8 @@ function buildSelectionsHtml(selections: OrderSelection[]) {
       const safeLeatherImageUrl = selection.leatherImageUrl
         ? escapeHtml(selection.leatherImageUrl)
         : "";
+
+      const hasLeather = Boolean(selection.leatherName);
 
       return `
         <div style="border:2px solid ${color};border-radius:14px;padding:16px;margin-bottom:18px;background:#ffffff;">
@@ -98,11 +108,15 @@ function buildSelectionsHtml(selections: OrderSelection[]) {
             <p style="margin:0 0 6px 0;font-size:18px;font-weight:700;color:#111827;">
               Style: ${safeChoiceLabel}
             </p>
-            <p style="margin:0 0 4px 0;font-size:16px;font-weight:700;color:#111827;">
-              Leather: ${safeLeatherName}
-            </p>
             ${
-              selection.leatherGrade
+              hasLeather
+                ? `<p style="margin:0 0 4px 0;font-size:16px;font-weight:700;color:#111827;">
+                    Leather: ${safeLeatherName}
+                  </p>`
+                : ""
+            }
+            ${
+              hasLeather && selection.leatherGrade
                 ? `<p style="margin:0;font-size:14px;color:#475569;">Grade: ${safeLeatherGrade}</p>`
                 : ""
             }
@@ -118,14 +132,18 @@ function buildSelectionsHtml(selections: OrderSelection[]) {
               }
             </div>
 
-            <div style="min-width:180px;">
-              <p style="margin:0 0 8px 0;font-size:13px;font-weight:700;color:#475569;">LEATHER IMAGE</p>
-              ${
-                safeLeatherImageUrl
-                  ? `<img src="${safeLeatherImageUrl}" alt="${safeLeatherName}" style="width:180px;height:180px;object-fit:cover;border-radius:12px;border:2px solid ${color};" />`
-                  : `<div style="width:180px;height:180px;border-radius:12px;border:2px solid ${color};display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:12px;">No Leather Image</div>`
-              }
-            </div>
+            ${
+              hasLeather
+                ? `<div style="min-width:180px;">
+                    <p style="margin:0 0 8px 0;font-size:13px;font-weight:700;color:#475569;">LEATHER IMAGE</p>
+                    ${
+                      safeLeatherImageUrl
+                        ? `<img src="${safeLeatherImageUrl}" alt="${safeLeatherName}" style="width:180px;height:180px;object-fit:cover;border-radius:12px;border:2px solid ${color};" />`
+                        : `<div style="width:180px;height:180px;border-radius:12px;border:2px solid ${color};display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:12px;">No Leather Image</div>`
+                    }
+                  </div>`
+                : ""
+            }
           </div>
         </div>
       `;

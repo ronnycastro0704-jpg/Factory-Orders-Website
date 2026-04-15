@@ -454,67 +454,67 @@ export async function POST(request: Request) {
 
       let textY = cursorY - 52;
 
-      page.drawText(`Style: ${selection.choiceLabel}`, {
-        x: PAGE_MARGIN + 16,
-        y: textY,
-        size: 15,
-        font: boldFont,
-        color: rgb(0.07, 0.09, 0.15),
-      });
-      textY -= 22;
+const hasLeather = Boolean(selection.leatherName);
 
-      page.drawText(`Leather: ${selection.leatherName || "None"}`, {
-        x: PAGE_MARGIN + 16,
-        y: textY,
-        size: 14,
-        font: boldFont,
-        color: rgb(0.07, 0.09, 0.15),
-      });
-      textY -= 18;
+if (hasLeather) {
+  page.drawText(`Leather: ${selection.leatherName}`, {
+    x: PAGE_MARGIN + 16,
+    y: textY,
+    size: 14,
+    font: boldFont,
+    color: rgb(0.07, 0.09, 0.15),
+  });
+  textY -= 18;
 
-      if (selection.leatherGrade) {
-        page.drawText(`Grade: ${selection.leatherGrade}`, {
-          x: PAGE_MARGIN + 16,
-          y: textY,
-          size: 11,
-          font,
-          color: rgb(0.3, 0.35, 0.42),
-        });
-        textY -= 16;
-      }
+  if (selection.leatherGrade) {
+    page.drawText(`Grade: ${selection.leatherGrade}`, {
+      x: PAGE_MARGIN + 16,
+      y: textY,
+      size: 11,
+      font,
+      color: rgb(0.3, 0.35, 0.42),
+    });
+    textY -= 16;
+  }
+}
 
-      const optionImage = await embedRemoteImage(pdfDoc, selection.imageUrl);
-      const leatherImage = await embedRemoteImage(pdfDoc, selection.leatherImageUrl);
+const optionImage = await embedRemoteImage(pdfDoc, selection.imageUrl);
+const leatherImage = hasLeather
+  ? await embedRemoteImage(pdfDoc, selection.leatherImageUrl)
+  : null;
 
-      const imageTopY = cursorY - 212;
-      const imageWidth = 180;
-      const imageHeight = 130;
-      const leftX = PAGE_MARGIN + 16;
-      const rightX = PAGE_MARGIN + 16 + imageWidth + 22;
+const imageTopY = cursorY - 212;
+const imageWidth = 180;
+const imageHeight = 130;
+const leftX = PAGE_MARGIN + 16;
 
-      drawImageOrPlaceholder({
-        page,
-        x: leftX,
-        y: imageTopY,
-        width: imageWidth,
-        height: imageHeight,
-        borderColor: color,
-        font,
-        title: "OPTION IMAGE",
-        image: optionImage,
-      });
+drawImageOrPlaceholder({
+  page,
+  x: leftX,
+  y: imageTopY,
+  width: imageWidth,
+  height: imageHeight,
+  borderColor: color,
+  font,
+  title: "OPTION IMAGE",
+  image: optionImage,
+});
 
-      drawImageOrPlaceholder({
-        page,
-        x: rightX,
-        y: imageTopY,
-        width: imageWidth,
-        height: imageHeight,
-        borderColor: color,
-        font,
-        title: "LEATHER IMAGE",
-        image: leatherImage,
-      });
+if (hasLeather) {
+  const rightX = PAGE_MARGIN + 16 + imageWidth + 22;
+
+  drawImageOrPlaceholder({
+    page,
+    x: rightX,
+    y: imageTopY,
+    width: imageWidth,
+    height: imageHeight,
+    borderColor: color,
+    font,
+    title: "LEATHER IMAGE",
+    image: leatherImage,
+  });
+}
 
       cursorY -= cardHeight + 18;
     }
