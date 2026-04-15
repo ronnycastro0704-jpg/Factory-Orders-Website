@@ -3,13 +3,25 @@ import { prisma } from "../../../lib/prisma";
 import { formatCurrency } from "../../../lib/utils";
 import CreateProductForm from "./product-form";
 
+type ProductRow = {
+  id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  sku: string | null;
+  basePrice: unknown;
+  optionGroups: {
+    id: string;
+  }[];
+};
+
 export default async function AdminProductsPage() {
-  const products = await prisma.product.findMany({
+  const products = (await prisma.product.findMany({
     orderBy: { createdAt: "desc" },
     include: {
       optionGroups: true,
     },
-  });
+  })) as ProductRow[];
 
   return (
     <main className="min-h-screen bg-slate-50 p-8 text-slate-900">
@@ -47,7 +59,7 @@ export default async function AdminProductsPage() {
               {products.length === 0 ? (
                 <p className="text-slate-500">No products yet.</p>
               ) : (
-                products.map((product) => (
+                products.map((product: ProductRow) => (
                   <div
                     key={product.id}
                     className="rounded-xl border p-4 transition hover:bg-slate-50"
