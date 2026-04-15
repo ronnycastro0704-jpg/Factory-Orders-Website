@@ -2,6 +2,7 @@ import Link from "next/link";
 import { prisma } from "../../../lib/prisma";
 import { formatCurrency } from "../../../lib/utils";
 import CreateProductForm from "./product-form";
+import ProductRowActions from "./product-row-actions";
 
 type ProductRow = {
   id: string;
@@ -11,6 +12,7 @@ type ProductRow = {
   sku: string | null;
   imageUrl: string | null;
   basePrice: unknown;
+  active: boolean;
   optionGroups: {
     id: string;
   }[];
@@ -92,6 +94,21 @@ export default async function AdminProductsPage() {
                           <p className="mt-1 text-sm text-slate-500">
                             Option Groups: {product.optionGroups.length}
                           </p>
+                          <p className="mt-1 text-sm text-slate-500">
+                            {product.active ? "Active" : "Inactive"}
+                          </p>
+
+                          <ProductRowActions
+                            product={{
+                              id: product.id,
+                              name: product.name,
+                              description: product.description,
+                              sku: product.sku,
+                              imageUrl: product.imageUrl,
+                              basePrice: Number(product.basePrice),
+                              active: product.active,
+                            }}
+                          />
                         </div>
                       </div>
 
