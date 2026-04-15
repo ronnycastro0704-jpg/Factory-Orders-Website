@@ -25,19 +25,19 @@ type ItemWithSelections = {
   selections: SelectionSnapshot[];
 };
 
+type EnrichedSelection = {
+  groupName: string;
+  choiceLabel: string;
+  leatherName?: string | null;
+  leatherGrade?: string | null;
+  baseAmount: number;
+  leatherSurcharge: number;
+  imageUrl?: string | null;
+  leatherImageUrl?: string | null;
+};
+
 function buildSelectionsFromItem(item: ItemWithSelections) {
-  const grouped = new Map<
-    string,
-    {
-      groupName: string;
-      choiceLabel: string;
-      leatherName?: string | null;
-      leatherGrade?: string | null;
-      baseAmount: number;
-      leatherSurcharge: number;
-      imageUrl?: string | null;
-    }
-  >();
+  const grouped = new Map<string, EnrichedSelection>();
 
   for (const selection of item.selections) {
     const groupName = selection.optionGroupNameSnapshot;
@@ -58,6 +58,7 @@ function buildSelectionsFromItem(item: ItemWithSelections) {
         leatherGrade: match?.[2] || null,
         leatherSurcharge: amount,
         imageUrl: null,
+        leatherImageUrl: null,
       });
     } else {
       const existing = grouped.get(groupName);
@@ -70,6 +71,7 @@ function buildSelectionsFromItem(item: ItemWithSelections) {
         leatherGrade: existing?.leatherGrade || null,
         leatherSurcharge: existing?.leatherSurcharge || 0,
         imageUrl: null,
+        leatherImageUrl: existing?.leatherImageUrl || null,
       });
     }
   }
@@ -77,9 +79,7 @@ function buildSelectionsFromItem(item: ItemWithSelections) {
   return Array.from(grouped.values());
 }
 
-function buildSelectionsText(
-  selections: ReturnType<typeof buildSelectionsFromItem>
-) {
+function buildSelectionsText(selections: EnrichedSelection[]) {
   return selections
     .map((selection) => {
       const lines = [`${selection.groupName}: ${selection.choiceLabel}`];
@@ -128,13 +128,35 @@ export async function POST(request: Request, context: RouteContext) {
     const item = order.items[0];
     const selections = buildSelectionsFromItem(item);
 
+    const enrichedSelections = await Promise.all(
+      selections.map(async (selection) => {
+        if (!selection.leatherName) {
+          return selection;
+        }
+
+        const leather = await prisma.leather.findFirst({
+          where: {
+            name: selection.leatherName,
+          },
+          select: {
+            imageUrl: true,
+          },
+        });
+
+        return {
+          ...selection,
+          leatherImageUrl: leather?.imageUrl || null,
+        };
+      })
+    );
+
     const nextRevisionNumber =
       order.revisions.length > 0 ? order.revisions[0].revisionNumber + 1 : 1;
 
     const nextStatus =
       action === "sent_to_factory" ? "SENT_TO_FACTORY" : "COMPLETED";
 
-await prisma.$transaction(async (tx: TransactionClient) => {
+    await prisma.$transaction(async (tx: TransactionClient) => {
       await tx.order.update({
         where: { id },
         data: {
@@ -176,7 +198,7 @@ await prisma.$transaction(async (tx: TransactionClient) => {
         notes: order.notes,
         productName: item.productNameSnapshot,
         total: Number(order.total),
-        selections,
+        selections: enrichedSelections,
       });
 
       await prisma.emailLog.createMany({
@@ -242,7 +264,7 @@ await prisma.$transaction(async (tx: TransactionClient) => {
         productName: item.productNameSnapshot,
         total: Number(order.total),
         notes: order.notes,
-        selectionsText: buildSelectionsText(selections),
+        selectionsText: buildSelectionsText(enrichedSelections),
       });
 
       await prisma.sheetSyncLog.create({

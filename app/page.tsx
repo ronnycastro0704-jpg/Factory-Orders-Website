@@ -1,20 +1,29 @@
-import Link from "next/link";
 import { prisma } from "../lib/prisma";
-import { formatCurrency } from "../lib/utils";
+import HomeProductGrid from "./home-product-grid";
 
 type HomeProduct = {
   id: string;
   name: string;
   slug: string;
   description: string | null;
+  imageUrl: string | null;
   basePrice: unknown;
 };
 
 export default async function HomePage() {
-  const products = (await prisma.product.findMany({
+  const productsRaw = (await prisma.product.findMany({
     where: { active: true },
     orderBy: { createdAt: "desc" },
   })) as HomeProduct[];
+
+  const products = productsRaw.map((product: HomeProduct) => ({
+    id: product.id,
+    name: product.name,
+    slug: product.slug,
+    description: product.description,
+    imageUrl: product.imageUrl,
+    basePrice: Number(product.basePrice),
+  }));
 
   return (
     <main className="min-h-screen bg-slate-50 p-8 text-slate-900">
@@ -27,23 +36,7 @@ export default async function HomePage() {
           </p>
         </div>
 
-        <div className="grid gap-6 md:grid-cols-2">
-          {products.map((product: HomeProduct) => (
-            <Link
-              key={product.id}
-              href={`/products/${product.slug}`}
-              className="rounded-2xl border bg-white p-6 shadow-sm transition hover:bg-slate-50"
-            >
-              <h2 className="text-2xl font-semibold">{product.name}</h2>
-              <p className="mt-2 text-slate-600">
-                {product.description || "No description"}
-              </p>
-              <p className="mt-4 text-sm font-medium text-slate-500">
-                Starting at {formatCurrency(Number(product.basePrice))}
-              </p>
-            </Link>
-          ))}
-        </div>
+        <HomeProductGrid products={products} />
       </div>
     </main>
   );

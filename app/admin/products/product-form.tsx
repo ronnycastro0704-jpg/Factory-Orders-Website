@@ -10,9 +10,36 @@ export default function CreateProductForm() {
   const [description, setDescription] = useState("");
   const [sku, setSku] = useState("");
   const [basePrice, setBasePrice] = useState("");
+  const [imageUrl, setImageUrl] = useState("");
+  const [imageFile, setImageFile] = useState<File | null>(null);
+
   const [loading, setLoading] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+
+  async function uploadImageIfNeeded() {
+    if (!imageFile) return imageUrl;
+
+    setUploading(true);
+
+    const formData = new FormData();
+    formData.append("file", imageFile);
+
+    const response = await fetch("/api/uploads", {
+      method: "POST",
+      body: formData,
+    });
+
+    const data = await response.json();
+    setUploading(false);
+
+    if (!response.ok) {
+      throw new Error(data.error || "Failed to upload image.");
+    }
+
+    return data.url as string;
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -21,6 +48,8 @@ export default function CreateProductForm() {
     setSuccess("");
 
     try {
+      const finalImageUrl = await uploadImageIfNeeded();
+
       const response = await fetch("/api/admin/products", {
         method: "POST",
         headers: {
@@ -30,6 +59,7 @@ export default function CreateProductForm() {
           name,
           description,
           sku,
+          imageUrl: finalImageUrl,
           basePrice: Number(basePrice),
         }),
       });
@@ -47,12 +77,15 @@ export default function CreateProductForm() {
       setDescription("");
       setSku("");
       setBasePrice("");
+      setImageUrl("");
+      setImageFile(null);
       router.refresh();
     } catch (err) {
       console.error(err);
-      setError("Failed to create product.");
+      setError(err instanceof Error ? err.message : "Failed to create product.");
     } finally {
       setLoading(false);
+      setUploading(false);
     }
   }
 
@@ -91,6 +124,26 @@ export default function CreateProductForm() {
       </div>
 
       <div>
+        <label className="mb-1 block text-sm font-medium">Upload Product Image</label>
+        <input
+          type="file"
+          accept="image/*"
+          className="w-full rounded-lg border px-3 py-2"
+          onChange={(e) => setImageFile(e.target.files?.[0] || null)}
+        />
+      </div>
+
+      <div>
+        <label className="mb-1 block text-sm font-medium">Or Paste Image URL</label>
+        <input
+          className="w-full rounded-lg border px-3 py-2"
+          value={imageUrl}
+          onChange={(e) => setImageUrl(e.target.value)}
+          placeholder="https://..."
+        />
+      </div>
+
+      <div>
         <label className="mb-1 block text-sm font-medium">Base Price</label>
         <input
           type="number"
@@ -104,6 +157,10 @@ export default function CreateProductForm() {
         />
       </div>
 
+      {uploading ? (
+        <p className="text-sm text-slate-500">Uploading image...</p>
+      ) : null}
+
       {error ? (
         <p className="text-sm font-medium text-red-600">{error}</p>
       ) : null}
@@ -114,7 +171,7 @@ export default function CreateProductForm() {
 
       <button
         type="submit"
-        disabled={loading}
+        disabled={loading || uploading}
         className="w-full rounded-lg bg-slate-900 px-4 py-2 text-white hover:bg-slate-800 disabled:opacity-50"
       >
         {loading ? "Creating..." : "Create Product"}

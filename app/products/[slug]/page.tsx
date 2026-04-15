@@ -45,6 +45,7 @@ type ProductRecord = {
   slug: string;
   description: string | null;
   sku: string | null;
+  imageUrl: string | null;
   active: boolean;
   basePrice: unknown;
   optionGroups: ProductGroup[];
@@ -150,11 +151,30 @@ export default async function ProductPage({ params }: PageProps) {
     <main className="min-h-screen bg-white p-8 text-slate-900">
       <div className="mx-auto max-w-6xl">
         <p className="mb-2 text-sm text-slate-500">Product Builder</p>
-        <h1 className="text-4xl font-bold">{product.name}</h1>
-        <p className="mt-2 text-slate-600">{product.description}</p>
-        <p className="mt-4 text-lg font-medium">
-          Base Price: {formatCurrency(Number(product.basePrice))}
-        </p>
+
+        <div className="grid gap-8 lg:grid-cols-[320px_1fr] lg:items-start">
+          <div>
+            {product.imageUrl ? (
+              <img
+                src={product.imageUrl}
+                alt={product.name}
+                className="w-full rounded-2xl border object-cover shadow-sm"
+              />
+            ) : (
+              <div className="flex h-72 w-full items-center justify-center rounded-2xl border bg-slate-100 text-sm text-slate-400 shadow-sm">
+                No Product Image
+              </div>
+            )}
+          </div>
+
+          <div>
+            <h1 className="text-4xl font-bold">{product.name}</h1>
+            <p className="mt-2 text-slate-600">{product.description}</p>
+            <p className="mt-4 text-lg font-medium">
+              Base Price: {formatCurrency(Number(product.basePrice))}
+            </p>
+          </div>
+        </div>
 
         <div className="mt-8">
           <ProductBuilder

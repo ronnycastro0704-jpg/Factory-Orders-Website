@@ -9,6 +9,7 @@ type ProductRow = {
   slug: string;
   description: string | null;
   sku: string | null;
+  imageUrl: string | null;
   basePrice: unknown;
   optionGroups: {
     id: string;
@@ -38,8 +39,7 @@ export default async function AdminProductsPage() {
           <div className="rounded-2xl border bg-white p-6 shadow-sm">
             <h2 className="text-2xl font-semibold">Create Product</h2>
             <p className="mt-2 text-sm text-slate-500">
-              Start by adding a furniture item like Barstool, Chair, Sofa, or
-              Booth.
+              Start by adding a furniture item like Barstool, Chair, Sofa, or Booth.
             </p>
 
             <div className="mt-6">
@@ -64,21 +64,35 @@ export default async function AdminProductsPage() {
                     key={product.id}
                     className="rounded-xl border p-4 transition hover:bg-slate-50"
                   >
-                    <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                      <div>
-                        <h3 className="text-xl font-semibold">{product.name}</h3>
-                        <p className="text-sm text-slate-500">
-                          Slug: {product.slug}
-                        </p>
-                        <p className="mt-1 text-slate-600">
-                          {product.description || "No description"}
-                        </p>
-                        <p className="mt-2 text-sm text-slate-500">
-                          SKU: {product.sku || "—"}
-                        </p>
-                        <p className="mt-1 text-sm text-slate-500">
-                          Option Groups: {product.optionGroups.length}
-                        </p>
+                    <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                      <div className="flex gap-4">
+                        {product.imageUrl ? (
+                          <img
+                            src={product.imageUrl}
+                            alt={product.name}
+                            className="h-24 w-24 rounded-xl object-cover"
+                          />
+                        ) : (
+                          <div className="flex h-24 w-24 items-center justify-center rounded-xl bg-slate-100 text-xs text-slate-400">
+                            No Image
+                          </div>
+                        )}
+
+                        <div>
+                          <h3 className="text-xl font-semibold">{product.name}</h3>
+                          <p className="text-sm text-slate-500">
+                            Slug: {product.slug}
+                          </p>
+                          <p className="mt-1 text-slate-600">
+                            {product.description || "No description"}
+                          </p>
+                          <p className="mt-2 text-sm text-slate-500">
+                            SKU: {product.sku || "—"}
+                          </p>
+                          <p className="mt-1 text-sm text-slate-500">
+                            Option Groups: {product.optionGroups.length}
+                          </p>
+                        </div>
                       </div>
 
                       <div className="md:text-right">
