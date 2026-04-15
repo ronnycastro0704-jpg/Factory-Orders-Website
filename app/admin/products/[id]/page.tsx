@@ -2,6 +2,7 @@ import { prisma } from "../../../../lib/prisma";
 import { notFound } from "next/navigation";
 import CreateOptionGroupForm from "./option-group-form";
 import CreateOptionChoiceForm from "./option-choice-form";
+import OptionGroupActions from "./option-group-actions";
 
 type PageProps = {
   params: Promise<{
@@ -128,6 +129,14 @@ export default async function AdminProductDetailPage({ params }: PageProps) {
                           {group.required ? "Required" : "Optional"} • Order:{" "}
                           {group.displayOrder}
                         </p>
+                        <p className="mt-1 text-sm text-slate-500">
+                          {group.active ? "Active" : "Inactive"}
+                        </p>
+
+                        <OptionGroupActions
+                          productId={product.id}
+                          group={group}
+                        />
                       </div>
 
                       <div className="mb-5">
@@ -159,7 +168,7 @@ export default async function AdminProductDetailPage({ params }: PageProps) {
                                   </p>
 
                                   {choice.usesLeatherGrades ? (
-                                    <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3 text-sm text-slate-600">
+                                    <div className="mt-3 grid gap-2 text-sm text-slate-600 sm:grid-cols-2 lg:grid-cols-3">
                                       <p>Grade A: ${money(choice.gradeAUpcharge ?? 0)}</p>
                                       <p>Grade B: ${money(choice.gradeBUpcharge ?? 0)}</p>
                                       <p>Grade EMB: ${money(choice.gradeEMBUpcharge ?? 0)}</p>

@@ -1,5 +1,6 @@
 import { prisma } from "../../../lib/prisma";
 import CreateLeatherForm from "./leather-form";
+import LeatherRowActions from "./leather-row-actions";
 
 type LeatherItem = {
   id: string;
@@ -7,6 +8,7 @@ type LeatherItem = {
   slug: string;
   grade: string;
   imageUrl: string | null;
+  active: boolean;
 };
 
 export default async function AdminLeathersPage() {
@@ -69,6 +71,11 @@ export default async function AdminLeathersPage() {
                     <p className="font-semibold">{leather.name}</p>
                     <p className="text-sm text-slate-500">{leather.grade}</p>
                     <p className="mt-1 text-xs text-slate-400">{leather.slug}</p>
+                    <p className="mt-1 text-xs text-slate-400">
+                      {leather.active ? "Active" : "Inactive"}
+                    </p>
+
+                    <LeatherRowActions leather={leather} />
                   </div>
                 ))
               )}
