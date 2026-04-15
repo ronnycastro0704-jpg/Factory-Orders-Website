@@ -12,6 +12,34 @@ type PageProps = {
   searchParams: SearchParams;
 };
 
+type OrderItemSummary = {
+  id: string;
+  productNameSnapshot: string;
+};
+
+type EmailLogSummary = {
+  id: string;
+  status: string;
+};
+
+type SheetSyncLogSummary = {
+  id: string;
+  status: string;
+};
+
+type AdminOrderRow = {
+  id: string;
+  orderNumber: string;
+  customerName: string;
+  customerEmail: string;
+  status: string;
+  total: unknown;
+  createdAt: Date;
+  items: OrderItemSummary[];
+  emailLogs: EmailLogSummary[];
+  sheetSyncLogs: SheetSyncLogSummary[];
+};
+
 const statusTabs = [
   { label: "All", value: "" },
   { label: "Draft", value: "DRAFT" },
@@ -27,7 +55,7 @@ export default async function AdminOrdersPage({ searchParams }: PageProps) {
   const emailStatus = params.emailStatus || "";
   const sheetStatus = params.sheetStatus || "";
 
-  const orders = await prisma.order.findMany({
+  const orders = (await prisma.order.findMany({
     where: {
       ...(status ? { status: status as never } : {}),
       ...(emailStatus
@@ -61,7 +89,7 @@ export default async function AdminOrdersPage({ searchParams }: PageProps) {
         take: 1,
       },
     },
-  });
+  })) as AdminOrderRow[];
 
   return (
     <main className="min-h-screen bg-slate-50 p-8 text-slate-900">
@@ -144,7 +172,7 @@ export default async function AdminOrdersPage({ searchParams }: PageProps) {
             {orders.length === 0 ? (
               <p className="text-slate-500">No orders found.</p>
             ) : (
-              orders.map((order) => {
+              orders.map((order: AdminOrderRow) => {
                 const firstItem = order.items[0];
                 const latestEmail = order.emailLogs[0];
                 const latestSheet = order.sheetSyncLogs[0];
