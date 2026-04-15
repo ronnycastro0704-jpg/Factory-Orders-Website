@@ -1,6 +1,20 @@
 import Link from "next/link";
 import { prisma } from "../../lib/prisma";
 
+type RecentOrderItem = {
+  id: string;
+  productNameSnapshot: string;
+};
+
+type RecentOrder = {
+  id: string;
+  orderNumber: string;
+  customerName: string;
+  customerEmail: string;
+  status: string;
+  items: RecentOrderItem[];
+};
+
 export default async function AdminDashboardPage() {
   const [
     totalOrders,
@@ -10,7 +24,7 @@ export default async function AdminDashboardPage() {
     completedOrders,
     failedEmails,
     failedSheets,
-    recentOrders,
+    recentOrdersRaw,
   ] = await Promise.all([
     prisma.order.count(),
     prisma.order.count({ where: { status: "DRAFT" } }),
@@ -27,6 +41,8 @@ export default async function AdminDashboardPage() {
       },
     }),
   ]);
+
+  const recentOrders = recentOrdersRaw as RecentOrder[];
 
   return (
     <main className="min-h-screen bg-slate-50 p-8 text-slate-900">
@@ -114,7 +130,7 @@ export default async function AdminDashboardPage() {
             {recentOrders.length === 0 ? (
               <p className="text-slate-500">No orders yet.</p>
             ) : (
-              recentOrders.map((order) => (
+              recentOrders.map((order: RecentOrder) => (
                 <div
                   key={order.id}
                   className="rounded-xl border p-4 transition hover:bg-slate-50"
