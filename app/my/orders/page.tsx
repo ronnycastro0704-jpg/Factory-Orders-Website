@@ -3,6 +3,19 @@ import { auth } from "../../../auth";
 import { prisma } from "../../../lib/prisma";
 import { formatCurrency } from "../../../lib/utils";
 
+type OrderItemSummary = {
+  id: string;
+  productNameSnapshot: string;
+};
+
+type MyOrderRow = {
+  id: string;
+  orderNumber: string;
+  status: string;
+  total: unknown;
+  items: OrderItemSummary[];
+};
+
 export default async function MyOrdersPage() {
   const session = await auth();
 
@@ -10,7 +23,7 @@ export default async function MyOrdersPage() {
     return null;
   }
 
-  const orders = await prisma.order.findMany({
+  const orders = (await prisma.order.findMany({
     where: {
       userId: session.user.id,
     },
@@ -18,7 +31,7 @@ export default async function MyOrdersPage() {
     include: {
       items: true,
     },
-  });
+  })) as MyOrderRow[];
 
   return (
     <main className="min-h-screen bg-slate-50 p-8 text-slate-900">
@@ -36,7 +49,7 @@ export default async function MyOrdersPage() {
             {orders.length === 0 ? (
               <p className="text-slate-500">You do not have any orders yet.</p>
             ) : (
-              orders.map((order) => (
+              orders.map((order: MyOrderRow) => (
                 <div key={order.id} className="rounded-xl border p-4">
                   <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                     <div>
