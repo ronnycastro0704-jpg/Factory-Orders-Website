@@ -9,10 +9,59 @@ type PageProps = {
   }>;
 };
 
+type ProductChoice = {
+  id: string;
+  label: string;
+  value: string | null;
+  description: string | null;
+  imageUrl: string | null;
+  priceDelta: unknown;
+  usesLeatherGrades: boolean;
+  gradeAUpcharge: unknown | null;
+  gradeBUpcharge: unknown | null;
+  gradeEMBUpcharge: unknown | null;
+  gradeHOHUpcharge: unknown | null;
+  gradeAxisUpcharge: unknown | null;
+  gradeBuffaloUpcharge: unknown | null;
+  comUpcharge: unknown | null;
+  displayOrder: number;
+  active: boolean;
+};
+
+type ProductGroup = {
+  id: string;
+  name: string;
+  slug: string;
+  type: string;
+  required: boolean;
+  displayOrder: number;
+  active: boolean;
+  choices: ProductChoice[];
+};
+
+type ProductRecord = {
+  id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  sku: string | null;
+  active: boolean;
+  basePrice: unknown;
+  optionGroups: ProductGroup[];
+};
+
+type LeatherRecord = {
+  id: string;
+  name: string;
+  slug: string;
+  grade: string;
+  imageUrl: string | null;
+};
+
 export default async function ProductPage({ params }: PageProps) {
   const { slug } = await params;
 
-  const product = await prisma.product.findUnique({
+  const product = (await prisma.product.findUnique({
     where: { slug },
     include: {
       optionGroups: {
@@ -26,16 +75,16 @@ export default async function ProductPage({ params }: PageProps) {
         },
       },
     },
-  });
+  })) as ProductRecord | null;
 
   if (!product) {
     notFound();
   }
 
-  const leathers = await prisma.leather.findMany({
+  const leathers = (await prisma.leather.findMany({
     where: { active: true },
     orderBy: { name: "asc" },
-  });
+  })) as LeatherRecord[];
 
   const serializedProduct = {
     id: product.id,
@@ -45,7 +94,7 @@ export default async function ProductPage({ params }: PageProps) {
     sku: product.sku,
     active: product.active,
     basePrice: Number(product.basePrice),
-    optionGroups: product.optionGroups.map((group) => ({
+    optionGroups: product.optionGroups.map((group: ProductGroup) => ({
       id: group.id,
       name: group.name,
       slug: group.slug,
@@ -53,7 +102,7 @@ export default async function ProductPage({ params }: PageProps) {
       required: group.required,
       displayOrder: group.displayOrder,
       active: group.active,
-      choices: group.choices.map((choice) => ({
+      choices: group.choices.map((choice: ProductChoice) => ({
         id: choice.id,
         label: choice.label,
         value: choice.value,
@@ -66,13 +115,21 @@ export default async function ProductPage({ params }: PageProps) {
         gradeBUpcharge:
           choice.gradeBUpcharge === null ? null : Number(choice.gradeBUpcharge),
         gradeEMBUpcharge:
-          choice.gradeEMBUpcharge === null ? null : Number(choice.gradeEMBUpcharge),
+          choice.gradeEMBUpcharge === null
+            ? null
+            : Number(choice.gradeEMBUpcharge),
         gradeHOHUpcharge:
-          choice.gradeHOHUpcharge === null ? null : Number(choice.gradeHOHUpcharge),
+          choice.gradeHOHUpcharge === null
+            ? null
+            : Number(choice.gradeHOHUpcharge),
         gradeAxisUpcharge:
-          choice.gradeAxisUpcharge === null ? null : Number(choice.gradeAxisUpcharge),
+          choice.gradeAxisUpcharge === null
+            ? null
+            : Number(choice.gradeAxisUpcharge),
         gradeBuffaloUpcharge:
-          choice.gradeBuffaloUpcharge === null ? null : Number(choice.gradeBuffaloUpcharge),
+          choice.gradeBuffaloUpcharge === null
+            ? null
+            : Number(choice.gradeBuffaloUpcharge),
         comUpcharge:
           choice.comUpcharge === null ? null : Number(choice.comUpcharge),
         displayOrder: choice.displayOrder,
@@ -81,7 +138,7 @@ export default async function ProductPage({ params }: PageProps) {
     })),
   };
 
-  const serializedLeathers = leathers.map((leather) => ({
+  const serializedLeathers = leathers.map((leather: LeatherRecord) => ({
     id: leather.id,
     name: leather.name,
     slug: leather.slug,
@@ -100,7 +157,10 @@ export default async function ProductPage({ params }: PageProps) {
         </p>
 
         <div className="mt-8">
-          <ProductBuilder product={serializedProduct} leathers={serializedLeathers} />
+          <ProductBuilder
+            product={serializedProduct}
+            leathers={serializedLeathers}
+          />
         </div>
       </div>
     </main>
