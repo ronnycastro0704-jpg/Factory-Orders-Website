@@ -17,6 +17,7 @@ type IncomingSelection = {
   baseAmount: number;
   leatherSurcharge: number;
   imageUrl?: string | null;
+  leatherImageUrl?: string | null;
 };
 
 function generateOrderNumber() {
@@ -30,7 +31,7 @@ function generateOrderNumber() {
 
 function buildSelectionsText(selections: IncomingSelection[]) {
   return selections
-    .map((selection) => {
+    .map((selection: IncomingSelection) => {
       const lines = [`${selection.groupName}: ${selection.choiceLabel}`];
 
       if (selection.leatherName) {
@@ -120,7 +121,7 @@ export async function POST(request: Request) {
               quantity: 1,
               lineTotal: total,
               selections: {
-                create: selections.flatMap((selection) => {
+                create: selections.flatMap((selection: IncomingSelection) => {
                   const rows = [
                     {
                       optionGroupNameSnapshot: selection.groupName,

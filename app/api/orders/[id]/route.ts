@@ -27,10 +27,11 @@ type IncomingSelection = {
   baseAmount: number;
   leatherSurcharge: number;
   imageUrl?: string | null;
+  leatherImageUrl?: string | null;
 };
 
 function buildSelectionRows(selections: IncomingSelection[]) {
-  return selections.flatMap((selection) => {
+  return selections.flatMap((selection: IncomingSelection) => {
     const rows = [
       {
         optionGroupNameSnapshot: selection.groupName,
@@ -55,7 +56,7 @@ function buildSelectionRows(selections: IncomingSelection[]) {
 
 function buildSelectionsText(selections: IncomingSelection[]) {
   return selections
-    .map((selection) => {
+    .map((selection: IncomingSelection) => {
       const lines = [`${selection.groupName}: ${selection.choiceLabel}`];
 
       if (selection.leatherName) {
@@ -193,7 +194,7 @@ export async function PUT(request: Request, context: RouteContext) {
       total: Number(existingOrder.total),
     };
 
-await prisma.$transaction(async (tx: TransactionClient) => {
+    await prisma.$transaction(async (tx: TransactionClient) => {
       await tx.order.update({
         where: { id },
         data: {

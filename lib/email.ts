@@ -15,6 +15,7 @@ type OrderSelection = {
   baseAmount: number;
   leatherSurcharge: number;
   imageUrl?: string | null;
+  leatherImageUrl?: string | null;
 };
 
 type SendOrderEmailInput = {
@@ -29,6 +30,21 @@ type SendOrderEmailInput = {
   selections: OrderSelection[];
 };
 
+const SECTION_COLORS = [
+  "#2563eb",
+  "#16a34a",
+  "#ea580c",
+  "#7c3aed",
+  "#dc2626",
+  "#0891b2",
+  "#ca8a04",
+  "#be185d",
+];
+
+function getSectionColor(index: number) {
+  return SECTION_COLORS[index % SECTION_COLORS.length];
+}
+
 function escapeHtml(value: string) {
   return value
     .replaceAll("&", "&amp;")
@@ -40,64 +56,74 @@ function escapeHtml(value: string) {
 
 function buildSelectionsText(selections: OrderSelection[]) {
   return selections
-    .map((selection) => {
-      const lines = [
-        `${selection.groupName}: ${selection.choiceLabel} (${formatCurrency(
-          selection.baseAmount
-        )})`,
-      ];
-
-      if (selection.leatherName) {
-        lines.push(
-          `  Leather: ${selection.leatherName}${
-            selection.leatherGrade ? ` (${selection.leatherGrade})` : ""
-          } (${formatCurrency(selection.leatherSurcharge)})`
-        );
-      }
-
-      return lines.join("\n");
+    .map((selection, index) => {
+      const colorNumber = index + 1;
+      return [
+        `SECTION ${colorNumber}: ${selection.groupName.toUpperCase()}`,
+        `Style: ${selection.choiceLabel}`,
+        `Leather: ${selection.leatherName || "None"}${
+          selection.leatherGrade ? ` (${selection.leatherGrade})` : ""
+        }`,
+      ].join("\n");
     })
-    .join("\n");
+    .join("\n\n");
 }
 
 function buildSelectionsHtml(selections: OrderSelection[]) {
   return selections
-    .map((selection) => {
+    .map((selection, index) => {
+      const color = getSectionColor(index);
       const safeGroupName = escapeHtml(selection.groupName);
       const safeChoiceLabel = escapeHtml(selection.choiceLabel);
       const safeLeatherName = selection.leatherName
         ? escapeHtml(selection.leatherName)
-        : "";
+        : "None";
       const safeLeatherGrade = selection.leatherGrade
         ? escapeHtml(selection.leatherGrade)
         : "";
       const safeImageUrl = selection.imageUrl
         ? escapeHtml(selection.imageUrl)
         : "";
+      const safeLeatherImageUrl = selection.leatherImageUrl
+        ? escapeHtml(selection.leatherImageUrl)
+        : "";
 
       return `
-        <div style="border:1px solid #e5e7eb;border-radius:12px;padding:16px;margin-bottom:16px;background:#ffffff;">
-          <div style="display:flex;gap:16px;align-items:flex-start;">
+        <div style="border:2px solid ${color};border-radius:14px;padding:16px;margin-bottom:18px;background:#ffffff;">
+          <div style="display:inline-block;background:${color};color:#ffffff;font-weight:700;font-size:13px;padding:6px 10px;border-radius:999px;margin-bottom:12px;">
+            ${safeGroupName.toUpperCase()}
+          </div>
+
+          <div style="margin-bottom:10px;">
+            <p style="margin:0 0 6px 0;font-size:18px;font-weight:700;color:#111827;">
+              Style: ${safeChoiceLabel}
+            </p>
+            <p style="margin:0 0 4px 0;font-size:16px;font-weight:700;color:#111827;">
+              Leather: ${safeLeatherName}
+            </p>
             ${
-              safeImageUrl
-                ? `<img src="${safeImageUrl}" alt="${safeChoiceLabel}" style="width:120px;height:120px;object-fit:cover;border-radius:10px;border:1px solid #e5e7eb;" />`
+              selection.leatherGrade
+                ? `<p style="margin:0;font-size:14px;color:#475569;">Grade: ${safeLeatherGrade}</p>`
                 : ""
             }
-            <div style="flex:1;">
-              <p style="margin:0 0 6px 0;font-size:16px;font-weight:700;color:#111827;">
-                ${safeGroupName}: ${safeChoiceLabel}
-              </p>
-              <p style="margin:0 0 6px 0;font-size:14px;color:#475569;">
-                Base Add-On: ${formatCurrency(selection.baseAmount)}
-              </p>
+          </div>
+
+          <div style="display:flex;gap:16px;flex-wrap:wrap;">
+            <div style="min-width:180px;">
+              <p style="margin:0 0 8px 0;font-size:13px;font-weight:700;color:#475569;">OPTION IMAGE</p>
               ${
-                selection.leatherName
-                  ? `<p style="margin:0;font-size:14px;color:#475569;">
-                      Leather: ${safeLeatherName}${
-                        selection.leatherGrade ? ` (${safeLeatherGrade})` : ""
-                      } — ${formatCurrency(selection.leatherSurcharge)}
-                    </p>`
-                  : ""
+                safeImageUrl
+                  ? `<img src="${safeImageUrl}" alt="${safeChoiceLabel}" style="width:180px;height:180px;object-fit:cover;border-radius:12px;border:2px solid ${color};" />`
+                  : `<div style="width:180px;height:180px;border-radius:12px;border:2px solid ${color};display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:12px;">No Option Image</div>`
+              }
+            </div>
+
+            <div style="min-width:180px;">
+              <p style="margin:0 0 8px 0;font-size:13px;font-weight:700;color:#475569;">LEATHER IMAGE</p>
+              ${
+                safeLeatherImageUrl
+                  ? `<img src="${safeLeatherImageUrl}" alt="${safeLeatherName}" style="width:180px;height:180px;object-fit:cover;border-radius:12px;border:2px solid ${color};" />`
+                  : `<div style="width:180px;height:180px;border-radius:12px;border:2px solid ${color};display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:12px;">No Leather Image</div>`
               }
             </div>
           </div>
@@ -191,17 +217,18 @@ export async function sendOrderNotification(input: SendOrderEmailInput) {
     `Total: ${formatCurrency(total)}`,
     notes ? `Notes: ${notes}` : "",
     "",
-    "Selections:",
+    "FACTORY SECTIONS:",
     buildSelectionsText(selections),
   ]
     .filter(Boolean)
     .join("\n");
 
   const internalHtml = `
-    <div style="font-family:Arial,sans-serif;max-width:760px;margin:0 auto;padding:24px;background:#f8fafc;color:#111827;">
+    <div style="font-family:Arial,sans-serif;max-width:900px;margin:0 auto;padding:24px;background:#f8fafc;color:#111827;">
       <h1 style="margin:0 0 16px 0;font-size:24px;">${escapeHtml(
         copy.internalSubject
       )}</h1>
+
       <div style="background:#ffffff;border:1px solid #e5e7eb;border-radius:12px;padding:20px;margin-bottom:20px;">
         <p><strong>Order Number:</strong> ${escapeHtml(orderNumber)}</p>
         <p><strong>Customer:</strong> ${escapeHtml(customerName)}</p>
@@ -216,7 +243,7 @@ export async function sendOrderNotification(input: SendOrderEmailInput) {
         ${notes ? `<p><strong>Notes:</strong> ${escapeHtml(notes)}</p>` : ""}
       </div>
 
-      <h2 style="font-size:20px;margin:0 0 16px 0;">Selections</h2>
+      <h2 style="font-size:22px;margin:0 0 16px 0;">Factory Sections</h2>
       ${buildSelectionsHtml(selections)}
     </div>
   `;
@@ -250,10 +277,11 @@ export async function sendOrderNotification(input: SendOrderEmailInput) {
     .join("\n");
 
   const customerHtml = `
-    <div style="font-family:Arial,sans-serif;max-width:760px;margin:0 auto;padding:24px;background:#f8fafc;color:#111827;">
+    <div style="font-family:Arial,sans-serif;max-width:900px;margin:0 auto;padding:24px;background:#f8fafc;color:#111827;">
       <h1 style="margin:0 0 16px 0;font-size:24px;">${escapeHtml(
         copy.customerSubject
       )}</h1>
+
       <div style="background:#ffffff;border:1px solid #e5e7eb;border-radius:12px;padding:20px;margin-bottom:20px;">
         <p>Hello ${escapeHtml(customerName)},</p>
         <p>${escapeHtml(copy.customerIntro)}</p>
@@ -263,7 +291,7 @@ export async function sendOrderNotification(input: SendOrderEmailInput) {
         ${notes ? `<p><strong>Notes:</strong> ${escapeHtml(notes)}</p>` : ""}
       </div>
 
-      <h2 style="font-size:20px;margin:0 0 16px 0;">Selections</h2>
+      <h2 style="font-size:22px;margin:0 0 16px 0;">Selections</h2>
       ${buildSelectionsHtml(selections)}
 
       <p style="margin-top:24px;font-size:14px;color:#475569;">
