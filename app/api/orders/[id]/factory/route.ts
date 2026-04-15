@@ -2,7 +2,9 @@ import { NextResponse } from "next/server";
 import { prisma } from "../../../../../lib/prisma";
 import { sendOrderNotification } from "../../../../../lib/email";
 import { appendOrderRow } from "../../../../../lib/sheets";
-import type { Prisma } from "@prisma/client";
+type TransactionClient = Parameters<
+  Exclude<Parameters<typeof prisma.$transaction>[0], any[]>
+>[0];
 
 type RouteContext = {
   params: Promise<{
@@ -130,7 +132,7 @@ export async function POST(request: Request, context: RouteContext) {
     const nextStatus =
       action === "sent_to_factory" ? "SENT_TO_FACTORY" : "COMPLETED";
 
-await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+await prisma.$transaction(async (tx: TransactionClient) => {
       await tx.order.update({
         where: { id },
         data: {
