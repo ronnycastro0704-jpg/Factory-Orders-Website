@@ -54,6 +54,25 @@ type PriceLine = {
   amount: number;
 };
 
+type SelectedChoiceDetail = {
+  groupId: string;
+  groupName: string;
+  choiceLabel: string;
+  baseAmount: number;
+  usesLeatherGrades: boolean;
+  selectedLeather?: Leather;
+  leatherSurcharge: number;
+  imageUrl?: string | null;
+};
+
+const SINGLE_APPLY_GRADES = new Set(["Grade A", "Grade B", "COM"]);
+const REPEATING_GRADES = new Set([
+  "Grade EMB",
+  "Grade HOH",
+  "Grade Axis",
+  "Grade Buffalo",
+]);
+
 function getLeatherSurcharge(choice: Choice, grade: string) {
   switch (grade) {
     case "Grade A":
@@ -75,6 +94,12 @@ function getLeatherSurcharge(choice: Choice, grade: string) {
   }
 }
 
+function getSingleApplyRank(grade: string) {
+  if (grade === "Grade B") return 2;
+  if (grade === "Grade A" || grade === "COM") return 1;
+  return 0;
+}
+
 export default function ProductBuilder({ product, leathers }: Props) {
   const [selectedOptions, setSelectedOptions] = useState<Record<string, string>>(
     {}
@@ -94,7 +119,7 @@ export default function ProductBuilder({ product, leathers }: Props) {
   const [saveMessage, setSaveMessage] = useState("");
   const [saveError, setSaveError] = useState("");
 
-  const selectedChoiceDetails = useMemo(() => {
+  const selectedChoiceDetails = useMemo<SelectedChoiceDetail[]>(() => {
     return product.optionGroups
       .map((group) => {
         const selectedChoiceId = selectedOptions[group.id];
@@ -125,16 +150,7 @@ export default function ProductBuilder({ product, leathers }: Props) {
           imageUrl: selectedChoice.imageUrl,
         };
       })
-      .filter(Boolean) as {
-      groupId: string;
-      groupName: string;
-      choiceLabel: string;
-      baseAmount: number;
-      usesLeatherGrades: boolean;
-      selectedLeather?: Leather;
-      leatherSurcharge: number;
-      imageUrl?: string | null;
-    }[];
+      .filter(Boolean) as SelectedChoiceDetail[];
   }, [product.optionGroups, selectedOptions, selectedLeatherByGroupId, leathers]);
 
   const allPriceLines = useMemo<PriceLine[]>(() => {
@@ -150,13 +166,44 @@ export default function ProductBuilder({ product, leathers }: Props) {
         label: `${item.groupName}: ${item.choiceLabel}`,
         amount: item.baseAmount,
       });
+    }
 
-      if (item.usesLeatherGrades && item.selectedLeather) {
-        lines.push({
-          label: `${item.groupName} Leather: ${item.selectedLeather.name} (${item.selectedLeather.grade})`,
-          amount: item.leatherSurcharge,
-        });
-      }
+    const repeatingLeatherItems = selectedChoiceDetails.filter((item) => {
+      const grade = item.selectedLeather?.grade;
+      return !!grade && REPEATING_GRADES.has(grade);
+    });
+
+    for (const item of repeatingLeatherItems) {
+      lines.push({
+        label: `${item.groupName} Leather: ${item.selectedLeather!.name} (${item.selectedLeather!.grade})`,
+        amount: item.leatherSurcharge,
+      });
+    }
+
+    const singleApplyCandidates = selectedChoiceDetails.filter((item) => {
+      const grade = item.selectedLeather?.grade;
+      return !!grade && SINGLE_APPLY_GRADES.has(grade);
+    });
+
+    if (singleApplyCandidates.length > 0) {
+      const highestRank = Math.max(
+        ...singleApplyCandidates.map((item) =>
+          getSingleApplyRank(item.selectedLeather!.grade)
+        )
+      );
+
+      const rankedCandidates = singleApplyCandidates.filter(
+        (item) => getSingleApplyRank(item.selectedLeather!.grade) === highestRank
+      );
+
+      const chosen = rankedCandidates.reduce((highest, current) =>
+        current.leatherSurcharge > highest.leatherSurcharge ? current : highest
+      );
+
+      lines.push({
+        label: `Leather Surcharge (${chosen.selectedLeather!.name} - ${chosen.selectedLeather!.grade}, applied once)`,
+        amount: chosen.leatherSurcharge,
+      });
     }
 
     return lines;
