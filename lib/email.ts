@@ -16,6 +16,8 @@ type OrderSelection = {
   leatherSurcharge: number;
   imageUrl?: string | null;
   leatherImageUrl?: string | null;
+  laseredBrand?: boolean;
+  laseredBrandImageUrl?: string | null;
 };
 
 type SendOrderEmailInput = {
@@ -72,6 +74,13 @@ function buildSelectionsText(selections: OrderSelection[]) {
         );
       }
 
+      if (selection.laseredBrand) {
+        lines.push("Lasered Brand: Yes");
+        if (selection.laseredBrandImageUrl) {
+          lines.push(`Lasered Brand Image: ${selection.laseredBrandImageUrl}`);
+        }
+      }
+
       return lines.join("\n");
     })
     .join("\n\n");
@@ -95,8 +104,12 @@ function buildSelectionsHtml(selections: OrderSelection[]) {
       const safeLeatherImageUrl = selection.leatherImageUrl
         ? escapeHtml(selection.leatherImageUrl)
         : "";
+      const safeLaseredBrandImageUrl = selection.laseredBrandImageUrl
+        ? escapeHtml(selection.laseredBrandImageUrl)
+        : "";
 
       const hasLeather = Boolean(selection.leatherName);
+      const hasLaseredBrand = Boolean(selection.laseredBrand);
 
       return `
         <div style="border:2px solid ${color};border-radius:14px;padding:16px;margin-bottom:18px;background:#ffffff;">
@@ -117,7 +130,12 @@ function buildSelectionsHtml(selections: OrderSelection[]) {
             }
             ${
               hasLeather && selection.leatherGrade
-                ? `<p style="margin:0;font-size:14px;color:#475569;">Grade: ${safeLeatherGrade}</p>`
+                ? `<p style="margin:0 0 4px 0;font-size:14px;color:#475569;">Grade: ${safeLeatherGrade}</p>`
+                : ""
+            }
+            ${
+              hasLaseredBrand
+                ? `<p style="margin:0;font-size:14px;font-weight:700;color:#111827;">Lasered Brand: Yes</p>`
                 : ""
             }
           </div>
@@ -140,6 +158,19 @@ function buildSelectionsHtml(selections: OrderSelection[]) {
                       safeLeatherImageUrl
                         ? `<img src="${safeLeatherImageUrl}" alt="${safeLeatherName}" style="width:180px;height:180px;object-fit:cover;border-radius:12px;border:2px solid ${color};" />`
                         : `<div style="width:180px;height:180px;border-radius:12px;border:2px solid ${color};display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:12px;">No Leather Image</div>`
+                    }
+                  </div>`
+                : ""
+            }
+
+            ${
+              hasLaseredBrand
+                ? `<div style="min-width:180px;">
+                    <p style="margin:0 0 8px 0;font-size:13px;font-weight:700;color:#475569;">LASERED BRAND IMAGE</p>
+                    ${
+                      safeLaseredBrandImageUrl
+                        ? `<img src="${safeLaseredBrandImageUrl}" alt="Lasered Brand" style="width:180px;height:180px;object-fit:cover;border-radius:12px;border:2px solid ${color};" />`
+                        : `<div style="width:180px;height:180px;border-radius:12px;border:2px solid ${color};display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:12px;">No Brand Image</div>`
                     }
                   </div>`
                 : ""
@@ -242,7 +273,7 @@ export async function sendOrderNotification(input: SendOrderEmailInput) {
     .join("\n");
 
   const internalHtml = `
-    <div style="font-family:Arial,sans-serif;max-width:900px;margin:0 auto;padding:24px;background:#f8fafc;color:#111827;">
+    <div style="font-family:Arial,sans-serif;max-width:1100px;margin:0 auto;padding:24px;background:#f8fafc;color:#111827;">
       <h1 style="margin:0 0 16px 0;font-size:24px;">${escapeHtml(
         copy.internalSubject
       )}</h1>
@@ -295,7 +326,7 @@ export async function sendOrderNotification(input: SendOrderEmailInput) {
     .join("\n");
 
   const customerHtml = `
-    <div style="font-family:Arial,sans-serif;max-width:900px;margin:0 auto;padding:24px;background:#f8fafc;color:#111827;">
+    <div style="font-family:Arial,sans-serif;max-width:1100px;margin:0 auto;padding:24px;background:#f8fafc;color:#111827;">
       <h1 style="margin:0 0 16px 0;font-size:24px;">${escapeHtml(
         copy.customerSubject
       )}</h1>

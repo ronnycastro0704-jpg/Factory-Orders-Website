@@ -34,6 +34,8 @@ type EnrichedSelection = {
   leatherSurcharge: number;
   imageUrl?: string | null;
   leatherImageUrl?: string | null;
+  laseredBrand?: boolean;
+  laseredBrandImageUrl?: string | null;
 };
 
 function buildSelectionsFromItem(item: ItemWithSelections) {
@@ -57,23 +59,69 @@ function buildSelectionsFromItem(item: ItemWithSelections) {
         leatherName: match?.[1] || leatherText,
         leatherGrade: match?.[2] || null,
         leatherSurcharge: amount,
-        imageUrl: null,
-        leatherImageUrl: null,
+        imageUrl: existing?.imageUrl || null,
+        leatherImageUrl: existing?.leatherImageUrl || null,
+        laseredBrand: existing?.laseredBrand || false,
+        laseredBrandImageUrl: existing?.laseredBrandImageUrl || null,
       });
-    } else {
-      const existing = grouped.get(groupName);
 
-      grouped.set(groupName, {
-        groupName,
-        choiceLabel: selection.optionChoiceNameSnapshot,
-        baseAmount: amount,
+      continue;
+    }
+
+    if (groupName.endsWith(" Lasered Brand")) {
+      const baseGroupName = groupName.replace(/ Lasered Brand$/, "");
+      const existing = grouped.get(baseGroupName);
+
+      grouped.set(baseGroupName, {
+        groupName: baseGroupName,
+        choiceLabel: existing?.choiceLabel || "",
+        baseAmount: existing?.baseAmount || 0,
         leatherName: existing?.leatherName || null,
         leatherGrade: existing?.leatherGrade || null,
         leatherSurcharge: existing?.leatherSurcharge || 0,
-        imageUrl: null,
+        imageUrl: existing?.imageUrl || null,
         leatherImageUrl: existing?.leatherImageUrl || null,
+        laseredBrand: selection.optionChoiceNameSnapshot === "Yes",
+        laseredBrandImageUrl: existing?.laseredBrandImageUrl || null,
       });
+
+      continue;
     }
+
+    if (groupName.endsWith(" Lasered Brand Image")) {
+      const baseGroupName = groupName.replace(/ Lasered Brand Image$/, "");
+      const existing = grouped.get(baseGroupName);
+
+      grouped.set(baseGroupName, {
+        groupName: baseGroupName,
+        choiceLabel: existing?.choiceLabel || "",
+        baseAmount: existing?.baseAmount || 0,
+        leatherName: existing?.leatherName || null,
+        leatherGrade: existing?.leatherGrade || null,
+        leatherSurcharge: existing?.leatherSurcharge || 0,
+        imageUrl: existing?.imageUrl || null,
+        leatherImageUrl: existing?.leatherImageUrl || null,
+        laseredBrand: existing?.laseredBrand || false,
+        laseredBrandImageUrl: selection.optionChoiceNameSnapshot || null,
+      });
+
+      continue;
+    }
+
+    const existing = grouped.get(groupName);
+
+    grouped.set(groupName, {
+      groupName,
+      choiceLabel: selection.optionChoiceNameSnapshot,
+      baseAmount: amount,
+      leatherName: existing?.leatherName || null,
+      leatherGrade: existing?.leatherGrade || null,
+      leatherSurcharge: existing?.leatherSurcharge || 0,
+      imageUrl: existing?.imageUrl || null,
+      leatherImageUrl: existing?.leatherImageUrl || null,
+      laseredBrand: existing?.laseredBrand || false,
+      laseredBrandImageUrl: existing?.laseredBrandImageUrl || null,
+    });
   }
 
   return Array.from(grouped.values());
@@ -83,6 +131,7 @@ function buildSelectionsText(selections: EnrichedSelection[]) {
   return selections
     .map((selection) => {
       const lines = [`${selection.groupName}: ${selection.choiceLabel}`];
+
       if (selection.leatherName) {
         lines.push(
           `Leather: ${selection.leatherName}${
@@ -90,6 +139,11 @@ function buildSelectionsText(selections: EnrichedSelection[]) {
           }`
         );
       }
+
+      if (selection.laseredBrand) {
+        lines.push("Lasered Brand: Yes");
+      }
+
       return lines.join(" | ");
     })
     .join(" || ");
@@ -130,22 +184,24 @@ export async function POST(request: Request, context: RouteContext) {
 
     const enrichedSelections = await Promise.all(
       selections.map(async (selection) => {
-        if (!selection.leatherName) {
-          return selection;
-        }
+        let leatherImageUrl = selection.leatherImageUrl || null;
 
-        const leather = await prisma.leather.findFirst({
-          where: {
-            name: selection.leatherName,
-          },
-          select: {
-            imageUrl: true,
-          },
-        });
+        if (selection.leatherName && !leatherImageUrl) {
+          const leather = await prisma.leather.findFirst({
+            where: {
+              name: selection.leatherName,
+            },
+            select: {
+              imageUrl: true,
+            },
+          });
+
+          leatherImageUrl = leather?.imageUrl || null;
+        }
 
         return {
           ...selection,
-          leatherImageUrl: leather?.imageUrl || null,
+          leatherImageUrl,
         };
       })
     );
