@@ -39,6 +39,7 @@ type ProductChoice = {
   gradeHOHUpcharge: unknown | null;
   gradeAxisUpcharge: unknown | null;
   gradeBuffaloUpcharge: unknown | null;
+  appliesLeatherSurcharge: boolean;
   comUpcharge: unknown | null;
   displayOrder: number;
   active: boolean;
@@ -192,6 +193,7 @@ export default async function CustomerOrderEditPage({ params }: PageProps) {
         id: choice.id,
         label: choice.label,
         value: choice.value,
+        appliesLeatherSurcharge: choice.appliesLeatherSurcharge,
         description: choice.description,
         imageUrl: choice.imageUrl,
         priceDelta: Number(choice.priceDelta),

@@ -19,6 +19,7 @@ type OptionChoiceItem = {
   imageUrl: string | null;
   priceDelta: unknown;
   usesLeatherGrades: boolean;
+  appliesLeatherSurcharge: boolean;
   allowsLaseredBrand: boolean;
   gradeAUpcharge: unknown | null;
   gradeBUpcharge: unknown | null;
@@ -173,15 +174,44 @@ export default async function AdminProductDetailPage({ params }: PageProps) {
                                   </p>
 
                                   {choice.usesLeatherGrades ? (
-                                    <div className="mt-3 grid gap-2 text-sm text-slate-600 sm:grid-cols-2 lg:grid-cols-3">
-                                      <p>Grade A: ${money(choice.gradeAUpcharge ?? 0)}</p>
-                                      <p>Grade B: ${money(choice.gradeBUpcharge ?? 0)}</p>
-                                      <p>Grade EMB: ${money(choice.gradeEMBUpcharge ?? 0)}</p>
-                                      <p>Grade HOH: ${money(choice.gradeHOHUpcharge ?? 0)}</p>
-                                      <p>Grade Axis: ${money(choice.gradeAxisUpcharge ?? 0)}</p>
-                                      <p>Grade Buffalo: ${money(choice.gradeBuffaloUpcharge ?? 0)}</p>
-                                      <p>COM: ${money(choice.comUpcharge ?? 0)}</p>
-                                    </div>
+                                    <>
+                                      <div className="mt-3 grid gap-2 text-sm text-slate-600 sm:grid-cols-2 lg:grid-cols-3">
+                                        <p>
+                                          Grade A: $
+                                          {money(choice.gradeAUpcharge ?? 0)}
+                                        </p>
+                                        <p>
+                                          Grade B: $
+                                          {money(choice.gradeBUpcharge ?? 0)}
+                                        </p>
+                                        <p>
+                                          Grade EMB: $
+                                          {money(choice.gradeEMBUpcharge ?? 0)}
+                                        </p>
+                                        <p>
+                                          Grade HOH: $
+                                          {money(choice.gradeHOHUpcharge ?? 0)}
+                                        </p>
+                                        <p>
+                                          Grade Axis: $
+                                          {money(choice.gradeAxisUpcharge ?? 0)}
+                                        </p>
+                                        <p>
+                                          Grade Buffalo: $
+                                          {money(choice.gradeBuffaloUpcharge ?? 0)}
+                                        </p>
+                                        <p>
+                                          COM: ${money(choice.comUpcharge ?? 0)}
+                                        </p>
+                                      </div>
+
+                                      <p className="mt-2 text-sm font-medium text-slate-700">
+                                        Leather Surcharge:{" "}
+                                        {choice.appliesLeatherSurcharge
+                                          ? "Applied"
+                                          : "Not Applied"}
+                                      </p>
+                                    </>
                                   ) : null}
 
                                   {choice.allowsLaseredBrand ? (
@@ -199,8 +229,12 @@ export default async function AdminProductDetailPage({ params }: PageProps) {
                                       description: choice.description,
                                       imageUrl: choice.imageUrl,
                                       priceDelta: Number(choice.priceDelta),
-                                      usesLeatherGrades: choice.usesLeatherGrades,
-                                      allowsLaseredBrand: choice.allowsLaseredBrand,
+                                      usesLeatherGrades:
+                                        choice.usesLeatherGrades,
+                                      appliesLeatherSurcharge:
+                                        choice.appliesLeatherSurcharge,
+                                      allowsLaseredBrand:
+                                        choice.allowsLaseredBrand,
                                       gradeAUpcharge:
                                         choice.gradeAUpcharge === null
                                           ? null

@@ -15,6 +15,7 @@ type Choice = {
   allowsLaseredBrand: boolean;
   gradeAUpcharge: number | null;
   gradeBUpcharge: number | null;
+  appliesLeatherSurcharge: boolean;
   gradeEMBUpcharge: number | null;
   gradeHOHUpcharge: number | null;
   gradeAxisUpcharge: number | null;
@@ -87,6 +88,10 @@ const REPEATING_GRADES = new Set([
 ]);
 
 function getLeatherSurcharge(choice: Choice, grade: string) {
+  if (!choice.appliesLeatherSurcharge) {
+    return 0;
+  }
+
   switch (grade) {
     case "Grade A":
       return choice.gradeAUpcharge ?? 0;
@@ -252,10 +257,10 @@ export default function CustomerOrderEditBuilder({
       });
     }
 
-    const repeatingLeatherItems = selectedChoiceDetails.filter((item) => {
-      const grade = item.selectedLeather?.grade;
-      return !!grade && REPEATING_GRADES.has(grade);
-    });
+const repeatingLeatherItems = selectedChoiceDetails.filter((item) => {
+  const grade = item.selectedLeather?.grade;
+  return !!grade && REPEATING_GRADES.has(grade) && item.leatherSurcharge > 0;
+});
 
     for (const item of repeatingLeatherItems) {
       lines.push({
@@ -264,10 +269,10 @@ export default function CustomerOrderEditBuilder({
       });
     }
 
-    const singleApplyCandidates = selectedChoiceDetails.filter((item) => {
-      const grade = item.selectedLeather?.grade;
-      return !!grade && SINGLE_APPLY_GRADES.has(grade);
-    });
+const singleApplyCandidates = selectedChoiceDetails.filter((item) => {
+  const grade = item.selectedLeather?.grade;
+  return !!grade && SINGLE_APPLY_GRADES.has(grade) && item.leatherSurcharge > 0;
+});
 
     if (singleApplyCandidates.length > 0) {
       const highestRank = Math.max(

@@ -19,6 +19,7 @@ export default function CreateOptionChoiceForm({ groupId }: Props) {
   const [displayOrder, setDisplayOrder] = useState("0");
 
   const [usesLeatherGrades, setUsesLeatherGrades] = useState(false);
+  const [appliesLeatherSurcharge, setAppliesLeatherSurcharge] = useState(true);
   const [allowsLaseredBrand, setAllowsLaseredBrand] = useState(false);
 
   const [gradeAUpcharge, setGradeAUpcharge] = useState("");
@@ -79,6 +80,7 @@ export default function CreateOptionChoiceForm({ groupId }: Props) {
           priceDelta: Number(priceDelta),
           displayOrder: Number(displayOrder),
           usesLeatherGrades,
+          appliesLeatherSurcharge,
           allowsLaseredBrand,
           gradeAUpcharge,
           gradeBUpcharge,
@@ -107,6 +109,7 @@ export default function CreateOptionChoiceForm({ groupId }: Props) {
       setPriceDelta("0");
       setDisplayOrder("0");
       setUsesLeatherGrades(false);
+      setAppliesLeatherSurcharge(true);
       setAllowsLaseredBrand(false);
       setGradeAUpcharge("");
       setGradeBUpcharge("");
@@ -212,6 +215,17 @@ export default function CreateOptionChoiceForm({ groupId }: Props) {
         />
         Enable leather grade pricing
       </label>
+
+      {usesLeatherGrades ? (
+        <label className="flex items-center gap-2 text-sm font-medium">
+          <input
+            type="checkbox"
+            checked={appliesLeatherSurcharge}
+            onChange={(e) => setAppliesLeatherSurcharge(e.target.checked)}
+          />
+          Applies Leather Surcharge
+        </label>
+      ) : null}
 
       <label className="flex items-center gap-2 text-sm font-medium">
         <input

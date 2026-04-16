@@ -11,6 +11,7 @@ type Choice = {
   imageUrl: string | null;
   priceDelta: number;
   usesLeatherGrades: boolean;
+  appliesLeatherSurcharge: boolean;
   allowsLaseredBrand: boolean;
   gradeAUpcharge: number | null;
   gradeBUpcharge: number | null;
@@ -43,6 +44,9 @@ export default function OptionChoiceActions({ groupId, choice }: Props) {
 
   const [usesLeatherGrades, setUsesLeatherGrades] = useState(
     choice.usesLeatherGrades
+  );
+  const [appliesLeatherSurcharge, setAppliesLeatherSurcharge] = useState(
+    choice.appliesLeatherSurcharge
   );
   const [allowsLaseredBrand, setAllowsLaseredBrand] = useState(
     choice.allowsLaseredBrand
@@ -122,6 +126,7 @@ export default function OptionChoiceActions({ groupId, choice }: Props) {
             priceDelta: Number(priceDelta),
             displayOrder: Number(displayOrder),
             usesLeatherGrades,
+            appliesLeatherSurcharge,
             allowsLaseredBrand,
             active,
             gradeAUpcharge: usesLeatherGrades ? gradeAUpcharge : "",
@@ -160,9 +165,7 @@ export default function OptionChoiceActions({ groupId, choice }: Props) {
   }
 
   async function handleDelete() {
-    const confirmed = window.confirm(
-      `Delete choice "${choice.label}"?`
-    );
+    const confirmed = window.confirm(`Delete choice "${choice.label}"?`);
 
     if (!confirmed) return;
 
@@ -302,6 +305,17 @@ export default function OptionChoiceActions({ groupId, choice }: Props) {
         Enable leather grade pricing
       </label>
 
+      {usesLeatherGrades ? (
+        <label className="flex items-center gap-2 text-sm font-medium">
+          <input
+            type="checkbox"
+            checked={appliesLeatherSurcharge}
+            onChange={(e) => setAppliesLeatherSurcharge(e.target.checked)}
+          />
+          Applies Leather Surcharge
+        </label>
+      ) : null}
+
       <label className="flex items-center gap-2 text-sm font-medium">
         <input
           type="checkbox"
@@ -411,6 +425,7 @@ export default function OptionChoiceActions({ groupId, choice }: Props) {
             setPriceDelta(String(choice.priceDelta));
             setDisplayOrder(String(choice.displayOrder));
             setUsesLeatherGrades(choice.usesLeatherGrades);
+            setAppliesLeatherSurcharge(choice.appliesLeatherSurcharge);
             setAllowsLaseredBrand(choice.allowsLaseredBrand);
             setActive(choice.active);
             setGradeAUpcharge(

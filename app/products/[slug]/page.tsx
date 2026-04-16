@@ -27,6 +27,7 @@ type ProductChoice = {
   displayOrder: number;
   active: boolean;
   allowsLaseredBrand: boolean;
+  appliesLeatherSurcharge: boolean;
 };
 
 type ProductGroup = {
@@ -107,6 +108,7 @@ export default async function ProductPage({ params }: PageProps) {
       choices: group.choices.map((choice: ProductChoice) => ({
         id: choice.id,
         label: choice.label,
+        appliesLeatherSurcharge: choice.appliesLeatherSurcharge,
         allowsLaseredBrand: choice.allowsLaseredBrand,
         value: choice.value,
         description: choice.description,

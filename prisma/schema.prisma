@@ -62,6 +62,7 @@ model OptionChoice {
 
   usesLeatherGrades    Boolean  @default(false)
   allowsLaseredBrand Boolean @default(false)
+  appliesLeatherSurcharge Boolean @default(true)
   gradeAUpcharge       Decimal? @db.Decimal(10, 2)
   gradeBUpcharge       Decimal? @db.Decimal(10, 2)
   gradeEMBUpcharge     Decimal? @db.Decimal(10, 2)

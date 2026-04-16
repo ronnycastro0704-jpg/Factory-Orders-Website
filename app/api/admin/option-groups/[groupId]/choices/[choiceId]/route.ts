@@ -36,6 +36,10 @@ export async function PUT(request: Request, context: RouteContext) {
     const displayOrder = Number(body.displayOrder || 0);
 
     const usesLeatherGrades = Boolean(body.usesLeatherGrades);
+    const appliesLeatherSurcharge =
+      typeof body.appliesLeatherSurcharge === "boolean"
+        ? body.appliesLeatherSurcharge
+        : true;
     const allowsLaseredBrand = Boolean(body.allowsLaseredBrand);
     const active =
       typeof body.active === "boolean" ? body.active : true;
@@ -106,6 +110,7 @@ export async function PUT(request: Request, context: RouteContext) {
         priceDelta,
         displayOrder,
         usesLeatherGrades,
+        appliesLeatherSurcharge,
         allowsLaseredBrand,
         active,
         gradeAUpcharge: usesLeatherGrades ? gradeAUpcharge : null,

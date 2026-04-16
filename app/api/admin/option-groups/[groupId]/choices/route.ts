@@ -20,6 +20,10 @@ export async function POST(request: Request, context: RouteContext) {
     const displayOrder = Number(body.displayOrder || 0);
 
     const usesLeatherGrades = Boolean(body.usesLeatherGrades);
+    const appliesLeatherSurcharge =
+      typeof body.appliesLeatherSurcharge === "boolean"
+        ? body.appliesLeatherSurcharge
+        : true;
     const allowsLaseredBrand = Boolean(body.allowsLaseredBrand);
 
     const gradeAUpcharge =
@@ -74,6 +78,7 @@ export async function POST(request: Request, context: RouteContext) {
         priceDelta,
         displayOrder,
         usesLeatherGrades,
+        appliesLeatherSurcharge,
         allowsLaseredBrand,
         gradeAUpcharge,
         gradeBUpcharge,
