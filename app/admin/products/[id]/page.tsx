@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import CreateOptionGroupForm from "./option-group-form";
 import CreateOptionChoiceForm from "./option-choice-form";
 import OptionGroupActions from "./option-group-actions";
+import OptionChoiceActions from "./option-choice-actions";
 
 type PageProps = {
   params: Promise<{
@@ -18,6 +19,7 @@ type OptionChoiceItem = {
   imageUrl: string | null;
   priceDelta: unknown;
   usesLeatherGrades: boolean;
+  allowsLaseredBrand: boolean;
   gradeAUpcharge: unknown | null;
   gradeBUpcharge: unknown | null;
   gradeEMBUpcharge: unknown | null;
@@ -166,6 +168,9 @@ export default async function AdminProductDetailPage({ params }: PageProps) {
                                   <p className="mt-1 text-sm text-slate-500">
                                     Display Order: {choice.displayOrder}
                                   </p>
+                                  <p className="mt-1 text-sm text-slate-500">
+                                    {choice.active ? "Active" : "Inactive"}
+                                  </p>
 
                                   {choice.usesLeatherGrades ? (
                                     <div className="mt-3 grid gap-2 text-sm text-slate-600 sm:grid-cols-2 lg:grid-cols-3">
@@ -178,6 +183,56 @@ export default async function AdminProductDetailPage({ params }: PageProps) {
                                       <p>COM: ${money(choice.comUpcharge ?? 0)}</p>
                                     </div>
                                   ) : null}
+
+                                  {choice.allowsLaseredBrand ? (
+                                    <p className="mt-3 text-sm font-medium text-slate-700">
+                                      Allows Lasered Brand
+                                    </p>
+                                  ) : null}
+
+                                  <OptionChoiceActions
+                                    groupId={group.id}
+                                    choice={{
+                                      id: choice.id,
+                                      label: choice.label,
+                                      value: choice.value,
+                                      description: choice.description,
+                                      imageUrl: choice.imageUrl,
+                                      priceDelta: Number(choice.priceDelta),
+                                      usesLeatherGrades: choice.usesLeatherGrades,
+                                      allowsLaseredBrand: choice.allowsLaseredBrand,
+                                      gradeAUpcharge:
+                                        choice.gradeAUpcharge === null
+                                          ? null
+                                          : Number(choice.gradeAUpcharge),
+                                      gradeBUpcharge:
+                                        choice.gradeBUpcharge === null
+                                          ? null
+                                          : Number(choice.gradeBUpcharge),
+                                      gradeEMBUpcharge:
+                                        choice.gradeEMBUpcharge === null
+                                          ? null
+                                          : Number(choice.gradeEMBUpcharge),
+                                      gradeHOHUpcharge:
+                                        choice.gradeHOHUpcharge === null
+                                          ? null
+                                          : Number(choice.gradeHOHUpcharge),
+                                      gradeAxisUpcharge:
+                                        choice.gradeAxisUpcharge === null
+                                          ? null
+                                          : Number(choice.gradeAxisUpcharge),
+                                      gradeBuffaloUpcharge:
+                                        choice.gradeBuffaloUpcharge === null
+                                          ? null
+                                          : Number(choice.gradeBuffaloUpcharge),
+                                      comUpcharge:
+                                        choice.comUpcharge === null
+                                          ? null
+                                          : Number(choice.comUpcharge),
+                                      displayOrder: choice.displayOrder,
+                                      active: choice.active,
+                                    }}
+                                  />
                                 </div>
 
                                 <div className="md:text-right">
