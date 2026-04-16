@@ -20,52 +20,46 @@ export async function POST(request: Request, context: RouteContext) {
     const displayOrder = Number(body.displayOrder || 0);
 
     const usesLeatherGrades = Boolean(body.usesLeatherGrades);
+    const allowsLaseredBrand = Boolean(body.allowsLaseredBrand);
 
     const gradeAUpcharge =
-      body.gradeAUpcharge === "" || body.gradeAUpcharge === undefined
+      body.gradeAUpcharge === "" || body.gradeAUpcharge === null || body.gradeAUpcharge === undefined
         ? null
         : Number(body.gradeAUpcharge);
 
     const gradeBUpcharge =
-      body.gradeBUpcharge === "" || body.gradeBUpcharge === undefined
+      body.gradeBUpcharge === "" || body.gradeBUpcharge === null || body.gradeBUpcharge === undefined
         ? null
         : Number(body.gradeBUpcharge);
 
     const gradeEMBUpcharge =
-      body.gradeEMBUpcharge === "" || body.gradeEMBUpcharge === undefined
+      body.gradeEMBUpcharge === "" || body.gradeEMBUpcharge === null || body.gradeEMBUpcharge === undefined
         ? null
         : Number(body.gradeEMBUpcharge);
 
     const gradeHOHUpcharge =
-      body.gradeHOHUpcharge === "" || body.gradeHOHUpcharge === undefined
+      body.gradeHOHUpcharge === "" || body.gradeHOHUpcharge === null || body.gradeHOHUpcharge === undefined
         ? null
         : Number(body.gradeHOHUpcharge);
 
     const gradeAxisUpcharge =
-      body.gradeAxisUpcharge === "" || body.gradeAxisUpcharge === undefined
+      body.gradeAxisUpcharge === "" || body.gradeAxisUpcharge === null || body.gradeAxisUpcharge === undefined
         ? null
         : Number(body.gradeAxisUpcharge);
 
     const gradeBuffaloUpcharge =
-      body.gradeBuffaloUpcharge === "" || body.gradeBuffaloUpcharge === undefined
+      body.gradeBuffaloUpcharge === "" || body.gradeBuffaloUpcharge === null || body.gradeBuffaloUpcharge === undefined
         ? null
         : Number(body.gradeBuffaloUpcharge);
 
     const comUpcharge =
-      body.comUpcharge === "" || body.comUpcharge === undefined
+      body.comUpcharge === "" || body.comUpcharge === null || body.comUpcharge === undefined
         ? null
         : Number(body.comUpcharge);
 
     if (!label) {
       return NextResponse.json(
         { error: "Choice label is required." },
-        { status: 400 }
-      );
-    }
-
-    if (Number.isNaN(priceDelta)) {
-      return NextResponse.json(
-        { error: "Price delta must be a valid number." },
         { status: 400 }
       );
     }
@@ -78,7 +72,9 @@ export async function POST(request: Request, context: RouteContext) {
         description: description || null,
         imageUrl: imageUrl || null,
         priceDelta,
+        displayOrder,
         usesLeatherGrades,
+        allowsLaseredBrand,
         gradeAUpcharge,
         gradeBUpcharge,
         gradeEMBUpcharge,
@@ -86,7 +82,6 @@ export async function POST(request: Request, context: RouteContext) {
         gradeAxisUpcharge,
         gradeBuffaloUpcharge,
         comUpcharge,
-        displayOrder,
         active: true,
       },
     });
@@ -95,7 +90,7 @@ export async function POST(request: Request, context: RouteContext) {
   } catch (error) {
     console.error("CREATE OPTION CHOICE ERROR:", error);
     return NextResponse.json(
-      { error: "Failed to create choice." },
+      { error: "Failed to create option choice." },
       { status: 500 }
     );
   }

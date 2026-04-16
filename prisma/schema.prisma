@@ -61,6 +61,7 @@ model OptionChoice {
   priceDelta    Decimal     @default(0) @db.Decimal(10, 2)
 
   usesLeatherGrades    Boolean  @default(false)
+  allowsLaseredBrand Boolean @default(false)
   gradeAUpcharge       Decimal? @db.Decimal(10, 2)
   gradeBUpcharge       Decimal? @db.Decimal(10, 2)
   gradeEMBUpcharge     Decimal? @db.Decimal(10, 2)

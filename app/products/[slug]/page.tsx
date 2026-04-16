@@ -26,6 +26,7 @@ type ProductChoice = {
   comUpcharge: unknown | null;
   displayOrder: number;
   active: boolean;
+  allowsLaseredBrand: boolean;
 };
 
 type ProductGroup = {
@@ -106,6 +107,7 @@ export default async function ProductPage({ params }: PageProps) {
       choices: group.choices.map((choice: ProductChoice) => ({
         id: choice.id,
         label: choice.label,
+        allowsLaseredBrand: choice.allowsLaseredBrand,
         value: choice.value,
         description: choice.description,
         imageUrl: choice.imageUrl,

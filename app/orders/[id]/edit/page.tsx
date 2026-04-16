@@ -32,6 +32,7 @@ type ProductChoice = {
   imageUrl: string | null;
   priceDelta: unknown;
   usesLeatherGrades: boolean;
+  allowsLaseredBrand: boolean;
   gradeAUpcharge: unknown | null;
   gradeBUpcharge: unknown | null;
   gradeEMBUpcharge: unknown | null;
@@ -118,6 +119,8 @@ export default async function CustomerOrderEditPage({ params }: PageProps) {
 
   const initialSelectedOptions: Record<string, string> = {};
   const initialSelectedLeatherByGroupId: Record<string, string> = {};
+  const initialSelectedLaseredBrandByGroupId: Record<string, "yes" | "no"> = {};
+  const initialSelectedLaseredBrandImageUrlByGroupId: Record<string, string> = {};
 
   for (const group of product.optionGroups) {
     const savedChoiceSelection = item.selections.find(
@@ -155,6 +158,25 @@ export default async function CustomerOrderEditPage({ params }: PageProps) {
         initialSelectedLeatherByGroupId[group.id] = matchedLeather.id;
       }
     }
+
+    const savedLaseredBrandSelection = item.selections.find(
+      (selection: SavedSelection) =>
+        selection.optionGroupNameSnapshot === `${group.name} Lasered Brand`
+    );
+
+    if (savedLaseredBrandSelection?.optionChoiceNameSnapshot === "Yes") {
+      initialSelectedLaseredBrandByGroupId[group.id] = "yes";
+    }
+
+    const savedLaseredBrandImageSelection = item.selections.find(
+      (selection: SavedSelection) =>
+        selection.optionGroupNameSnapshot === `${group.name} Lasered Brand Image`
+    );
+
+    if (savedLaseredBrandImageSelection?.optionChoiceNameSnapshot) {
+      initialSelectedLaseredBrandImageUrlByGroupId[group.id] =
+        savedLaseredBrandImageSelection.optionChoiceNameSnapshot;
+    }
   }
 
   const serializedProduct = {
@@ -174,6 +196,7 @@ export default async function CustomerOrderEditPage({ params }: PageProps) {
         imageUrl: choice.imageUrl,
         priceDelta: Number(choice.priceDelta),
         usesLeatherGrades: choice.usesLeatherGrades,
+        allowsLaseredBrand: choice.allowsLaseredBrand,
         gradeAUpcharge:
           choice.gradeAUpcharge === null ? null : Number(choice.gradeAUpcharge),
         gradeBUpcharge:
@@ -223,6 +246,12 @@ export default async function CustomerOrderEditPage({ params }: PageProps) {
             leathers={serializedLeathers}
             initialSelectedOptions={initialSelectedOptions}
             initialSelectedLeatherByGroupId={initialSelectedLeatherByGroupId}
+            initialSelectedLaseredBrandByGroupId={
+              initialSelectedLaseredBrandByGroupId
+            }
+            initialSelectedLaseredBrandImageUrlByGroupId={
+              initialSelectedLaseredBrandImageUrlByGroupId
+            }
             initialCustomerName={order.customerName}
             initialCustomerEmail={order.customerEmail}
             initialCustomerPhone={order.customerPhone || ""}

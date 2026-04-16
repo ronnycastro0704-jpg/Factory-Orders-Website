@@ -12,6 +12,7 @@ type Choice = {
   imageUrl?: string | null;
   priceDelta: number;
   usesLeatherGrades: boolean;
+  allowsLaseredBrand: boolean;
   gradeAUpcharge: number | null;
   gradeBUpcharge: number | null;
   gradeEMBUpcharge: number | null;
@@ -63,6 +64,8 @@ type SelectedChoiceDetail = {
   selectedLeather?: Leather;
   leatherSurcharge: number;
   imageUrl?: string | null;
+  laseredBrand: boolean;
+  laseredBrandImageUrl?: string | null;
 };
 
 const SINGLE_APPLY_GRADES = new Set(["Grade A", "Grade B", "COM"]);
@@ -109,6 +112,15 @@ export default function ProductBuilder({ product, leathers }: Props) {
     Record<string, string>
   >({});
 
+  const [selectedLaseredBrandByGroupId, setSelectedLaseredBrandByGroupId] =
+    useState<Record<string, "yes" | "no">>({});
+
+  const [selectedLaseredBrandImageUrlByGroupId, setSelectedLaseredBrandImageUrlByGroupId] =
+    useState<Record<string, string>>({});
+
+  const [selectedLaseredBrandFileByGroupId, setSelectedLaseredBrandFileByGroupId] =
+    useState<Record<string, File | null>>({});
+
   const [savedOrderId, setSavedOrderId] = useState("");
   const [customerName, setCustomerName] = useState("");
   const [customerEmail, setCustomerEmail] = useState("");
@@ -118,6 +130,41 @@ export default function ProductBuilder({ product, leathers }: Props) {
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState("");
   const [saveError, setSaveError] = useState("");
+
+  async function uploadSingleImage(file: File) {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const response = await fetch("/api/uploads", {
+      method: "POST",
+      body: formData,
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || "Failed to upload image.");
+    }
+
+    return data.url as string;
+  }
+
+  async function uploadLaseredBrandImagesIfNeeded() {
+    const nextUrls = { ...selectedLaseredBrandImageUrlByGroupId };
+
+    for (const group of product.optionGroups) {
+      if (selectedLaseredBrandByGroupId[group.id] !== "yes") continue;
+
+      const file = selectedLaseredBrandFileByGroupId[group.id];
+      if (!file) continue;
+
+      const uploadedUrl = await uploadSingleImage(file);
+      nextUrls[group.id] = uploadedUrl;
+    }
+
+    setSelectedLaseredBrandImageUrlByGroupId(nextUrls);
+    return nextUrls;
+  }
 
   const selectedChoiceDetails = useMemo<SelectedChoiceDetail[]>(() => {
     return product.optionGroups
@@ -139,6 +186,10 @@ export default function ProductBuilder({ product, leathers }: Props) {
             ? getLeatherSurcharge(selectedChoice, selectedLeather.grade)
             : 0;
 
+        const laseredBrand =
+          selectedChoice.allowsLaseredBrand &&
+          selectedLaseredBrandByGroupId[group.id] === "yes";
+
         return {
           groupId: group.id,
           groupName: group.name,
@@ -148,10 +199,21 @@ export default function ProductBuilder({ product, leathers }: Props) {
           selectedLeather,
           leatherSurcharge,
           imageUrl: selectedChoice.imageUrl,
+          laseredBrand,
+          laseredBrandImageUrl: laseredBrand
+            ? selectedLaseredBrandImageUrlByGroupId[group.id] || null
+            : null,
         };
       })
       .filter(Boolean) as SelectedChoiceDetail[];
-  }, [product.optionGroups, selectedOptions, selectedLeatherByGroupId, leathers]);
+  }, [
+    product.optionGroups,
+    selectedOptions,
+    selectedLeatherByGroupId,
+    selectedLaseredBrandByGroupId,
+    selectedLaseredBrandImageUrlByGroupId,
+    leathers,
+  ]);
 
   const allPriceLines = useMemo<PriceLine[]>(() => {
     const lines: PriceLine[] = [
@@ -213,12 +275,45 @@ export default function ProductBuilder({ product, leathers }: Props) {
     return allPriceLines.reduce((sum, line) => sum + line.amount, 0);
   }, [allPriceLines]);
 
+  async function buildSelectionPayload() {
+    const uploadedBrandUrls = await uploadLaseredBrandImagesIfNeeded();
+
+    const payloadSelections = selectedChoiceDetails.map((item) => ({
+      groupName: item.groupName,
+      choiceLabel: item.choiceLabel,
+      leatherName: item.selectedLeather?.name || null,
+      leatherGrade: item.selectedLeather?.grade || null,
+      baseAmount: item.baseAmount,
+      leatherSurcharge: item.leatherSurcharge,
+      imageUrl: item.imageUrl || null,
+      leatherImageUrl: item.selectedLeather?.imageUrl || null,
+      laseredBrand: item.laseredBrand,
+      laseredBrandImageUrl: item.laseredBrand
+        ? uploadedBrandUrls[item.groupId] || item.laseredBrandImageUrl || null
+        : null,
+    }));
+
+    const missingBrandImage = payloadSelections.some(
+      (item) => item.laseredBrand && !item.laseredBrandImageUrl
+    );
+
+    if (missingBrandImage) {
+      throw new Error(
+        "Please upload a brand image for every section marked Lasered Brand."
+      );
+    }
+
+    return payloadSelections;
+  }
+
   async function handleSendToFactory() {
     setSaving(true);
     setSaveError("");
     setSaveMessage("");
 
     try {
+      const payloadSelections = await buildSelectionPayload();
+
       const response = await fetch("/api/orders", {
         method: "POST",
         headers: {
@@ -234,16 +329,7 @@ export default function ProductBuilder({ product, leathers }: Props) {
           basePrice: product.basePrice,
           total,
           submitToFactory: true,
-          selections: selectedChoiceDetails.map((item) => ({
-            groupName: item.groupName,
-            choiceLabel: item.choiceLabel,
-            leatherName: item.selectedLeather?.name || null,
-            leatherGrade: item.selectedLeather?.grade || null,
-            baseAmount: item.baseAmount,
-            leatherSurcharge: item.leatherSurcharge,
-            imageUrl: item.imageUrl || null,
-            leatherImageUrl: item.selectedLeather?.imageUrl || null,
-          })),
+          selections: payloadSelections,
           lineItems: allPriceLines,
         }),
       });
@@ -260,7 +346,11 @@ export default function ProductBuilder({ product, leathers }: Props) {
       setSaveMessage(`Order sent to factory: ${data.orderNumber}`);
     } catch (error) {
       console.error(error);
-      setSaveError("Failed to send order to factory.");
+      setSaveError(
+        error instanceof Error
+          ? error.message
+          : "Failed to send order to factory."
+      );
     } finally {
       setSaving(false);
     }
@@ -268,6 +358,8 @@ export default function ProductBuilder({ product, leathers }: Props) {
 
   async function handleDownloadPdf() {
     try {
+      const payloadSelections = await buildSelectionPayload();
+
       const response = await fetch("/api/orders/pdf", {
         method: "POST",
         headers: {
@@ -280,16 +372,7 @@ export default function ProductBuilder({ product, leathers }: Props) {
           customerPhone,
           notes,
           total,
-          selections: selectedChoiceDetails.map((item) => ({
-            groupName: item.groupName,
-            choiceLabel: item.choiceLabel,
-            leatherName: item.selectedLeather?.name || null,
-            leatherGrade: item.selectedLeather?.grade || null,
-            baseAmount: item.baseAmount,
-            leatherSurcharge: item.leatherSurcharge,
-            imageUrl: item.imageUrl || null,
-            leatherImageUrl: item.selectedLeather?.imageUrl || null,
-          })),
+          selections: payloadSelections,
           lineItems: allPriceLines,
         }),
       });
@@ -309,7 +392,9 @@ export default function ProductBuilder({ product, leathers }: Props) {
       window.URL.revokeObjectURL(url);
     } catch (error) {
       console.error(error);
-      setSaveError("Failed to download PDF.");
+      setSaveError(
+        error instanceof Error ? error.message : "Failed to download PDF."
+      );
     }
   }
 
@@ -321,6 +406,13 @@ export default function ProductBuilder({ product, leathers }: Props) {
           const selectedChoice = group.choices.find(
             (choice) => choice.id === selectedChoiceId
           );
+
+          const brandEnabledForChoice = Boolean(
+            selectedChoice?.allowsLaseredBrand
+          );
+
+          const wantsLaseredBrand =
+            selectedLaseredBrandByGroupId[group.id] === "yes";
 
           return (
             <div key={group.id} className="rounded-2xl border p-5 shadow-sm">
@@ -404,6 +496,56 @@ export default function ProductBuilder({ product, leathers }: Props) {
                       </option>
                     ))}
                   </select>
+                </div>
+              ) : null}
+
+              {brandEnabledForChoice ? (
+                <div className="mt-5 rounded-xl border bg-slate-50 p-4">
+                  <label className="mb-2 block text-sm font-medium">
+                    Lasered Brand
+                  </label>
+                  <select
+                    className="w-full rounded-lg border bg-white px-3 py-2"
+                    value={selectedLaseredBrandByGroupId[group.id] || "no"}
+                    onChange={(e) =>
+                      setSelectedLaseredBrandByGroupId((prev) => ({
+                        ...prev,
+                        [group.id]: e.target.value as "yes" | "no",
+                      }))
+                    }
+                  >
+                    <option value="no">No</option>
+                    <option value="yes">Yes</option>
+                  </select>
+
+                  {wantsLaseredBrand ? (
+                    <div className="mt-4 space-y-3">
+                      <div>
+                        <label className="mb-1 block text-sm font-medium">
+                          Upload Brand Image
+                        </label>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="w-full rounded-lg border bg-white px-3 py-2"
+                          onChange={(e) =>
+                            setSelectedLaseredBrandFileByGroupId((prev) => ({
+                              ...prev,
+                              [group.id]: e.target.files?.[0] || null,
+                            }))
+                          }
+                        />
+                      </div>
+
+                      {selectedLaseredBrandImageUrlByGroupId[group.id] ? (
+                        <img
+                          src={selectedLaseredBrandImageUrlByGroupId[group.id]}
+                          alt="Lasered brand preview"
+                          className="h-32 w-32 rounded-lg border object-cover"
+                        />
+                      ) : null}
+                    </div>
+                  ) : null}
                 </div>
               ) : null}
             </div>

@@ -18,6 +18,8 @@ type IncomingSelection = {
   leatherSurcharge: number;
   imageUrl?: string | null;
   leatherImageUrl?: string | null;
+  laseredBrand?: boolean;
+  laseredBrandImageUrl?: string | null;
 };
 
 function generateOrderNumber() {
@@ -27,6 +29,46 @@ function generateOrderNumber() {
   const dd = String(now.getDate()).padStart(2, "0");
   const random = Math.floor(1000 + Math.random() * 9000);
   return `ORD-${yyyy}${mm}${dd}-${random}`;
+}
+
+function buildSelectionRows(selections: IncomingSelection[]) {
+  return selections.flatMap((selection: IncomingSelection) => {
+    const rows = [
+      {
+        optionGroupNameSnapshot: selection.groupName,
+        optionChoiceNameSnapshot: selection.choiceLabel,
+        priceDeltaSnapshot: selection.baseAmount,
+      },
+    ];
+
+    if (selection.leatherName) {
+      rows.push({
+        optionGroupNameSnapshot: `${selection.groupName} Leather`,
+        optionChoiceNameSnapshot: `${selection.leatherName}${
+          selection.leatherGrade ? ` (${selection.leatherGrade})` : ""
+        }`,
+        priceDeltaSnapshot: selection.leatherSurcharge || 0,
+      });
+    }
+
+    if (selection.laseredBrand) {
+      rows.push({
+        optionGroupNameSnapshot: `${selection.groupName} Lasered Brand`,
+        optionChoiceNameSnapshot: "Yes",
+        priceDeltaSnapshot: 0,
+      });
+    }
+
+    if (selection.laseredBrandImageUrl) {
+      rows.push({
+        optionGroupNameSnapshot: `${selection.groupName} Lasered Brand Image`,
+        optionChoiceNameSnapshot: selection.laseredBrandImageUrl,
+        priceDeltaSnapshot: 0,
+      });
+    }
+
+    return rows;
+  });
 }
 
 function buildSelectionsText(selections: IncomingSelection[]) {
@@ -40,6 +82,10 @@ function buildSelectionsText(selections: IncomingSelection[]) {
             selection.leatherGrade ? ` (${selection.leatherGrade})` : ""
           }`
         );
+      }
+
+      if (selection.laseredBrand) {
+        lines.push("Lasered Brand: Yes");
       }
 
       return lines.join(" | ");
@@ -121,29 +167,7 @@ export async function POST(request: Request) {
               quantity: 1,
               lineTotal: total,
               selections: {
-                create: selections.flatMap((selection: IncomingSelection) => {
-                  const rows = [
-                    {
-                      optionGroupNameSnapshot: selection.groupName,
-                      optionChoiceNameSnapshot: selection.choiceLabel,
-                      priceDeltaSnapshot: selection.baseAmount,
-                    },
-                  ];
-
-                  if (selection.leatherName) {
-                    rows.push({
-                      optionGroupNameSnapshot: `${selection.groupName} Leather`,
-                      optionChoiceNameSnapshot: `${selection.leatherName}${
-                        selection.leatherGrade
-                          ? ` (${selection.leatherGrade})`
-                          : ""
-                      }`,
-                      priceDeltaSnapshot: selection.leatherSurcharge || 0,
-                    });
-                  }
-
-                  return rows;
-                }),
+                create: buildSelectionRows(selections),
               },
             },
           ],

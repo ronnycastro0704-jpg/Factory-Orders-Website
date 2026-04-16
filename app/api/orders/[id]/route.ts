@@ -28,6 +28,8 @@ type IncomingSelection = {
   leatherSurcharge: number;
   imageUrl?: string | null;
   leatherImageUrl?: string | null;
+  laseredBrand?: boolean;
+  laseredBrandImageUrl?: string | null;
 };
 
 function buildSelectionRows(selections: IncomingSelection[]) {
@@ -50,6 +52,22 @@ function buildSelectionRows(selections: IncomingSelection[]) {
       });
     }
 
+    if (selection.laseredBrand) {
+      rows.push({
+        optionGroupNameSnapshot: `${selection.groupName} Lasered Brand`,
+        optionChoiceNameSnapshot: "Yes",
+        priceDeltaSnapshot: 0,
+      });
+    }
+
+    if (selection.laseredBrandImageUrl) {
+      rows.push({
+        optionGroupNameSnapshot: `${selection.groupName} Lasered Brand Image`,
+        optionChoiceNameSnapshot: selection.laseredBrandImageUrl,
+        priceDeltaSnapshot: 0,
+      });
+    }
+
     return rows;
   });
 }
@@ -65,6 +83,10 @@ function buildSelectionsText(selections: IncomingSelection[]) {
             selection.leatherGrade ? ` (${selection.leatherGrade})` : ""
           }`
         );
+      }
+
+      if (selection.laseredBrand) {
+        lines.push("Lasered Brand: Yes");
       }
 
       return lines.join(" | ");
