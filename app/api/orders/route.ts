@@ -31,6 +31,8 @@ function generateOrderNumber() {
   return `ORD-${yyyy}${mm}${dd}-${random}`;
 }
 
+const SELECTION_META_SEPARATOR = "|||";
+
 function buildSelectionRows(selections: IncomingSelection[]) {
   return selections.flatMap((selection: IncomingSelection) => {
     const rows = [
@@ -44,7 +46,7 @@ function buildSelectionRows(selections: IncomingSelection[]) {
     if (selection.leatherName) {
       rows.push({
         optionGroupNameSnapshot: `${selection.groupName} Leather`,
-        optionChoiceNameSnapshot: `${selection.leatherName}${
+        optionChoiceNameSnapshot: `${selection.choiceLabel}${SELECTION_META_SEPARATOR}${selection.leatherName}${
           selection.leatherGrade ? ` (${selection.leatherGrade})` : ""
         }`,
         priceDeltaSnapshot: selection.leatherSurcharge || 0,
@@ -54,7 +56,7 @@ function buildSelectionRows(selections: IncomingSelection[]) {
     if (selection.laseredBrand) {
       rows.push({
         optionGroupNameSnapshot: `${selection.groupName} Lasered Brand`,
-        optionChoiceNameSnapshot: "Yes",
+        optionChoiceNameSnapshot: `${selection.choiceLabel}${SELECTION_META_SEPARATOR}Yes`,
         priceDeltaSnapshot: 0,
       });
     }
@@ -62,7 +64,7 @@ function buildSelectionRows(selections: IncomingSelection[]) {
     if (selection.laseredBrandImageUrl) {
       rows.push({
         optionGroupNameSnapshot: `${selection.groupName} Lasered Brand Image`,
-        optionChoiceNameSnapshot: selection.laseredBrandImageUrl,
+        optionChoiceNameSnapshot: `${selection.choiceLabel}${SELECTION_META_SEPARATOR}${selection.laseredBrandImageUrl}`,
         priceDeltaSnapshot: 0,
       });
     }

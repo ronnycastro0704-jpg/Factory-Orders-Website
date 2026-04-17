@@ -28,6 +28,7 @@ type Group = {
   id: string;
   name: string;
   slug: string;
+  type: string;
   required: boolean;
   choices: Choice[];
 };
@@ -60,6 +61,7 @@ type PriceLine = {
 type SelectedChoiceDetail = {
   groupId: string;
   groupName: string;
+  choiceId: string;
   choiceLabel: string;
   baseAmount: number;
   usesLeatherGrades: boolean;
@@ -78,6 +80,10 @@ const REPEATING_GRADES = new Set([
   "Grade Axis",
   "Grade Buffalo",
 ]);
+
+function makeSelectionKey(groupId: string, choiceId: string) {
+  return `${groupId}:::${choiceId}`;
+}
 
 function getLeatherSurcharge(choice: Choice, grade: string) {
   if (!choice.appliesLeatherSurcharge) {
@@ -111,22 +117,25 @@ function getSingleApplyRank(grade: string) {
 }
 
 export default function ProductBuilder({ product, leathers }: Props) {
-  const [selectedOptions, setSelectedOptions] = useState<Record<string, string>>(
+  const [selectedOptions, setSelectedOptions] = useState<Record<string, string[]>>(
     {}
   );
 
-  const [selectedLeatherByGroupId, setSelectedLeatherByGroupId] = useState<
-    Record<string, string>
-  >({});
-
-  const [selectedLaseredBrandByGroupId, setSelectedLaseredBrandByGroupId] =
-    useState<Record<string, "yes" | "no">>({});
-
-  const [selectedLaseredBrandImageUrlByGroupId, setSelectedLaseredBrandImageUrlByGroupId] =
+  const [selectedLeatherBySelectionKey, setSelectedLeatherBySelectionKey] =
     useState<Record<string, string>>({});
 
-  const [selectedLaseredBrandFileByGroupId, setSelectedLaseredBrandFileByGroupId] =
-    useState<Record<string, File | null>>({});
+  const [selectedLaseredBrandBySelectionKey, setSelectedLaseredBrandBySelectionKey] =
+    useState<Record<string, "yes" | "no">>({});
+
+  const [
+    selectedLaseredBrandImageUrlBySelectionKey,
+    setSelectedLaseredBrandImageUrlBySelectionKey,
+  ] = useState<Record<string, string>>({});
+
+  const [
+    selectedLaseredBrandFileBySelectionKey,
+    setSelectedLaseredBrandFileBySelectionKey,
+  ] = useState<Record<string, File | null>>({});
 
   const [savedOrderId, setSavedOrderId] = useState("");
   const [customerName, setCustomerName] = useState("");
@@ -137,6 +146,35 @@ export default function ProductBuilder({ product, leathers }: Props) {
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState("");
   const [saveError, setSaveError] = useState("");
+
+  function setSingleChoice(groupId: string, choiceId: string) {
+    setSelectedOptions((prev) => ({
+      ...prev,
+      [groupId]: [choiceId],
+    }));
+  }
+
+  function clearGroupSelection(groupId: string) {
+    setSelectedOptions((prev) => {
+      const next = { ...prev };
+      delete next[groupId];
+      return next;
+    });
+  }
+
+  function toggleMultiChoice(groupId: string, choiceId: string) {
+    setSelectedOptions((prev) => {
+      const current = prev[groupId] || [];
+      const exists = current.includes(choiceId);
+
+      return {
+        ...prev,
+        [groupId]: exists
+          ? current.filter((id) => id !== choiceId)
+          : [...current, choiceId],
+      };
+    });
+  }
 
   async function uploadSingleImage(file: File) {
     const formData = new FormData();
@@ -157,69 +195,73 @@ export default function ProductBuilder({ product, leathers }: Props) {
   }
 
   async function uploadLaseredBrandImagesIfNeeded() {
-    const nextUrls = { ...selectedLaseredBrandImageUrlByGroupId };
+    const nextUrls = { ...selectedLaseredBrandImageUrlBySelectionKey };
 
-    for (const group of product.optionGroups) {
-      if (selectedLaseredBrandByGroupId[group.id] !== "yes") continue;
-
-      const file = selectedLaseredBrandFileByGroupId[group.id];
+    for (const [selectionKey, file] of Object.entries(
+      selectedLaseredBrandFileBySelectionKey
+    )) {
       if (!file) continue;
 
+      const brandSelection = selectedLaseredBrandBySelectionKey[selectionKey];
+      if (brandSelection !== "yes") continue;
+
       const uploadedUrl = await uploadSingleImage(file);
-      nextUrls[group.id] = uploadedUrl;
+      nextUrls[selectionKey] = uploadedUrl;
     }
 
-    setSelectedLaseredBrandImageUrlByGroupId(nextUrls);
+    setSelectedLaseredBrandImageUrlBySelectionKey(nextUrls);
     return nextUrls;
   }
 
   const selectedChoiceDetails = useMemo<SelectedChoiceDetail[]>(() => {
-    return product.optionGroups
-      .map((group) => {
-        const selectedChoiceId = selectedOptions[group.id];
-        const selectedChoice = group.choices.find(
-          (choice) => choice.id === selectedChoiceId
-        );
+    return product.optionGroups.flatMap((group) => {
+      const selectedChoiceIds = selectedOptions[group.id] || [];
 
-        if (!selectedChoice) return null;
+      return selectedChoiceIds
+        .map((choiceId) => {
+          const selectedChoice = group.choices.find((choice) => choice.id === choiceId);
+          if (!selectedChoice) return null;
 
-        const selectedLeatherId = selectedLeatherByGroupId[group.id] || "";
-        const selectedLeather = leathers.find(
-          (leather) => leather.id === selectedLeatherId
-        );
+          const selectionKey = makeSelectionKey(group.id, selectedChoice.id);
+          const selectedLeatherId = selectedLeatherBySelectionKey[selectionKey] || "";
+          const selectedLeather = leathers.find(
+            (leather) => leather.id === selectedLeatherId
+          );
 
-        const leatherSurcharge =
-          selectedChoice.usesLeatherGrades && selectedLeather
-            ? getLeatherSurcharge(selectedChoice, selectedLeather.grade)
-            : 0;
+          const leatherSurcharge =
+            selectedChoice.usesLeatherGrades && selectedLeather
+              ? getLeatherSurcharge(selectedChoice, selectedLeather.grade)
+              : 0;
 
-        const laseredBrand =
-          selectedChoice.allowsLaseredBrand &&
-          selectedLaseredBrandByGroupId[group.id] === "yes";
+          const laseredBrand =
+            selectedChoice.allowsLaseredBrand &&
+            selectedLaseredBrandBySelectionKey[selectionKey] === "yes";
 
-        return {
-          groupId: group.id,
-          groupName: group.name,
-          choiceLabel: selectedChoice.label,
-          baseAmount: selectedChoice.priceDelta,
-          usesLeatherGrades: selectedChoice.usesLeatherGrades,
-          isBinaryOption: selectedChoice.isBinaryOption,
-          selectedLeather,
-          leatherSurcharge,
-          imageUrl: selectedChoice.imageUrl,
-          laseredBrand,
-          laseredBrandImageUrl: laseredBrand
-            ? selectedLaseredBrandImageUrlByGroupId[group.id] || null
-            : null,
-        };
-      })
-      .filter(Boolean) as SelectedChoiceDetail[];
+          return {
+            groupId: group.id,
+            groupName: group.name,
+            choiceId: selectedChoice.id,
+            choiceLabel: selectedChoice.label,
+            baseAmount: selectedChoice.priceDelta,
+            usesLeatherGrades: selectedChoice.usesLeatherGrades,
+            isBinaryOption: selectedChoice.isBinaryOption,
+            selectedLeather,
+            leatherSurcharge,
+            imageUrl: selectedChoice.imageUrl,
+            laseredBrand,
+            laseredBrandImageUrl: laseredBrand
+              ? selectedLaseredBrandImageUrlBySelectionKey[selectionKey] || null
+              : null,
+          };
+        })
+        .filter(Boolean) as SelectedChoiceDetail[];
+    });
   }, [
     product.optionGroups,
     selectedOptions,
-    selectedLeatherByGroupId,
-    selectedLaseredBrandByGroupId,
-    selectedLaseredBrandImageUrlByGroupId,
+    selectedLeatherBySelectionKey,
+    selectedLaseredBrandBySelectionKey,
+    selectedLaseredBrandImageUrlBySelectionKey,
     leathers,
   ]);
 
@@ -247,7 +289,7 @@ export default function ProductBuilder({ product, leathers }: Props) {
 
     for (const item of repeatingLeatherItems) {
       lines.push({
-        label: `${item.groupName} Leather: ${item.selectedLeather!.name} (${item.selectedLeather!.grade})`,
+        label: `${item.groupName} - ${item.choiceLabel} Leather: ${item.selectedLeather!.name} (${item.selectedLeather!.grade})`,
         amount: item.leatherSurcharge,
       });
     }
@@ -288,20 +330,24 @@ export default function ProductBuilder({ product, leathers }: Props) {
   async function buildSelectionPayload() {
     const uploadedBrandUrls = await uploadLaseredBrandImagesIfNeeded();
 
-    const payloadSelections = selectedChoiceDetails.map((item) => ({
-      groupName: item.groupName,
-      choiceLabel: item.isBinaryOption ? "Yes" : item.choiceLabel,
-      leatherName: item.selectedLeather?.name || null,
-      leatherGrade: item.selectedLeather?.grade || null,
-      baseAmount: item.baseAmount,
-      leatherSurcharge: item.leatherSurcharge,
-      imageUrl: item.imageUrl || null,
-      leatherImageUrl: item.selectedLeather?.imageUrl || null,
-      laseredBrand: item.laseredBrand,
-      laseredBrandImageUrl: item.laseredBrand
-        ? uploadedBrandUrls[item.groupId] || item.laseredBrandImageUrl || null
-        : null,
-    }));
+    const payloadSelections = selectedChoiceDetails.map((item) => {
+      const selectionKey = makeSelectionKey(item.groupId, item.choiceId);
+
+      return {
+        groupName: item.groupName,
+        choiceLabel: item.isBinaryOption ? "Yes" : item.choiceLabel,
+        leatherName: item.selectedLeather?.name || null,
+        leatherGrade: item.selectedLeather?.grade || null,
+        baseAmount: item.baseAmount,
+        leatherSurcharge: item.leatherSurcharge,
+        imageUrl: item.imageUrl || null,
+        leatherImageUrl: item.selectedLeather?.imageUrl || null,
+        laseredBrand: item.laseredBrand,
+        laseredBrandImageUrl: item.laseredBrand
+          ? uploadedBrandUrls[selectionKey] || item.laseredBrandImageUrl || null
+          : null,
+      };
+    });
 
     const missingBrandImage = payloadSelections.some(
       (item) => item.laseredBrand && !item.laseredBrandImageUrl
@@ -309,7 +355,7 @@ export default function ProductBuilder({ product, leathers }: Props) {
 
     if (missingBrandImage) {
       throw new Error(
-        "Please upload a brand image for every section marked Lasered Brand."
+        "Please upload a brand image for every selection marked Lasered Brand."
       );
     }
 
@@ -348,7 +394,6 @@ export default function ProductBuilder({ product, leathers }: Props) {
 
       if (!response.ok) {
         setSaveError(data.error || "Failed to send order to factory.");
-        setSaving(false);
         return;
       }
 
@@ -412,21 +457,16 @@ export default function ProductBuilder({ product, leathers }: Props) {
     <div className="grid gap-8 lg:grid-cols-[1.4fr_0.8fr]">
       <div className="space-y-6">
         {product.optionGroups.map((group) => {
-          const selectedChoiceId = selectedOptions[group.id];
-          const selectedChoice = group.choices.find(
-            (choice) => choice.id === selectedChoiceId
+          const selectedChoiceIds = selectedOptions[group.id] || [];
+          const selectedChoicesForGroup = group.choices.filter((choice) =>
+            selectedChoiceIds.includes(choice.id)
           );
 
           const binaryChoice = group.choices.find((choice) => choice.isBinaryOption);
           const isBinaryGroup = Boolean(binaryChoice);
-          const binarySelected = selectedChoiceId === binaryChoice?.id;
-
-          const brandEnabledForChoice = Boolean(
-            selectedChoice?.allowsLaseredBrand
-          );
-
-          const wantsLaseredBrand =
-            selectedLaseredBrandByGroupId[group.id] === "yes";
+          const binarySelected = binaryChoice
+            ? selectedChoiceIds.includes(binaryChoice.id)
+            : false;
 
           return (
             <div key={group.id} className="rounded-2xl border p-5 shadow-sm">
@@ -439,12 +479,7 @@ export default function ProductBuilder({ product, leathers }: Props) {
                 <div className="grid gap-3 sm:grid-cols-2">
                   <button
                     type="button"
-                    onClick={() =>
-                      setSelectedOptions((prev) => ({
-                        ...prev,
-                        [group.id]: binaryChoice.id,
-                      }))
-                    }
+                    onClick={() => setSingleChoice(group.id, binaryChoice.id)}
                     className={`rounded-xl border p-4 text-left transition ${
                       binarySelected
                         ? "border-slate-900 ring-2 ring-slate-900"
@@ -461,13 +496,7 @@ export default function ProductBuilder({ product, leathers }: Props) {
 
                   <button
                     type="button"
-                    onClick={() =>
-                      setSelectedOptions((prev) => {
-                        const next = { ...prev };
-                        delete next[group.id];
-                        return next;
-                      })
-                    }
+                    onClick={() => clearGroupSelection(group.id)}
                     className={`rounded-xl border p-4 text-left transition ${
                       !binarySelected
                         ? "border-slate-900 ring-2 ring-slate-900"
@@ -475,26 +504,69 @@ export default function ProductBuilder({ product, leathers }: Props) {
                     }`}
                   >
                     <p className="font-semibold">No</p>
-                    <p className="mt-1 text-sm text-slate-500">
-                      No extra charge
-                    </p>
+                    <p className="mt-1 text-sm text-slate-500">No extra charge</p>
                   </button>
                 </div>
-              ) : (
+              ) : group.type === "MULTI_SELECT" ? (
                 <div className="grid gap-4 sm:grid-cols-2">
                   {group.choices.map((choice) => {
-                    const isSelected = selectedChoiceId === choice.id;
+                    const isSelected = selectedChoiceIds.includes(choice.id);
 
                     return (
                       <button
                         key={choice.id}
                         type="button"
-                        onClick={() =>
-                          setSelectedOptions((prev) => ({
-                            ...prev,
-                            [group.id]: choice.id,
-                          }))
-                        }
+                        onClick={() => toggleMultiChoice(group.id, choice.id)}
+                        className={`overflow-hidden rounded-xl border text-left transition ${
+                          isSelected
+                            ? "border-slate-900 ring-2 ring-slate-900"
+                            : "border-slate-200 hover:border-slate-400"
+                        }`}
+                      >
+                        {choice.imageUrl ? (
+                          <div className="flex h-40 w-full items-center justify-center bg-white p-3">
+                            <img
+                              src={choice.imageUrl}
+                              alt={choice.label}
+                              className="h-full w-full object-contain"
+                            />
+                          </div>
+                        ) : (
+                          <div className="flex h-40 w-full items-center justify-center bg-slate-100 text-sm text-slate-400">
+                            No Image
+                          </div>
+                        )}
+
+                        <div className="p-4">
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <p className="font-semibold">{choice.label}</p>
+                              <p className="mt-1 text-sm text-slate-500">
+                                {choice.description || "No description"}
+                              </p>
+                            </div>
+
+                            <div className="whitespace-nowrap text-sm font-medium">
+                              {choice.priceDelta === 0
+                                ? "Included"
+                                : `+${formatCurrency(choice.priceDelta)}`}
+                            </div>
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="grid gap-4 sm:grid-cols-2">
+                  {group.choices.map((choice) => {
+                    const isSelected = selectedChoiceIds.includes(choice.id);
+
+                    return (
+                      <button
+                        key={choice.id}
+                        type="button"
+                        onClick={() => setSingleChoice(group.id, choice.id)}
                         className={`overflow-hidden rounded-xl border text-left transition ${
                           isSelected
                             ? "border-slate-900 ring-2 ring-slate-900"
@@ -537,78 +609,95 @@ export default function ProductBuilder({ product, leathers }: Props) {
                 </div>
               )}
 
-              {selectedChoice?.usesLeatherGrades ? (
-                <div className="mt-5 rounded-xl border bg-slate-50 p-4">
-                  <label className="mb-2 block text-sm font-medium">
-                    Leather
-                  </label>
-                  <select
-                    className="w-full rounded-lg border bg-white px-3 py-2"
-                    value={selectedLeatherByGroupId[group.id] || ""}
-                    onChange={(e) =>
-                      setSelectedLeatherByGroupId((prev) => ({
-                        ...prev,
-                        [group.id]: e.target.value,
-                      }))
-                    }
-                  >
-                    <option value="">Select leather</option>
-                    {leathers.map((leather) => (
-                      <option key={leather.id} value={leather.id}>
-                        {leather.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              ) : null}
+              {selectedChoicesForGroup.length > 0 ? (
+                <div className="mt-5 space-y-4">
+                  {selectedChoicesForGroup.map((choice) => {
+                    const selectionKey = makeSelectionKey(group.id, choice.id);
 
-              {brandEnabledForChoice ? (
-                <div className="mt-5 rounded-xl border bg-slate-50 p-4">
-                  <label className="mb-2 block text-sm font-medium">
-                    Lasered Brand
-                  </label>
-                  <select
-                    className="w-full rounded-lg border bg-white px-3 py-2"
-                    value={selectedLaseredBrandByGroupId[group.id] || "no"}
-                    onChange={(e) =>
-                      setSelectedLaseredBrandByGroupId((prev) => ({
-                        ...prev,
-                        [group.id]: e.target.value as "yes" | "no",
-                      }))
-                    }
-                  >
-                    <option value="no">No</option>
-                    <option value="yes">Yes</option>
-                  </select>
+                    return (
+                      <div
+                        key={selectionKey}
+                        className="rounded-xl border bg-slate-50 p-4"
+                      >
+                        <p className="mb-3 font-semibold">{choice.label}</p>
 
-                  {wantsLaseredBrand ? (
-                    <div className="mt-4 space-y-3">
-                      <div>
-                        <label className="mb-1 block text-sm font-medium">
-                          Upload Brand Image
-                        </label>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          className="w-full rounded-lg border bg-white px-3 py-2"
-                          onChange={(e) =>
-                            setSelectedLaseredBrandFileByGroupId((prev) => ({
-                              ...prev,
-                              [group.id]: e.target.files?.[0] || null,
-                            }))
-                          }
-                        />
+                        {choice.usesLeatherGrades ? (
+                          <div className="mb-4">
+                            <label className="mb-2 block text-sm font-medium">
+                              Leather for {choice.label}
+                            </label>
+                            <select
+                              className="w-full rounded-lg border bg-white px-3 py-2"
+                              value={selectedLeatherBySelectionKey[selectionKey] || ""}
+                              onChange={(e) =>
+                                setSelectedLeatherBySelectionKey((prev) => ({
+                                  ...prev,
+                                  [selectionKey]: e.target.value,
+                                }))
+                              }
+                            >
+                              <option value="">Select leather</option>
+                              {leathers.map((leather) => (
+                                <option key={leather.id} value={leather.id}>
+                                  {leather.name}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        ) : null}
+
+                        {choice.allowsLaseredBrand ? (
+                          <div>
+                            <label className="mb-2 block text-sm font-medium">
+                              Lasered Brand for {choice.label}
+                            </label>
+                            <select
+                              className="w-full rounded-lg border bg-white px-3 py-2"
+                              value={selectedLaseredBrandBySelectionKey[selectionKey] || "no"}
+                              onChange={(e) =>
+                                setSelectedLaseredBrandBySelectionKey((prev) => ({
+                                  ...prev,
+                                  [selectionKey]: e.target.value as "yes" | "no",
+                                }))
+                              }
+                            >
+                              <option value="no">No</option>
+                              <option value="yes">Yes</option>
+                            </select>
+
+                            {selectedLaseredBrandBySelectionKey[selectionKey] === "yes" ? (
+                              <div className="mt-4 space-y-3">
+                                <div>
+                                  <label className="mb-1 block text-sm font-medium">
+                                    Upload Brand Image
+                                  </label>
+                                  <input
+                                    type="file"
+                                    accept="image/*"
+                                    className="w-full rounded-lg border bg-white px-3 py-2"
+                                    onChange={(e) =>
+                                      setSelectedLaseredBrandFileBySelectionKey((prev) => ({
+                                        ...prev,
+                                        [selectionKey]: e.target.files?.[0] || null,
+                                      }))
+                                    }
+                                  />
+                                </div>
+
+                                {selectedLaseredBrandImageUrlBySelectionKey[selectionKey] ? (
+                                  <img
+                                    src={selectedLaseredBrandImageUrlBySelectionKey[selectionKey]}
+                                    alt="Lasered brand preview"
+                                    className="h-32 w-32 rounded-lg border object-contain bg-white p-2"
+                                  />
+                                ) : null}
+                              </div>
+                            ) : null}
+                          </div>
+                        ) : null}
                       </div>
-
-                      {selectedLaseredBrandImageUrlByGroupId[group.id] ? (
-                        <img
-                          src={selectedLaseredBrandImageUrlByGroupId[group.id]}
-                          alt="Lasered brand preview"
-                          className="h-32 w-32 rounded-lg border object-contain bg-white p-2"
-                        />
-                      ) : null}
-                    </div>
-                  ) : null}
+                    );
+                  })}
                 </div>
               ) : null}
             </div>

@@ -28,19 +28,19 @@ type ProductChoice = {
   id: string;
   label: string;
   value: string | null;
-  isBinaryOption: boolean;
   description: string | null;
   imageUrl: string | null;
   priceDelta: unknown;
   usesLeatherGrades: boolean;
+  appliesLeatherSurcharge: boolean;
   allowsLaseredBrand: boolean;
+  isBinaryOption: boolean;
   gradeAUpcharge: unknown | null;
   gradeBUpcharge: unknown | null;
   gradeEMBUpcharge: unknown | null;
   gradeHOHUpcharge: unknown | null;
   gradeAxisUpcharge: unknown | null;
   gradeBuffaloUpcharge: unknown | null;
-  appliesLeatherSurcharge: boolean;
   comUpcharge: unknown | null;
   displayOrder: number;
   active: boolean;
@@ -50,6 +50,7 @@ type ProductGroup = {
   id: string;
   name: string;
   slug: string;
+  type: string;
   required: boolean;
   choices: ProductChoice[];
 };
@@ -69,6 +70,28 @@ type LeatherRecord = {
   grade: string;
   imageUrl: string | null;
 };
+
+const SELECTION_META_SEPARATOR = "|||";
+
+function makeSelectionKey(groupId: string, choiceId: string) {
+  return `${groupId}:::${choiceId}`;
+}
+
+function parseScopedValue(raw: string) {
+  const index = raw.indexOf(SELECTION_META_SEPARATOR);
+
+  if (index === -1) {
+    return {
+      choiceLabel: null,
+      value: raw,
+    };
+  }
+
+  return {
+    choiceLabel: raw.slice(0, index),
+    value: raw.slice(index + SELECTION_META_SEPARATOR.length),
+  };
+}
 
 export default async function CustomerOrderEditPage({ params }: PageProps) {
   const { id } = await params;
@@ -117,75 +140,146 @@ export default async function CustomerOrderEditPage({ params }: PageProps) {
   const leathers = (await prisma.leather.findMany({
     where: { active: true },
     orderBy: { name: "asc" },
-  })) as LeatherRecord[]; 
+  })) as LeatherRecord[];
 
-  const initialSelectedOptions: Record<string, string> = {};
-  const initialSelectedLeatherByGroupId: Record<string, string> = {};
-  const initialSelectedLaseredBrandByGroupId: Record<string, "yes" | "no"> = {};
-  const initialSelectedLaseredBrandImageUrlByGroupId: Record<string, string> = {};
+  const initialSelectedOptions: Record<string, string[]> = {};
+  const initialSelectedLeatherBySelectionKey: Record<string, string> = {};
+  const initialSelectedLaseredBrandBySelectionKey: Record<string, "yes" | "no"> =
+    {};
+  const initialSelectedLaseredBrandImageUrlBySelectionKey: Record<
+    string,
+    string
+  > = {};
 
-  for (const group of product.optionGroups) {
-const savedChoiceSelection = item.selections.find(
-  (selection: SavedSelection) =>
-    selection.optionGroupNameSnapshot === group.name
-);
-
-if (savedChoiceSelection) {
-  const matchedChoice = group.choices.find(
-    (choice: ProductChoice) =>
-      choice.label === savedChoiceSelection.optionChoiceNameSnapshot
+  const baseSelections = item.selections.filter(
+    (selection: SavedSelection) =>
+      !selection.optionGroupNameSnapshot.endsWith(" Leather") &&
+      !selection.optionGroupNameSnapshot.endsWith(" Lasered Brand") &&
+      !selection.optionGroupNameSnapshot.endsWith(" Lasered Brand Image")
   );
 
-  const binaryChoice = group.choices.find(
-    (choice: ProductChoice) => choice.isBinaryOption
-  );
+  for (const baseSelection of baseSelections) {
+    const group = product.optionGroups.find(
+      (groupItem: ProductGroup) =>
+        groupItem.name === baseSelection.optionGroupNameSnapshot
+    );
 
-  if (matchedChoice) {
-    initialSelectedOptions[group.id] = matchedChoice.id;
-  } else if (
-    binaryChoice &&
-    savedChoiceSelection.optionChoiceNameSnapshot === "Yes"
-  ) {
-    initialSelectedOptions[group.id] = binaryChoice.id;
-  }
-}
-    const savedLeatherSelection = item.selections.find(
+    if (!group) continue;
+
+    let matchedChoice =
+      group.choices.find(
+        (choice: ProductChoice) =>
+          choice.label === baseSelection.optionChoiceNameSnapshot
+      ) || null;
+
+    if (!matchedChoice) {
+      const binaryChoice = group.choices.find(
+        (choice: ProductChoice) => choice.isBinaryOption
+      );
+
+      if (
+        binaryChoice &&
+        baseSelection.optionChoiceNameSnapshot === "Yes"
+      ) {
+        matchedChoice = binaryChoice;
+      }
+    }
+
+    if (!matchedChoice) continue;
+
+    if (!initialSelectedOptions[group.id]) {
+      initialSelectedOptions[group.id] = [];
+    }
+
+    if (!initialSelectedOptions[group.id].includes(matchedChoice.id)) {
+      initialSelectedOptions[group.id].push(matchedChoice.id);
+    }
+
+    const selectionKey = makeSelectionKey(group.id, matchedChoice.id);
+
+    const sameGroupBaseCount = baseSelections.filter(
+      (selection: SavedSelection) =>
+        selection.optionGroupNameSnapshot === group.name
+    ).length;
+
+    const leatherCandidates = item.selections.filter(
       (selection: SavedSelection) =>
         selection.optionGroupNameSnapshot === `${group.name} Leather`
     );
 
-    if (savedLeatherSelection) {
-      const leatherLabel = savedLeatherSelection.optionChoiceNameSnapshot.replace(
-        /\s+\((.*?)\)$/,
-        ""
-      );
-
-      const matchedLeather = leathers.find(
-        (leather: LeatherRecord) => leather.name === leatherLabel
-      );
-
-      if (matchedLeather) {
-        initialSelectedLeatherByGroupId[group.id] = matchedLeather.id;
-      }
-    }
-
-    const savedLaseredBrandSelection = item.selections.find(
+    const laseredBrandCandidates = item.selections.filter(
       (selection: SavedSelection) =>
         selection.optionGroupNameSnapshot === `${group.name} Lasered Brand`
     );
 
-    if (savedLaseredBrandSelection?.optionChoiceNameSnapshot === "Yes") {
-      initialSelectedLaseredBrandByGroupId[group.id] = "yes";
-    }
-
-    const savedLaseredBrandImageSelection = item.selections.find(
+    const laseredBrandImageCandidates = item.selections.filter(
       (selection: SavedSelection) =>
         selection.optionGroupNameSnapshot === `${group.name} Lasered Brand Image`
     );
 
-    if (savedLaseredBrandImageSelection?.optionChoiceNameSnapshot) {
-      initialSelectedLaseredBrandImageUrlByGroupId[group.id] =
-        savedLaseredBrandImageSelection.optionChoiceNameSnapshot;
+    const matchingLeather =
+      leatherCandidates.find((selection: SavedSelection) => {
+        const parsed = parseScopedValue(selection.optionChoiceNameSnapshot);
+        return parsed.choiceLabel === matchedChoice.label;
+      }) ??
+      (sameGroupBaseCount === 1
+        ? leatherCandidates.find((selection: SavedSelection) => {
+            const parsed = parseScopedValue(selection.optionChoiceNameSnapshot);
+            return parsed.choiceLabel === null;
+          })
+        : undefined);
+
+    if (matchingLeather) {
+      const parsedLeather = parseScopedValue(
+        matchingLeather.optionChoiceNameSnapshot
+      ).value;
+
+      const leatherName = parsedLeather.replace(/\s+\((.*?)\)$/, "");
+
+      const matchedLeather = leathers.find(
+        (leather: LeatherRecord) => leather.name === leatherName
+      );
+
+      if (matchedLeather) {
+        initialSelectedLeatherBySelectionKey[selectionKey] = matchedLeather.id;
+      }
+    }
+
+    const matchingLaseredBrand =
+      laseredBrandCandidates.find((selection: SavedSelection) => {
+        const parsed = parseScopedValue(selection.optionChoiceNameSnapshot);
+        return parsed.choiceLabel === matchedChoice.label;
+      }) ??
+      (sameGroupBaseCount === 1
+        ? laseredBrandCandidates.find((selection: SavedSelection) => {
+            const parsed = parseScopedValue(selection.optionChoiceNameSnapshot);
+            return parsed.choiceLabel === null;
+          })
+        : undefined);
+
+    if (
+      matchingLaseredBrand &&
+      parseScopedValue(matchingLaseredBrand.optionChoiceNameSnapshot).value ===
+        "Yes"
+    ) {
+      initialSelectedLaseredBrandBySelectionKey[selectionKey] = "yes";
+    }
+
+    const matchingLaseredBrandImage =
+      laseredBrandImageCandidates.find((selection: SavedSelection) => {
+        const parsed = parseScopedValue(selection.optionChoiceNameSnapshot);
+        return parsed.choiceLabel === matchedChoice.label;
+      }) ??
+      (sameGroupBaseCount === 1
+        ? laseredBrandImageCandidates.find((selection: SavedSelection) => {
+            const parsed = parseScopedValue(selection.optionChoiceNameSnapshot);
+            return parsed.choiceLabel === null;
+          })
+        : undefined);
+
+    if (matchingLaseredBrandImage) {
+      initialSelectedLaseredBrandImageUrlBySelectionKey[selectionKey] =
+        parseScopedValue(matchingLaseredBrandImage.optionChoiceNameSnapshot).value;
     }
   }
 
@@ -197,16 +291,17 @@ if (savedChoiceSelection) {
       id: group.id,
       name: group.name,
       slug: group.slug,
+      type: group.type,
       required: group.required,
       choices: group.choices.map((choice: ProductChoice) => ({
         id: choice.id,
         label: choice.label,
         value: choice.value,
-        appliesLeatherSurcharge: choice.appliesLeatherSurcharge,
         description: choice.description,
         imageUrl: choice.imageUrl,
         priceDelta: Number(choice.priceDelta),
         usesLeatherGrades: choice.usesLeatherGrades,
+        appliesLeatherSurcharge: choice.appliesLeatherSurcharge,
         allowsLaseredBrand: choice.allowsLaseredBrand,
         isBinaryOption: choice.isBinaryOption,
         gradeAUpcharge:
@@ -257,12 +352,14 @@ if (savedChoiceSelection) {
             product={serializedProduct}
             leathers={serializedLeathers}
             initialSelectedOptions={initialSelectedOptions}
-            initialSelectedLeatherByGroupId={initialSelectedLeatherByGroupId}
-            initialSelectedLaseredBrandByGroupId={
-              initialSelectedLaseredBrandByGroupId
+            initialSelectedLeatherBySelectionKey={
+              initialSelectedLeatherBySelectionKey
             }
-            initialSelectedLaseredBrandImageUrlByGroupId={
-              initialSelectedLaseredBrandImageUrlByGroupId
+            initialSelectedLaseredBrandBySelectionKey={
+              initialSelectedLaseredBrandBySelectionKey
+            }
+            initialSelectedLaseredBrandImageUrlBySelectionKey={
+              initialSelectedLaseredBrandImageUrlBySelectionKey
             }
             initialCustomerName={order.customerName}
             initialCustomerEmail={order.customerEmail}
