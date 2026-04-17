@@ -21,6 +21,7 @@ type OptionChoiceItem = {
   usesLeatherGrades: boolean;
   appliesLeatherSurcharge: boolean;
   allowsLaseredBrand: boolean;
+  isBinaryOption: boolean;
   gradeAUpcharge: unknown | null;
   gradeBUpcharge: unknown | null;
   gradeEMBUpcharge: unknown | null;
@@ -220,6 +221,12 @@ export default async function AdminProductDetailPage({ params }: PageProps) {
                                     </p>
                                   ) : null}
 
+                                  {choice.isBinaryOption ? (
+                                    <p className="mt-2 text-sm font-medium text-slate-700">
+                                      Binary Option: Yes/No
+                                    </p>
+                                  ) : null}
+
                                   <OptionChoiceActions
                                     groupId={group.id}
                                     choice={{
@@ -235,6 +242,7 @@ export default async function AdminProductDetailPage({ params }: PageProps) {
                                         choice.appliesLeatherSurcharge,
                                       allowsLaseredBrand:
                                         choice.allowsLaseredBrand,
+                                      isBinaryOption: choice.isBinaryOption,
                                       gradeAUpcharge:
                                         choice.gradeAUpcharge === null
                                           ? null

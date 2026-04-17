@@ -11,9 +11,10 @@ type Choice = {
   description?: string | null;
   imageUrl?: string | null;
   priceDelta: number;
-  appliesLeatherSurcharge: boolean;
   usesLeatherGrades: boolean;
+  appliesLeatherSurcharge: boolean;
   allowsLaseredBrand: boolean;
+  isBinaryOption: boolean;
   gradeAUpcharge: number | null;
   gradeBUpcharge: number | null;
   gradeEMBUpcharge: number | null;
@@ -62,6 +63,7 @@ type SelectedChoiceDetail = {
   choiceLabel: string;
   baseAmount: number;
   usesLeatherGrades: boolean;
+  isBinaryOption: boolean;
   selectedLeather?: Leather;
   leatherSurcharge: number;
   imageUrl?: string | null;
@@ -201,6 +203,7 @@ export default function ProductBuilder({ product, leathers }: Props) {
           choiceLabel: selectedChoice.label,
           baseAmount: selectedChoice.priceDelta,
           usesLeatherGrades: selectedChoice.usesLeatherGrades,
+          isBinaryOption: selectedChoice.isBinaryOption,
           selectedLeather,
           leatherSurcharge,
           imageUrl: selectedChoice.imageUrl,
@@ -230,15 +233,17 @@ export default function ProductBuilder({ product, leathers }: Props) {
 
     for (const item of selectedChoiceDetails) {
       lines.push({
-        label: `${item.groupName}: ${item.choiceLabel}`,
+        label: item.isBinaryOption
+          ? `${item.groupName}: Yes`
+          : `${item.groupName}: ${item.choiceLabel}`,
         amount: item.baseAmount,
       });
     }
 
-const repeatingLeatherItems = selectedChoiceDetails.filter((item) => {
-  const grade = item.selectedLeather?.grade;
-  return !!grade && REPEATING_GRADES.has(grade) && item.leatherSurcharge > 0;
-});
+    const repeatingLeatherItems = selectedChoiceDetails.filter((item) => {
+      const grade = item.selectedLeather?.grade;
+      return !!grade && REPEATING_GRADES.has(grade) && item.leatherSurcharge > 0;
+    });
 
     for (const item of repeatingLeatherItems) {
       lines.push({
@@ -247,10 +252,10 @@ const repeatingLeatherItems = selectedChoiceDetails.filter((item) => {
       });
     }
 
-const singleApplyCandidates = selectedChoiceDetails.filter((item) => {
-  const grade = item.selectedLeather?.grade;
-  return !!grade && SINGLE_APPLY_GRADES.has(grade) && item.leatherSurcharge > 0;
-});
+    const singleApplyCandidates = selectedChoiceDetails.filter((item) => {
+      const grade = item.selectedLeather?.grade;
+      return !!grade && SINGLE_APPLY_GRADES.has(grade) && item.leatherSurcharge > 0;
+    });
 
     if (singleApplyCandidates.length > 0) {
       const highestRank = Math.max(
@@ -285,7 +290,7 @@ const singleApplyCandidates = selectedChoiceDetails.filter((item) => {
 
     const payloadSelections = selectedChoiceDetails.map((item) => ({
       groupName: item.groupName,
-      choiceLabel: item.choiceLabel,
+      choiceLabel: item.isBinaryOption ? "Yes" : item.choiceLabel,
       leatherName: item.selectedLeather?.name || null,
       leatherGrade: item.selectedLeather?.grade || null,
       baseAmount: item.baseAmount,
@@ -412,6 +417,10 @@ const singleApplyCandidates = selectedChoiceDetails.filter((item) => {
             (choice) => choice.id === selectedChoiceId
           );
 
+          const binaryChoice = group.choices.find((choice) => choice.isBinaryOption);
+          const isBinaryGroup = Boolean(binaryChoice);
+          const binarySelected = selectedChoiceId === binaryChoice?.id;
+
           const brandEnabledForChoice = Boolean(
             selectedChoice?.allowsLaseredBrand
           );
@@ -426,58 +435,107 @@ const singleApplyCandidates = selectedChoiceDetails.filter((item) => {
                 {group.required ? "Required" : "Optional"}
               </p>
 
-              <div className="grid gap-4 sm:grid-cols-2">
-                {group.choices.map((choice) => {
-                  const isSelected = selectedChoiceId === choice.id;
+              {isBinaryGroup && binaryChoice ? (
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setSelectedOptions((prev) => ({
+                        ...prev,
+                        [group.id]: binaryChoice.id,
+                      }))
+                    }
+                    className={`rounded-xl border p-4 text-left transition ${
+                      binarySelected
+                        ? "border-slate-900 ring-2 ring-slate-900"
+                        : "border-slate-200 hover:border-slate-400"
+                    }`}
+                  >
+                    <p className="font-semibold">Yes</p>
+                    <p className="mt-1 text-sm text-slate-500">
+                      {binaryChoice.priceDelta === 0
+                        ? "Included"
+                        : `+${formatCurrency(binaryChoice.priceDelta)}`}
+                    </p>
+                  </button>
 
-                  return (
-                    <button
-                      key={choice.id}
-                      type="button"
-                      onClick={() =>
-                        setSelectedOptions((prev) => ({
-                          ...prev,
-                          [group.id]: choice.id,
-                        }))
-                      }
-                      className={`overflow-hidden rounded-xl border text-left transition ${
-                        isSelected
-                          ? "border-slate-900 ring-2 ring-slate-900"
-                          : "border-slate-200 hover:border-slate-400"
-                      }`}
-                    >
-                      {choice.imageUrl ? (
-                        <img
-                          src={choice.imageUrl}
-                          alt={choice.label}
-                          className="h-40 w-full object-cover"
-                        />
-                      ) : (
-                        <div className="flex h-40 w-full items-center justify-center bg-slate-100 text-sm text-slate-400">
-                          No Image
-                        </div>
-                      )}
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setSelectedOptions((prev) => {
+                        const next = { ...prev };
+                        delete next[group.id];
+                        return next;
+                      })
+                    }
+                    className={`rounded-xl border p-4 text-left transition ${
+                      !binarySelected
+                        ? "border-slate-900 ring-2 ring-slate-900"
+                        : "border-slate-200 hover:border-slate-400"
+                    }`}
+                  >
+                    <p className="font-semibold">No</p>
+                    <p className="mt-1 text-sm text-slate-500">
+                      No extra charge
+                    </p>
+                  </button>
+                </div>
+              ) : (
+                <div className="grid gap-4 sm:grid-cols-2">
+                  {group.choices.map((choice) => {
+                    const isSelected = selectedChoiceId === choice.id;
 
-                      <div className="p-4">
-                        <div className="flex items-start justify-between gap-3">
-                          <div>
-                            <p className="font-semibold">{choice.label}</p>
-                            <p className="mt-1 text-sm text-slate-500">
-                              {choice.description || "No description"}
-                            </p>
+                    return (
+                      <button
+                        key={choice.id}
+                        type="button"
+                        onClick={() =>
+                          setSelectedOptions((prev) => ({
+                            ...prev,
+                            [group.id]: choice.id,
+                          }))
+                        }
+                        className={`overflow-hidden rounded-xl border text-left transition ${
+                          isSelected
+                            ? "border-slate-900 ring-2 ring-slate-900"
+                            : "border-slate-200 hover:border-slate-400"
+                        }`}
+                      >
+                        {choice.imageUrl ? (
+                          <div className="flex h-40 w-full items-center justify-center bg-white p-3">
+                            <img
+                              src={choice.imageUrl}
+                              alt={choice.label}
+                              className="h-full w-full object-contain"
+                            />
                           </div>
+                        ) : (
+                          <div className="flex h-40 w-full items-center justify-center bg-slate-100 text-sm text-slate-400">
+                            No Image
+                          </div>
+                        )}
 
-                          <div className="whitespace-nowrap text-sm font-medium">
-                            {choice.priceDelta === 0
-                              ? "Included"
-                              : `+${formatCurrency(choice.priceDelta)}`}
+                        <div className="p-4">
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <p className="font-semibold">{choice.label}</p>
+                              <p className="mt-1 text-sm text-slate-500">
+                                {choice.description || "No description"}
+                              </p>
+                            </div>
+
+                            <div className="whitespace-nowrap text-sm font-medium">
+                              {choice.priceDelta === 0
+                                ? "Included"
+                                : `+${formatCurrency(choice.priceDelta)}`}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
 
               {selectedChoice?.usesLeatherGrades ? (
                 <div className="mt-5 rounded-xl border bg-slate-50 p-4">
@@ -546,7 +604,7 @@ const singleApplyCandidates = selectedChoiceDetails.filter((item) => {
                         <img
                           src={selectedLaseredBrandImageUrlByGroupId[group.id]}
                           alt="Lasered brand preview"
-                          className="h-32 w-32 rounded-lg border object-cover"
+                          className="h-32 w-32 rounded-lg border object-contain bg-white p-2"
                         />
                       ) : null}
                     </div>

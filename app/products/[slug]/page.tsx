@@ -13,6 +13,7 @@ type ProductChoice = {
   id: string;
   label: string;
   value: string | null;
+  isBinaryOption: boolean;
   description: string | null;
   imageUrl: string | null;
   priceDelta: unknown;
@@ -110,6 +111,7 @@ export default async function ProductPage({ params }: PageProps) {
         label: choice.label,
         appliesLeatherSurcharge: choice.appliesLeatherSurcharge,
         allowsLaseredBrand: choice.allowsLaseredBrand,
+        isBinaryOption: choice.isBinaryOption,
         value: choice.value,
         description: choice.description,
         imageUrl: choice.imageUrl,

@@ -25,6 +25,7 @@ export async function POST(request: Request, context: RouteContext) {
         ? body.appliesLeatherSurcharge
         : true;
     const allowsLaseredBrand = Boolean(body.allowsLaseredBrand);
+    const isBinaryOption = Boolean(body.isBinaryOption);
 
     const gradeAUpcharge =
       body.gradeAUpcharge === "" || body.gradeAUpcharge === null || body.gradeAUpcharge === undefined
@@ -80,6 +81,7 @@ export async function POST(request: Request, context: RouteContext) {
         usesLeatherGrades,
         appliesLeatherSurcharge,
         allowsLaseredBrand,
+        isBinaryOption,
         gradeAUpcharge,
         gradeBUpcharge,
         gradeEMBUpcharge,

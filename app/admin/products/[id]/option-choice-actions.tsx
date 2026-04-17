@@ -13,6 +13,7 @@ type Choice = {
   usesLeatherGrades: boolean;
   appliesLeatherSurcharge: boolean;
   allowsLaseredBrand: boolean;
+  isBinaryOption: boolean;
   gradeAUpcharge: number | null;
   gradeBUpcharge: number | null;
   gradeEMBUpcharge: number | null;
@@ -51,6 +52,7 @@ export default function OptionChoiceActions({ groupId, choice }: Props) {
   const [allowsLaseredBrand, setAllowsLaseredBrand] = useState(
     choice.allowsLaseredBrand
   );
+  const [isBinaryOption, setIsBinaryOption] = useState(choice.isBinaryOption);
   const [active, setActive] = useState(choice.active);
 
   const [gradeAUpcharge, setGradeAUpcharge] = useState(
@@ -128,6 +130,7 @@ export default function OptionChoiceActions({ groupId, choice }: Props) {
             usesLeatherGrades,
             appliesLeatherSurcharge,
             allowsLaseredBrand,
+            isBinaryOption,
             active,
             gradeAUpcharge: usesLeatherGrades ? gradeAUpcharge : "",
             gradeBUpcharge: usesLeatherGrades ? gradeBUpcharge : "",
@@ -328,6 +331,15 @@ export default function OptionChoiceActions({ groupId, choice }: Props) {
       <label className="flex items-center gap-2 text-sm font-medium">
         <input
           type="checkbox"
+          checked={isBinaryOption}
+          onChange={(e) => setIsBinaryOption(e.target.checked)}
+        />
+        Binary Option (Yes/No)
+      </label>
+
+      <label className="flex items-center gap-2 text-sm font-medium">
+        <input
+          type="checkbox"
           checked={active}
           onChange={(e) => setActive(e.target.checked)}
         />
@@ -427,6 +439,7 @@ export default function OptionChoiceActions({ groupId, choice }: Props) {
             setUsesLeatherGrades(choice.usesLeatherGrades);
             setAppliesLeatherSurcharge(choice.appliesLeatherSurcharge);
             setAllowsLaseredBrand(choice.allowsLaseredBrand);
+            setIsBinaryOption(choice.isBinaryOption);
             setActive(choice.active);
             setGradeAUpcharge(
               choice.gradeAUpcharge === null ? "" : String(choice.gradeAUpcharge)

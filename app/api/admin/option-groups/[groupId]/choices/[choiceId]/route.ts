@@ -41,6 +41,7 @@ export async function PUT(request: Request, context: RouteContext) {
         ? body.appliesLeatherSurcharge
         : true;
     const allowsLaseredBrand = Boolean(body.allowsLaseredBrand);
+    const isBinaryOption = Boolean(body.isBinaryOption);
     const active =
       typeof body.active === "boolean" ? body.active : true;
 
@@ -112,6 +113,7 @@ export async function PUT(request: Request, context: RouteContext) {
         usesLeatherGrades,
         appliesLeatherSurcharge,
         allowsLaseredBrand,
+        isBinaryOption,
         active,
         gradeAUpcharge: usesLeatherGrades ? gradeAUpcharge : null,
         gradeBUpcharge: usesLeatherGrades ? gradeBUpcharge : null,

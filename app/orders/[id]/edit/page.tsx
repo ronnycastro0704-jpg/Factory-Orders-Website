@@ -28,6 +28,7 @@ type ProductChoice = {
   id: string;
   label: string;
   value: string | null;
+  isBinaryOption: boolean;
   description: string | null;
   imageUrl: string | null;
   priceDelta: unknown;
@@ -116,7 +117,7 @@ export default async function CustomerOrderEditPage({ params }: PageProps) {
   const leathers = (await prisma.leather.findMany({
     where: { active: true },
     orderBy: { name: "asc" },
-  })) as LeatherRecord[];
+  })) as LeatherRecord[]; 
 
   const initialSelectedOptions: Record<string, string> = {};
   const initialSelectedLeatherByGroupId: Record<string, string> = {};
@@ -124,22 +125,30 @@ export default async function CustomerOrderEditPage({ params }: PageProps) {
   const initialSelectedLaseredBrandImageUrlByGroupId: Record<string, string> = {};
 
   for (const group of product.optionGroups) {
-    const savedChoiceSelection = item.selections.find(
-      (selection: SavedSelection) =>
-        selection.optionGroupNameSnapshot === group.name
-    );
+const savedChoiceSelection = item.selections.find(
+  (selection: SavedSelection) =>
+    selection.optionGroupNameSnapshot === group.name
+);
 
-    if (savedChoiceSelection) {
-      const matchedChoice = group.choices.find(
-        (choice: ProductChoice) =>
-          choice.label === savedChoiceSelection.optionChoiceNameSnapshot
-      );
+if (savedChoiceSelection) {
+  const matchedChoice = group.choices.find(
+    (choice: ProductChoice) =>
+      choice.label === savedChoiceSelection.optionChoiceNameSnapshot
+  );
 
-      if (matchedChoice) {
-        initialSelectedOptions[group.id] = matchedChoice.id;
-      }
-    }
+  const binaryChoice = group.choices.find(
+    (choice: ProductChoice) => choice.isBinaryOption
+  );
 
+  if (matchedChoice) {
+    initialSelectedOptions[group.id] = matchedChoice.id;
+  } else if (
+    binaryChoice &&
+    savedChoiceSelection.optionChoiceNameSnapshot === "Yes"
+  ) {
+    initialSelectedOptions[group.id] = binaryChoice.id;
+  }
+}
     const savedLeatherSelection = item.selections.find(
       (selection: SavedSelection) =>
         selection.optionGroupNameSnapshot === `${group.name} Leather`
@@ -199,6 +208,7 @@ export default async function CustomerOrderEditPage({ params }: PageProps) {
         priceDelta: Number(choice.priceDelta),
         usesLeatherGrades: choice.usesLeatherGrades,
         allowsLaseredBrand: choice.allowsLaseredBrand,
+        isBinaryOption: choice.isBinaryOption,
         gradeAUpcharge:
           choice.gradeAUpcharge === null ? null : Number(choice.gradeAUpcharge),
         gradeBUpcharge:

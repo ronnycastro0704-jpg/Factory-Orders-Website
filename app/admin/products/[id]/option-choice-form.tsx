@@ -21,6 +21,7 @@ export default function CreateOptionChoiceForm({ groupId }: Props) {
   const [usesLeatherGrades, setUsesLeatherGrades] = useState(false);
   const [appliesLeatherSurcharge, setAppliesLeatherSurcharge] = useState(true);
   const [allowsLaseredBrand, setAllowsLaseredBrand] = useState(false);
+  const [isBinaryOption, setIsBinaryOption] = useState(false);
 
   const [gradeAUpcharge, setGradeAUpcharge] = useState("");
   const [gradeBUpcharge, setGradeBUpcharge] = useState("");
@@ -82,6 +83,7 @@ export default function CreateOptionChoiceForm({ groupId }: Props) {
           usesLeatherGrades,
           appliesLeatherSurcharge,
           allowsLaseredBrand,
+          isBinaryOption,
           gradeAUpcharge,
           gradeBUpcharge,
           gradeEMBUpcharge,
@@ -111,6 +113,7 @@ export default function CreateOptionChoiceForm({ groupId }: Props) {
       setUsesLeatherGrades(false);
       setAppliesLeatherSurcharge(true);
       setAllowsLaseredBrand(false);
+      setIsBinaryOption(false);
       setGradeAUpcharge("");
       setGradeBUpcharge("");
       setGradeEMBUpcharge("");
@@ -234,6 +237,15 @@ export default function CreateOptionChoiceForm({ groupId }: Props) {
           onChange={(e) => setAllowsLaseredBrand(e.target.checked)}
         />
         Allows Lasered Brand
+      </label>
+
+      <label className="flex items-center gap-2 text-sm font-medium">
+        <input
+          type="checkbox"
+          checked={isBinaryOption}
+          onChange={(e) => setIsBinaryOption(e.target.checked)}
+        />
+        Binary Option (Yes/No)
       </label>
 
       {usesLeatherGrades ? (
