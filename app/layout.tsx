@@ -1,11 +1,16 @@
 import type { Metadata } from "next";
-import { SessionProvider } from "next-auth/react";
+import { Inter } from "next/font/google";
 import "./globals.css";
-import SiteHeader from "./components/site-header";
+
+const inter = Inter({
+  subsets: ["latin"],
+  display: "swap",
+  fallback: ["Arial", "Helvetica", "sans-serif"],
+});
 
 export const metadata: Metadata = {
   title: "Furniture Orders",
-  description: "Custom furniture ordering platform",
+  description: "Factory-ready furniture order builder",
 };
 
 export default function RootLayout({
@@ -15,12 +20,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className="bg-slate-50 text-slate-900">
-        <SessionProvider>
-          <SiteHeader />
-          {children}
-        </SessionProvider>
-      </body>
+      <body className={inter.className}>{children}</body>
     </html>
   );
 }
