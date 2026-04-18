@@ -2,249 +2,313 @@ import Link from "next/link";
 import { prisma } from "../../../lib/prisma";
 import { formatCurrency } from "../../../lib/utils";
 
-type SearchParams = Promise<{
-  status?: string;
-  emailStatus?: string;
-  sheetStatus?: string;
-}>;
-
-type PageProps = {
-  searchParams: SearchParams;
-};
-
-type OrderItemSummary = {
-  id: string;
-  productNameSnapshot: string;
-};
-
-type EmailLogSummary = {
-  id: string;
-  status: string;
-};
-
-type SheetSyncLogSummary = {
-  id: string;
-  status: string;
-};
-
-type AdminOrderRow = {
+type OrderRow = {
   id: string;
   orderNumber: string;
   customerName: string;
   customerEmail: string;
+  customerPhone: string | null;
   status: string;
   total: unknown;
+  notes: string | null;
   createdAt: Date;
-  items: OrderItemSummary[];
-  emailLogs: EmailLogSummary[];
-  sheetSyncLogs: SheetSyncLogSummary[];
+  items: {
+    id: string;
+    productNameSnapshot: string;
+    lineTotal: unknown;
+    selections: {
+      id: string;
+      optionGroupNameSnapshot: string;
+      optionChoiceNameSnapshot: string;
+    }[];
+  }[];
+  emailLogs: {
+    id: string;
+    status: string;
+    recipient: string;
+    createdAt: Date;
+  }[];
+  sheetSyncLogs: {
+    id: string;
+    status: string;
+    worksheetName: string | null;
+    createdAt: Date;
+  }[];
 };
 
-const statusTabs = [
-  { label: "All", value: "" },
-  { label: "Draft", value: "DRAFT" },
-  { label: "Changed", value: "CHANGED" },
-  { label: "Sent to Factory", value: "SENT_TO_FACTORY" },
-  { label: "Completed", value: "COMPLETED" },
-];
+function formatDate(date: Date) {
+  return new Intl.DateTimeFormat("en-US", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(date);
+}
 
-export default async function AdminOrdersPage({ searchParams }: PageProps) {
-  const params = await searchParams;
+function getStatusClasses(status: string) {
+  switch (status) {
+    case "SENT_TO_FACTORY":
+      return "bg-amber-50 text-amber-700 border-amber-200";
+    case "COMPLETED":
+      return "bg-green-50 text-green-700 border-green-200";
+    case "CHANGED":
+      return "bg-blue-50 text-blue-700 border-blue-200";
+    case "DRAFT":
+      return "bg-slate-100 text-slate-700 border-slate-200";
+    case "CANCELLED":
+      return "bg-red-50 text-red-700 border-red-200";
+    default:
+      return "bg-white text-slate-700 border-slate-200";
+  }
+}
 
-  const status = params.status || "";
-  const emailStatus = params.emailStatus || "";
-  const sheetStatus = params.sheetStatus || "";
-
-  const orders = (await prisma.order.findMany({
-    where: {
-      ...(status ? { status: status as never } : {}),
-      ...(emailStatus
-        ? {
-            emailLogs: {
-              some: {
-                status: emailStatus,
-              },
-            },
-          }
-        : {}),
-      ...(sheetStatus
-        ? {
-            sheetSyncLogs: {
-              some: {
-                status: sheetStatus,
-              },
-            },
-          }
-        : {}),
-    },
-    orderBy: { createdAt: "desc" },
-    include: {
-      items: true,
-      emailLogs: {
+export default async function AdminOrdersPage() {
+  const [totalOrders, draftOrders, sentToFactoryOrders, completedOrders, orders] =
+    await Promise.all([
+      prisma.order.count(),
+      prisma.order.count({
+        where: { status: "DRAFT" },
+      }),
+      prisma.order.count({
+        where: { status: "SENT_TO_FACTORY" },
+      }),
+      prisma.order.count({
+        where: { status: "COMPLETED" },
+      }),
+      prisma.order.findMany({
         orderBy: { createdAt: "desc" },
-        take: 1,
-      },
-      sheetSyncLogs: {
-        orderBy: { createdAt: "desc" },
-        take: 1,
-      },
-    },
-  })) as AdminOrderRow[];
+        take: 50,
+        include: {
+          items: {
+            include: {
+              selections: true,
+            },
+          },
+          emailLogs: {
+            orderBy: { createdAt: "desc" },
+            take: 1,
+          },
+          sheetSyncLogs: {
+            orderBy: { createdAt: "desc" },
+            take: 1,
+          },
+        },
+      }),
+    ]);
+
+  const typedOrders = orders as OrderRow[];
 
   return (
-    <main className="min-h-screen bg-slate-50 p-8 text-slate-900">
-      <div className="mx-auto max-w-6xl space-y-8">
-        <div>
-          <p className="text-sm text-slate-500">Admin</p>
-          <h1 className="text-4xl font-bold">Orders Dashboard</h1>
-          <p className="mt-2 text-slate-600">
-            Review recent orders, factory submissions, and exceptions.
-          </p>
-        </div>
+    <main className="min-h-screen p-4 sm:p-6 lg:p-8">
+      <div className="page-shell">
+        <section className="page-header">
+          <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <p className="mb-3 inline-flex rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-slate-600">
+                Admin Orders
+              </p>
+              <h1 className="text-4xl font-bold sm:text-5xl">
+                Track orders and factory status
+              </h1>
+              <p className="mt-4 max-w-2xl text-base sm:text-lg text-slate-600">
+                Review incoming customer orders, open details, and monitor email
+                and sheet sync activity.
+              </p>
+            </div>
 
-        <div className="rounded-2xl border bg-white p-4 shadow-sm">
-          <div className="flex flex-wrap gap-2">
-            {statusTabs.map((tab) => {
-              const href =
-                tab.value === ""
-                  ? "/admin/orders"
-                  : `/admin/orders?status=${tab.value}`;
-
-              const isActive =
-                (tab.value === "" && !status && !emailStatus && !sheetStatus) ||
-                status === tab.value;
-
-              return (
-                <Link
-                  key={tab.label}
-                  href={href}
-                  className={`rounded-lg px-3 py-2 text-sm ${
-                    isActive
-                      ? "bg-slate-900 text-white"
-                      : "border hover:bg-slate-100"
-                  }`}
-                >
-                  {tab.label}
-                </Link>
-              );
-            })}
-
-            <Link
-              href="/admin/orders?emailStatus=FAILED"
-              className={`rounded-lg px-3 py-2 text-sm ${
-                emailStatus === "FAILED"
-                  ? "bg-red-600 text-white"
-                  : "border hover:bg-slate-100"
-              }`}
-            >
-              Failed Emails
-            </Link>
-
-            <Link
-              href="/admin/orders?sheetStatus=FAILED"
-              className={`rounded-lg px-3 py-2 text-sm ${
-                sheetStatus === "FAILED"
-                  ? "bg-red-600 text-white"
-                  : "border hover:bg-slate-100"
-              }`}
-            >
-              Failed Sheets
-            </Link>
-
-            <Link
-              href="/admin/orders"
-              className="rounded-lg border px-3 py-2 text-sm hover:bg-slate-100"
-            >
-              Clear Filters
-            </Link>
+            <div className="flex flex-wrap gap-3">
+              <Link href="/admin" className="button-secondary">
+                ← Dashboard
+              </Link>
+              <Link href="/admin/products" className="button-secondary">
+                Products
+              </Link>
+              <Link href="/admin/leathers" className="button-secondary">
+                Leathers
+              </Link>
+            </div>
           </div>
-        </div>
+        </section>
 
-        <div className="rounded-2xl border bg-white p-6 shadow-sm">
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-2xl font-semibold">Orders</h2>
-            <span className="text-sm text-slate-500">
-              {orders.length} results
+        <section className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
+          <div className="section-card-strong">
+            <p className="text-xs uppercase tracking-[0.16em] text-slate-500">
+              Total Orders
+            </p>
+            <p className="mt-3 text-4xl font-bold">{totalOrders}</p>
+          </div>
+
+          <div className="section-card-strong">
+            <p className="text-xs uppercase tracking-[0.16em] text-slate-500">
+              Drafts
+            </p>
+            <p className="mt-3 text-4xl font-bold">{draftOrders}</p>
+          </div>
+
+          <div className="section-card-strong">
+            <p className="text-xs uppercase tracking-[0.16em] text-slate-500">
+              Sent to Factory
+            </p>
+            <p className="mt-3 text-4xl font-bold">{sentToFactoryOrders}</p>
+          </div>
+
+          <div className="section-card-strong">
+            <p className="text-xs uppercase tracking-[0.16em] text-slate-500">
+              Completed
+            </p>
+            <p className="mt-3 text-4xl font-bold">{completedOrders}</p>
+          </div>
+        </section>
+
+        <section className="mt-8 section-card-strong">
+          <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <p className="text-sm font-medium uppercase tracking-[0.18em] text-slate-500">
+                Orders
+              </p>
+              <h2 className="mt-2 text-3xl font-bold">Latest 50 Orders</h2>
+            </div>
+
+            <span className="status-pill">
+              Sorted newest to oldest
             </span>
           </div>
 
-          <div className="space-y-4">
-            {orders.length === 0 ? (
-              <p className="text-slate-500">No orders found.</p>
-            ) : (
-              orders.map((order: AdminOrderRow) => {
+          {typedOrders.length === 0 ? (
+            <div className="rounded-2xl border border-dashed bg-white/70 p-10 text-center">
+              <p className="text-lg font-semibold text-slate-700">
+                No orders found.
+              </p>
+              <p className="mt-2 text-sm text-slate-500">
+                Orders will appear here once customers start submitting them.
+              </p>
+            </div>
+          ) : (
+            <div className="grid gap-4 xl:grid-cols-2">
+              {typedOrders.map((order: OrderRow) => {
                 const firstItem = order.items[0];
                 const latestEmail = order.emailLogs[0];
                 const latestSheet = order.sheetSyncLogs[0];
+                const selectionCount = order.items.reduce(
+                  (sum, item) => sum + item.selections.length,
+                  0
+                );
 
                 return (
-                  <div
+                  <Link
                     key={order.id}
-                    className="rounded-xl border p-4 transition hover:bg-slate-50"
+                    href={`/admin/orders/${order.id}`}
+                    className="premium-grid-card"
                   >
-                    <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                      <div>
-                        <h3 className="text-xl font-semibold">
-                          {order.orderNumber}
-                        </h3>
-                        <p className="text-sm text-slate-500">
-                          {order.customerName} • {order.customerEmail}
-                        </p>
-                        <p className="mt-1 text-slate-600">
-                          {firstItem?.productNameSnapshot || "No item"}
-                        </p>
-                        <div className="mt-2 flex flex-wrap gap-2 text-xs">
-                          <span className="rounded-full bg-slate-100 px-2 py-1">
-                            Status: {order.status}
-                          </span>
-                          {latestEmail ? (
+                    <div className="flex flex-col gap-5">
+                      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                        <div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="text-lg font-semibold">
+                              {order.orderNumber}
+                            </p>
                             <span
-                              className={`rounded-full px-2 py-1 ${
-                                latestEmail.status === "FAILED"
-                                  ? "bg-red-100 text-red-700"
-                                  : "bg-green-100 text-green-700"
-                              }`}
+                              className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${getStatusClasses(
+                                order.status
+                              )}`}
                             >
-                              Email: {latestEmail.status}
+                              {order.status.replaceAll("_", " ")}
                             </span>
+                          </div>
+
+                          <p className="mt-2 text-sm text-slate-500">
+                            {order.customerName}
+                          </p>
+                          <p className="text-sm text-slate-500">
+                            {order.customerEmail}
+                          </p>
+                          {order.customerPhone ? (
+                            <p className="text-sm text-slate-500">
+                              {order.customerPhone}
+                            </p>
                           ) : null}
-                          {latestSheet ? (
-                            <span
-                              className={`rounded-full px-2 py-1 ${
-                                latestSheet.status === "FAILED"
-                                  ? "bg-red-100 text-red-700"
-                                  : "bg-green-100 text-green-700"
-                              }`}
-                            >
-                              Sheets: {latestSheet.status}
-                            </span>
-                          ) : null}
+                        </div>
+
+                        <div className="sm:text-right">
+                          <p className="text-xs uppercase tracking-[0.16em] text-slate-500">
+                            Total
+                          </p>
+                          <p className="mt-1 text-2xl font-bold text-slate-900">
+                            {formatCurrency(Number(order.total))}
+                          </p>
                         </div>
                       </div>
 
-                      <div className="md:text-right">
-                        <p className="text-lg font-semibold">
-                          {formatCurrency(Number(order.total))}
-                        </p>
-                        <p className="mt-1 text-sm text-slate-500">
-                          {new Date(order.createdAt).toLocaleString()}
-                        </p>
-                        <div className="mt-3">
-                          <Link
-                            href={`/admin/orders/${order.id}`}
-                            className="rounded-lg bg-slate-900 px-3 py-2 text-sm text-white hover:bg-slate-800"
-                          >
-                            Open Order
-                          </Link>
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <div className="soft-panel">
+                          <p className="text-xs uppercase tracking-[0.16em] text-slate-500">
+                            Product
+                          </p>
+                          <p className="mt-2 font-semibold text-slate-900">
+                            {firstItem?.productNameSnapshot || "—"}
+                          </p>
+                        </div>
+
+                        <div className="soft-panel">
+                          <p className="text-xs uppercase tracking-[0.16em] text-slate-500">
+                            Selections
+                          </p>
+                          <p className="mt-2 font-semibold text-slate-900">
+                            {selectionCount}
+                          </p>
                         </div>
                       </div>
+
+                      <div className="grid gap-3 sm:grid-cols-3">
+                        <div>
+                          <p className="text-xs uppercase tracking-[0.16em] text-slate-500">
+                            Created
+                          </p>
+                          <p className="mt-1 text-sm text-slate-700">
+                            {formatDate(order.createdAt)}
+                          </p>
+                        </div>
+
+                        <div>
+                          <p className="text-xs uppercase tracking-[0.16em] text-slate-500">
+                            Latest Email
+                          </p>
+                          <p className="mt-1 text-sm text-slate-700">
+                            {latestEmail
+                              ? `${latestEmail.status} → ${latestEmail.recipient}`
+                              : "No email logs"}
+                          </p>
+                        </div>
+
+                        <div>
+                          <p className="text-xs uppercase tracking-[0.16em] text-slate-500">
+                            Latest Sheet Sync
+                          </p>
+                          <p className="mt-1 text-sm text-slate-700">
+                            {latestSheet
+                              ? `${latestSheet.status} · ${
+                                  latestSheet.worksheetName || "Orders"
+                                }`
+                              : "No sheet logs"}
+                          </p>
+                        </div>
+                      </div>
+
+                      {order.notes ? (
+                        <div className="rounded-xl border bg-white/80 p-3">
+                          <p className="text-xs uppercase tracking-[0.16em] text-slate-500">
+                            Notes
+                          </p>
+                          <p className="mt-2 text-sm text-slate-600">
+                            {order.notes}
+                          </p>
+                        </div>
+                      ) : null}
                     </div>
-                  </div>
+                  </Link>
                 );
-              })
-            )}
-          </div>
-        </div>
+              })}
+            </div>
+          )}
+        </section>
       </div>
     </main>
   );

@@ -26,117 +26,196 @@ export default async function AdminProductsPage() {
     },
   })) as ProductRow[];
 
-  return (
-    <main className="min-h-screen bg-slate-50 p-8 text-slate-900">
-      <div className="mx-auto max-w-6xl">
-        <div className="mb-8">
-          <p className="text-sm text-slate-500">Admin</p>
-          <h1 className="text-4xl font-bold">Products</h1>
-          <p className="mt-2 text-slate-600">
-            Add furniture items your client can later configure in the builder.
-          </p>
-        </div>
+  const activeCount = products.filter((product) => product.active).length;
+  const inactiveCount = products.length - activeCount;
 
-        <div className="grid gap-8 lg:grid-cols-[420px_1fr]">
-          <div className="rounded-2xl border bg-white p-6 shadow-sm">
+  return (
+    <main className="min-h-screen p-4 sm:p-6 lg:p-8">
+      <div className="page-shell">
+        <section className="page-header">
+          <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <p className="mb-3 inline-flex rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-slate-600">
+                Admin Products
+              </p>
+              <h1 className="text-4xl font-bold sm:text-5xl">
+                Build and manage your catalog
+              </h1>
+              <p className="mt-4 max-w-2xl text-base sm:text-lg text-slate-600">
+                Add products, manage images, and open each product to organize
+                groups and choices for the builder.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap gap-3">
+              <Link href="/admin" className="button-secondary">
+                ← Dashboard
+              </Link>
+              <Link href="/admin/orders" className="button-secondary">
+                Orders
+              </Link>
+              <Link href="/admin/leathers" className="button-secondary">
+                Leathers
+              </Link>
+            </div>
+          </div>
+        </section>
+
+        <section className="grid gap-6 md:grid-cols-3">
+          <div className="section-card-strong">
+            <p className="text-xs uppercase tracking-[0.16em] text-slate-500">
+              Total Products
+            </p>
+            <p className="mt-3 text-4xl font-bold">{products.length}</p>
+          </div>
+
+          <div className="section-card-strong">
+            <p className="text-xs uppercase tracking-[0.16em] text-slate-500">
+              Active
+            </p>
+            <p className="mt-3 text-4xl font-bold">{activeCount}</p>
+          </div>
+
+          <div className="section-card-strong">
+            <p className="text-xs uppercase tracking-[0.16em] text-slate-500">
+              Inactive
+            </p>
+            <p className="mt-3 text-4xl font-bold">{inactiveCount}</p>
+          </div>
+        </section>
+
+        <div className="mt-8 grid gap-8 lg:grid-cols-[420px_1fr]">
+          <section className="section-card-strong">
             <h2 className="text-2xl font-semibold">Create Product</h2>
             <p className="mt-2 text-sm text-slate-500">
-              Start by adding a furniture item like Barstool, Chair, Sofa, or Booth.
+              Add a new furniture product like a chair, barstool, booth, or sofa.
             </p>
 
             <div className="mt-6">
               <CreateProductForm />
             </div>
-          </div>
+          </section>
 
-          <div className="rounded-2xl border bg-white p-6 shadow-sm">
-            <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-2xl font-semibold">Existing Products</h2>
-              <span className="text-sm text-slate-500">
+          <section className="section-card-strong">
+            <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <p className="text-sm font-medium uppercase tracking-[0.18em] text-slate-500">
+                  Product Catalog
+                </p>
+                <h2 className="mt-2 text-3xl font-bold">Existing Products</h2>
+              </div>
+
+              <span className="status-pill">
                 {products.length} total
               </span>
             </div>
 
-            <div className="space-y-4">
-              {products.length === 0 ? (
-                <p className="text-slate-500">No products yet.</p>
-              ) : (
-                products.map((product: ProductRow) => (
-                  <div
-                    key={product.id}
-                    className="rounded-xl border p-4 transition hover:bg-slate-50"
-                  >
-                    <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                      <div className="flex gap-4">
+            {products.length === 0 ? (
+              <div className="rounded-2xl border border-dashed bg-white/70 p-10 text-center">
+                <p className="text-lg font-semibold text-slate-700">
+                  No products yet.
+                </p>
+                <p className="mt-2 text-sm text-slate-500">
+                  Create your first product using the form on the left.
+                </p>
+              </div>
+            ) : (
+              <div className="grid gap-5 xl:grid-cols-2">
+                {products.map((product: ProductRow) => (
+                  <div key={product.id} className="premium-grid-card">
+                    <div className="flex flex-col gap-5">
+                      <div className="image-frame">
                         {product.imageUrl ? (
-                          <img
-                            src={product.imageUrl}
-                            alt={product.name}
-                            className="h-24 w-24 rounded-xl object-cover"
-                          />
+                          <div className="flex h-56 items-center justify-center overflow-hidden rounded-xl bg-white p-3">
+                            <img
+                              src={product.imageUrl}
+                              alt={product.name}
+                              className="h-full w-full object-contain"
+                            />
+                          </div>
                         ) : (
-                          <div className="flex h-24 w-24 items-center justify-center rounded-xl bg-slate-100 text-xs text-slate-400">
+                          <div className="flex h-56 items-center justify-center rounded-xl bg-slate-100 text-sm text-slate-400">
                             No Image
                           </div>
                         )}
-
-                        <div>
-                          <h3 className="text-xl font-semibold">{product.name}</h3>
-                          <p className="text-sm text-slate-500">
-                            Slug: {product.slug}
-                          </p>
-                          <p className="mt-1 text-slate-600">
-                            {product.description || "No description"}
-                          </p>
-                          <p className="mt-2 text-sm text-slate-500">
-                            SKU: {product.sku || "—"}
-                          </p>
-                          <p className="mt-1 text-sm text-slate-500">
-                            Option Groups: {product.optionGroups.length}
-                          </p>
-                          <p className="mt-1 text-sm text-slate-500">
-                            {product.active ? "Active" : "Inactive"}
-                          </p>
-
-                          <ProductRowActions
-                            product={{
-                              id: product.id,
-                              name: product.name,
-                              description: product.description,
-                              sku: product.sku,
-                              imageUrl: product.imageUrl,
-                              basePrice: Number(product.basePrice),
-                              active: product.active,
-                            }}
-                          />
-                        </div>
                       </div>
 
-                      <div className="md:text-right">
-                        <p className="text-lg font-semibold">
-                          {formatCurrency(Number(product.basePrice))}
+                      <div className="flex flex-col gap-4">
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div>
+                            <h3 className="text-2xl font-semibold">
+                              {product.name}
+                            </h3>
+                            <p className="mt-1 text-sm text-slate-500">
+                              Slug: {product.slug}
+                            </p>
+                            <p className="text-sm text-slate-500">
+                              SKU: {product.sku || "—"}
+                            </p>
+                          </div>
+
+                          <span className="status-pill">
+                            {product.active ? "Active" : "Inactive"}
+                          </span>
+                        </div>
+
+                        <p className="text-sm leading-6 text-slate-600">
+                          {product.description || "No description"}
                         </p>
-                        <div className="mt-3 flex gap-2 md:justify-end">
+
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          <div className="soft-panel">
+                            <p className="text-xs uppercase tracking-[0.16em] text-slate-500">
+                              Base Price
+                            </p>
+                            <p className="mt-2 text-xl font-bold text-slate-900">
+                              {formatCurrency(Number(product.basePrice))}
+                            </p>
+                          </div>
+
+                          <div className="soft-panel">
+                            <p className="text-xs uppercase tracking-[0.16em] text-slate-500">
+                              Option Groups
+                            </p>
+                            <p className="mt-2 text-xl font-bold text-slate-900">
+                              {product.optionGroups.length}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex flex-wrap gap-3">
                           <Link
                             href={`/products/${product.slug}`}
-                            className="rounded-lg border px-3 py-2 text-sm hover:bg-slate-100"
+                            className="button-secondary"
                           >
                             View Builder
                           </Link>
                           <Link
                             href={`/admin/products/${product.id}`}
-                            className="rounded-lg bg-slate-900 px-3 py-2 text-sm text-white hover:bg-slate-800"
+                            className="button-primary"
                           >
                             Manage Options
                           </Link>
                         </div>
+
+                        <ProductRowActions
+                          product={{
+                            id: product.id,
+                            name: product.name,
+                            description: product.description,
+                            sku: product.sku,
+                            imageUrl: product.imageUrl,
+                            basePrice: Number(product.basePrice),
+                            active: product.active,
+                          }}
+                        />
                       </div>
                     </div>
                   </div>
-                ))
-              )}
-            </div>
-          </div>
+                ))}
+              </div>
+            )}
+          </section>
         </div>
       </div>
     </main>
