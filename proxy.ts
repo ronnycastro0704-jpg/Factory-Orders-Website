@@ -1,37 +1,57 @@
 import { auth } from "./auth";
 import { NextResponse } from "next/server";
 
-export default auth((req) => {
-  const isLoggedIn = !!req.auth;
-  const role = req.auth?.user?.role;
+function normalizeEmail(value?: string | null) {
+  return (value || "").trim().toLowerCase();
+}
 
-  const pathname = req.nextUrl.pathname;
+function isAdminEmail(email?: string | null) {
+  const normalized = normalizeEmail(email);
 
-  const isAdminRoute = pathname.startsWith("/admin");
-  const isCustomerRoute =
-    pathname.startsWith("/my") || pathname.startsWith("/orders");
-
-  if (isAdminRoute) {
-    if (!isLoggedIn) {
-      const loginUrl = new URL("/login", req.nextUrl.origin);
-      loginUrl.searchParams.set("callbackUrl", pathname);
-      return NextResponse.redirect(loginUrl);
-    }
-
-    if (role !== "ADMIN" && role !== "STAFF") {
-      return NextResponse.redirect(new URL("/my/orders", req.nextUrl.origin));
-    }
+  if (!normalized) {
+    return false;
   }
 
-  if (isCustomerRoute && !isLoggedIn) {
-    const loginUrl = new URL("/login", req.nextUrl.origin);
+  const adminEmails = (process.env.ADMIN_EMAILS || "")
+    .split(",")
+    .map((value) => normalizeEmail(value))
+    .filter(Boolean);
+
+  return adminEmails.includes(normalized);
+}
+
+export default auth((req) => {
+  const pathname = req.nextUrl.pathname;
+  const userEmail = req.auth?.user?.email || null;
+  const isLoggedIn = Boolean(userEmail);
+  const isAdmin = isAdminEmail(userEmail);
+
+  const isLoginRoute = pathname === "/login";
+  const isAdminRoute = pathname === "/admin" || pathname.startsWith("/admin/");
+  const isCustomerRoute =
+    pathname === "/my/orders" ||
+    pathname.startsWith("/my/orders/") ||
+    (pathname.startsWith("/orders/") && pathname.endsWith("/edit"));
+
+  if (isLoginRoute && isLoggedIn) {
+    return NextResponse.redirect(
+      new URL(isAdmin ? "/admin/products" : "/my/orders", req.url)
+    );
+  }
+
+  if ((isAdminRoute || isCustomerRoute) && !isLoggedIn) {
+    const loginUrl = new URL("/login", req.url);
     loginUrl.searchParams.set("callbackUrl", pathname);
     return NextResponse.redirect(loginUrl);
+  }
+
+  if (isAdminRoute && !isAdmin) {
+    return NextResponse.redirect(new URL("/my/orders", req.url));
   }
 
   return NextResponse.next();
 });
 
 export const config = {
-  matcher: ["/admin/:path*", "/my/:path*", "/orders/:path*"],
+  matcher: ["/login", "/admin/:path*", "/my/orders/:path*", "/orders/:path*/edit"],
 };
