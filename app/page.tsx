@@ -1,5 +1,4 @@
 import Link from "next/link";
-import Image from "next/image";
 import { prisma } from "../lib/prisma";
 import { formatCurrency } from "../lib/utils";
 
@@ -86,11 +85,14 @@ export default async function HomePage({ searchParams }: PageProps) {
               </p>
 
               <div className="mt-8 flex flex-wrap gap-3">
-                <Link href="/admin" className="button-primary">
+                <Link href="/admin/products" className="button-primary">
                   Open Admin
                 </Link>
                 <Link href="/my/orders" className="button-secondary">
                   View My Orders
+                </Link>
+                <Link href="/admin" className="button-secondary">
+                  Admin Dashboard
                 </Link>
               </div>
             </div>
@@ -210,9 +212,7 @@ export default async function HomePage({ searchParams }: PageProps) {
                         </p>
                       </div>
 
-                      <span className="button-primary">
-                        Configure
-                      </span>
+                      <span className="button-primary">Configure</span>
                     </div>
                   </div>
                 </Link>
