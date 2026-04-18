@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
+import { auth } from "../../auth";
 import { prisma } from "../../lib/prisma";
 import { formatCurrency } from "../../lib/utils";
 
@@ -40,7 +42,28 @@ function getStatusClasses(status: string) {
   }
 }
 
+function isAdminEmail(email?: string | null) {
+  if (!email) return false;
+
+  const adminEmails = (process.env.ADMIN_EMAILS || "")
+    .split(",")
+    .map((value) => value.trim().toLowerCase())
+    .filter(Boolean);
+
+  return adminEmails.includes(email.toLowerCase());
+}
+
 export default async function AdminDashboardPage() {
+  const session = await auth();
+
+  if (!session?.user?.email) {
+    redirect("/login");
+  }
+
+  if (!isAdminEmail(session.user.email)) {
+    redirect("/");
+  }
+
   const [
     totalOrders,
     sentToFactoryOrders,
@@ -106,6 +129,9 @@ export default async function AdminDashboardPage() {
                 </Link>
                 <Link href="/admin/leathers" className="button-secondary">
                   Manage Leathers
+                </Link>
+                <Link href="/" className="button-secondary">
+                  Customer Side
                 </Link>
               </div>
             </div>
