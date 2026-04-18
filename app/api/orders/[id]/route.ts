@@ -1,22 +1,13 @@
 import { NextResponse } from "next/server";
+import { auth } from "../../../../auth";
 import { prisma } from "../../../../lib/prisma";
 import { sendOrderNotification } from "../../../../lib/email";
 import { appendOrderRow } from "../../../../lib/sheets";
-
-type TransactionClient = Omit<
-  typeof prisma,
-  "$connect" | "$disconnect" | "$on" | "$use" | "$extends"
->;
 
 type RouteContext = {
   params: Promise<{
     id: string;
   }>;
-};
-
-type IncomingLineItem = {
-  label: string;
-  amount: number;
 };
 
 type IncomingSelection = {
@@ -32,7 +23,23 @@ type IncomingSelection = {
   laseredBrandImageUrl?: string | null;
 };
 
+type IncomingLineItem = {
+  label: string;
+  amount: number;
+};
+
 const SELECTION_META_SEPARATOR = "|||";
+
+function isAdminEmail(email?: string | null) {
+  if (!email) return false;
+
+  const adminEmails = (process.env.ADMIN_EMAILS || "")
+    .split(",")
+    .map((value) => value.trim().toLowerCase())
+    .filter(Boolean);
+
+  return adminEmails.includes(email.toLowerCase());
+}
 
 function buildSelectionRows(selections: IncomingSelection[]) {
   return selections.flatMap((selection: IncomingSelection) => {
@@ -40,7 +47,7 @@ function buildSelectionRows(selections: IncomingSelection[]) {
       {
         optionGroupNameSnapshot: selection.groupName,
         optionChoiceNameSnapshot: selection.choiceLabel,
-        priceDeltaSnapshot: selection.baseAmount,
+        priceDeltaSnapshot: Number(selection.baseAmount || 0),
       },
     ];
 
@@ -50,7 +57,7 @@ function buildSelectionRows(selections: IncomingSelection[]) {
         optionChoiceNameSnapshot: `${selection.choiceLabel}${SELECTION_META_SEPARATOR}${selection.leatherName}${
           selection.leatherGrade ? ` (${selection.leatherGrade})` : ""
         }`,
-        priceDeltaSnapshot: selection.leatherSurcharge || 0,
+        priceDeltaSnapshot: Number(selection.leatherSurcharge || 0),
       });
     }
 
@@ -98,6 +105,15 @@ function buildSelectionsText(selections: IncomingSelection[]) {
 
 export async function GET(_: Request, context: RouteContext) {
   try {
+    const session = await auth();
+
+    if (!session?.user?.email) {
+      return NextResponse.json(
+        { error: "You must be signed in." },
+        { status: 401 }
+      );
+    }
+
     const { id } = await context.params;
 
     const order = await prisma.order.findUnique({
@@ -124,11 +140,22 @@ export async function GET(_: Request, context: RouteContext) {
       return NextResponse.json({ error: "Order not found." }, { status: 404 });
     }
 
+    const viewerEmail = session.user.email.toLowerCase();
+    const allowed =
+      order.customerEmail.toLowerCase() === viewerEmail || isAdminEmail(viewerEmail);
+
+    if (!allowed) {
+      return NextResponse.json(
+        { error: "You are not allowed to view this order." },
+        { status: 403 }
+      );
+    }
+
     return NextResponse.json(order);
   } catch (error) {
     console.error("GET ORDER ERROR:", error);
     return NextResponse.json(
-      { error: "Failed to load order." },
+      { error: "Failed to fetch order." },
       { status: 500 }
     );
   }
@@ -136,27 +163,33 @@ export async function GET(_: Request, context: RouteContext) {
 
 export async function PUT(request: Request, context: RouteContext) {
   try {
+    const session = await auth();
+
+    if (!session?.user?.email) {
+      return NextResponse.json(
+        { error: "You must be signed in to edit an order." },
+        { status: 401 }
+      );
+    }
+
     const { id } = await context.params;
     const body = await request.json();
 
     const customerName = String(body.customerName || "").trim();
-    const customerEmail = String(body.customerEmail || "").trim();
-    const customerPhone = String(body.customerPhone || "").trim();
-    const notes = String(body.notes || "").trim();
-    const status = String(body.status || "").trim();
-    const changeReason = String(body.changeReason || "").trim();
-
+    const customerPhone = String(body.customerPhone || "").trim() || null;
+    const notes = String(body.notes || "").trim() || null;
+    const changeReason = String(body.changeReason || "").trim() || "Order updated";
     const productName = String(body.productName || "").trim();
     const basePrice = Number(body.basePrice || 0);
     const total = Number(body.total || 0);
 
     const selections = Array.isArray(body.selections)
       ? (body.selections as IncomingSelection[])
-      : null;
+      : [];
 
     const lineItems = Array.isArray(body.lineItems)
       ? (body.lineItems as IncomingLineItem[])
-      : null;
+      : [];
 
     if (!customerName) {
       return NextResponse.json(
@@ -165,14 +198,14 @@ export async function PUT(request: Request, context: RouteContext) {
       );
     }
 
-    if (!customerEmail) {
+    if (selections.length === 0) {
       return NextResponse.json(
-        { error: "Customer email is required." },
+        { error: "At least one selection is required." },
         { status: 400 }
       );
     }
 
-    const existingOrder = await prisma.order.findUnique({
+    const order = await prisma.order.findUnique({
       where: { id },
       include: {
         items: {
@@ -187,214 +220,182 @@ export async function PUT(request: Request, context: RouteContext) {
       },
     });
 
-    if (!existingOrder) {
+    if (!order || order.items.length === 0) {
       return NextResponse.json({ error: "Order not found." }, { status: 404 });
     }
 
-    const existingItem = existingOrder.items[0] || null;
-    const hasConfigUpdate =
-      !!existingItem &&
-      selections !== null &&
-      lineItems !== null &&
-      !Number.isNaN(total);
+    const viewerEmail = session.user.email.toLowerCase();
+    const allowed =
+      order.customerEmail.toLowerCase() === viewerEmail || isAdminEmail(viewerEmail);
 
+    if (!allowed) {
+      return NextResponse.json(
+        { error: "You are not allowed to edit this order." },
+        { status: 403 }
+      );
+    }
+
+    const item = order.items[0];
+    const selectionRows = buildSelectionRows(selections);
     const nextRevisionNumber =
-      existingOrder.revisions.length > 0
-        ? existingOrder.revisions[0].revisionNumber + 1
-        : 1;
+      order.revisions.length > 0 ? order.revisions[0].revisionNumber + 1 : 1;
+    const nextStatus = order.status === "DRAFT" ? "DRAFT" : "CHANGED";
 
-    const finalStatus = status
-      ? status
-      : hasConfigUpdate
-      ? "CHANGED"
-      : existingOrder.status;
-
-    const beforeSnapshot = {
-      customerName: existingOrder.customerName,
-      customerEmail: existingOrder.customerEmail,
-      customerPhone: existingOrder.customerPhone,
-      notes: existingOrder.notes,
-      status: existingOrder.status,
-      total: Number(existingOrder.total),
-    };
-
-    await prisma.$transaction(async (tx: TransactionClient) => {
-      await tx.order.update({
+    const [updatedOrder] = await prisma.$transaction([
+      prisma.order.update({
         where: { id },
         data: {
           customerName,
-          customerEmail,
-          customerPhone: customerPhone || null,
-          notes: notes || null,
-          status: finalStatus as
-            | "DRAFT"
-            | "SUBMITTED"
-            | "CHANGED"
-            | "SENT_TO_FACTORY"
-            | "COMPLETED"
-            | "CANCELLED",
-          ...(hasConfigUpdate
-            ? {
-                subtotal: total,
-                total,
-              }
-            : {}),
-        },
-      });
-
-      if (hasConfigUpdate && existingItem && selections) {
-        await tx.orderItem.update({
-          where: { id: existingItem.id },
-          data: {
-            productNameSnapshot:
-              productName || existingItem.productNameSnapshot,
-            ...(basePrice > 0
-              ? {
-                  basePriceSnapshot: basePrice,
-                }
-              : {}),
-            lineTotal: total,
-            selections: {
-              deleteMany: {},
-              create: buildSelectionRows(selections),
+          customerPhone,
+          notes,
+          total,
+          status: nextStatus,
+          items: {
+            update: {
+              where: { id: item.id },
+              data: {
+                productNameSnapshot: productName || item.productNameSnapshot,
+                basePriceSnapshot: basePrice,
+                lineTotal: total,
+                selections: {
+                  deleteMany: {},
+                  create: selectionRows,
+                },
+              },
             },
           },
-        });
-      }
-
-      await tx.orderRevision.create({
+        },
+        include: {
+          items: {
+            include: {
+              selections: true,
+            },
+          },
+          revisions: {
+            orderBy: { createdAt: "desc" },
+          },
+          emailLogs: {
+            orderBy: { createdAt: "desc" },
+          },
+          sheetSyncLogs: {
+            orderBy: { createdAt: "desc" },
+          },
+        },
+      }),
+      prisma.orderRevision.create({
         data: {
           orderId: id,
           revisionNumber: nextRevisionNumber,
-          changedBy: customerEmail,
-          changeReason:
-            changeReason ||
-            (hasConfigUpdate
-              ? "Customer edited order configuration"
-              : "Order details updated"),
-          beforeJson: beforeSnapshot,
-          afterJson: {
-            customerName,
-            customerEmail,
-            customerPhone,
-            notes,
-            status: finalStatus,
-            total: hasConfigUpdate ? total : Number(existingOrder.total),
-            productName: productName || existingItem?.productNameSnapshot || "",
-            selections: selections || [],
-            lineItems: lineItems || [],
+          changedBy: viewerEmail,
+          changeReason,
+          beforeJson: {
+            status: order.status,
           },
+          afterJson: {
+            status: nextStatus,
+            selections,
+            lineItems,
+          },
+        },
+      }),
+    ]);
+
+    try {
+      await sendOrderNotification({
+        type: "updated",
+        orderNumber: updatedOrder.orderNumber,
+        customerName,
+        customerEmail: updatedOrder.customerEmail,
+        customerPhone,
+        notes,
+        productName: productName || item.productNameSnapshot,
+        total,
+        selections: selections.map((selection: IncomingSelection) => ({
+          groupName: selection.groupName,
+          choiceLabel: selection.choiceLabel,
+          leatherName: selection.leatherName || null,
+          leatherGrade: selection.leatherGrade || null,
+          baseAmount: Number(selection.baseAmount || 0),
+          leatherSurcharge: Number(selection.leatherSurcharge || 0),
+          imageUrl: selection.imageUrl || null,
+          leatherImageUrl: selection.leatherImageUrl || null,
+          laseredBrand: Boolean(selection.laseredBrand),
+          laseredBrandImageUrl: selection.laseredBrandImageUrl || null,
+        })),
+      });
+
+      await prisma.emailLog.createMany({
+        data: [
+          {
+            orderId: id,
+            eventType: "ORDER_UPDATED_CUSTOMER",
+            recipient: updatedOrder.customerEmail,
+            subject: `Your order was updated: ${updatedOrder.orderNumber}`,
+            status: "SENT",
+          },
+          {
+            orderId: id,
+            eventType: "ORDER_UPDATED_INTERNAL",
+            recipient: process.env.ORDER_NOTIFY_TO || "",
+            subject: `Order Updated: ${updatedOrder.orderNumber}`,
+            status: "SENT",
+          },
+        ],
+      });
+    } catch (error) {
+      console.error("UPDATE ORDER EMAIL ERROR:", error);
+
+      await prisma.emailLog.create({
+        data: {
+          orderId: id,
+          eventType: "ORDER_UPDATED",
+          recipient: updatedOrder.customerEmail,
+          subject: `Your order was updated: ${updatedOrder.orderNumber}`,
+          status: "FAILED",
+          errorMessage:
+            error instanceof Error ? error.message : "Unknown email error",
         },
       });
-    });
-
-    if (hasConfigUpdate && selections) {
-      try {
-        await sendOrderNotification({
-          type: "updated",
-          orderNumber: existingOrder.orderNumber,
-          customerName,
-          customerEmail,
-          customerPhone,
-          notes,
-          productName: productName || existingItem?.productNameSnapshot || "",
-          total,
-          selections,
-        });
-
-        await prisma.emailLog.createMany({
-          data: [
-            {
-              orderId: id,
-              eventType: "ORDER_UPDATED_CUSTOMER",
-              recipient: customerEmail,
-              subject: `Your order was updated: ${existingOrder.orderNumber}`,
-              status: "SENT",
-            },
-            {
-              orderId: id,
-              eventType: "ORDER_UPDATED_INTERNAL",
-              recipient: process.env.ORDER_NOTIFY_TO || "",
-              subject: `Order Updated: ${existingOrder.orderNumber}`,
-              status: "SENT",
-            },
-          ],
-        });
-      } catch (error) {
-        console.error("ORDER UPDATE EMAIL ERROR:", error);
-
-        await prisma.emailLog.create({
-          data: {
-            orderId: id,
-            eventType: "ORDER_UPDATED",
-            recipient: customerEmail,
-            subject: `Your order was updated: ${existingOrder.orderNumber}`,
-            status: "FAILED",
-            errorMessage:
-              error instanceof Error ? error.message : "Unknown email error",
-          },
-        });
-      }
-
-      try {
-        await appendOrderRow({
-          eventType: "updated",
-          orderNumber: existingOrder.orderNumber,
-          status: finalStatus,
-          customerName,
-          customerEmail,
-          customerPhone,
-          productName: productName || existingItem?.productNameSnapshot || "",
-          total,
-          notes,
-          selectionsText: buildSelectionsText(selections),
-        });
-
-        await prisma.sheetSyncLog.create({
-          data: {
-            orderId: id,
-            spreadsheetId: process.env.GOOGLE_SHEETS_SPREADSHEET_ID || null,
-            worksheetName: process.env.GOOGLE_SHEETS_TAB_NAME || "Orders",
-            spreadsheetRowId: "APPENDED",
-            status: "SYNCED",
-          },
-        });
-      } catch (error) {
-        console.error("ORDER UPDATE SHEETS ERROR:", error);
-
-        await prisma.sheetSyncLog.create({
-          data: {
-            orderId: id,
-            spreadsheetId: process.env.GOOGLE_SHEETS_SPREADSHEET_ID || null,
-            worksheetName: process.env.GOOGLE_SHEETS_TAB_NAME || "Orders",
-            spreadsheetRowId: "APPEND_FAILED",
-            status: "FAILED",
-            errorMessage:
-              error instanceof Error ? error.message : "Unknown sheets error",
-          },
-        });
-      }
     }
 
-    const updatedOrder = await prisma.order.findUnique({
-      where: { id },
-      include: {
-        items: {
-          include: {
-            selections: true,
-          },
+    try {
+      await appendOrderRow({
+        eventType: "updated",
+        orderNumber: updatedOrder.orderNumber,
+        status: nextStatus,
+        customerName,
+        customerEmail: updatedOrder.customerEmail,
+        customerPhone,
+        productName: productName || item.productNameSnapshot,
+        total,
+        notes,
+        selectionsText: buildSelectionsText(selections),
+      });
+
+      await prisma.sheetSyncLog.create({
+        data: {
+          orderId: id,
+          spreadsheetId: process.env.GOOGLE_SHEETS_SPREADSHEET_ID || null,
+          worksheetName: process.env.GOOGLE_SHEETS_TAB_NAME || "Orders",
+          spreadsheetRowId: "APPENDED",
+          status: "SYNCED",
         },
-        revisions: {
-          orderBy: { createdAt: "desc" },
+      });
+    } catch (error) {
+      console.error("UPDATE ORDER SHEETS ERROR:", error);
+
+      await prisma.sheetSyncLog.create({
+        data: {
+          orderId: id,
+          spreadsheetId: process.env.GOOGLE_SHEETS_SPREADSHEET_ID || null,
+          worksheetName: process.env.GOOGLE_SHEETS_TAB_NAME || "Orders",
+          spreadsheetRowId: "APPEND_FAILED",
+          status: "FAILED",
+          errorMessage:
+            error instanceof Error ? error.message : "Unknown sheets error",
         },
-        emailLogs: {
-          orderBy: { createdAt: "desc" },
-        },
-        sheetSyncLogs: {
-          orderBy: { createdAt: "desc" },
-        },
-      },
-    });
+      });
+    }
 
     return NextResponse.json(updatedOrder);
   } catch (error) {

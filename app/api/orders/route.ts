@@ -1,13 +1,9 @@
 import { NextResponse } from "next/server";
-import { prisma } from "../../../lib/prisma";
+import { Prisma } from "@prisma/client";
 import { auth } from "../../../auth";
+import { prisma } from "../../../lib/prisma";
 import { sendOrderNotification } from "../../../lib/email";
 import { appendOrderRow } from "../../../lib/sheets";
-
-type IncomingLineItem = {
-  label: string;
-  amount: number;
-};
 
 type IncomingSelection = {
   groupName: string;
@@ -22,16 +18,22 @@ type IncomingSelection = {
   laseredBrandImageUrl?: string | null;
 };
 
-function generateOrderNumber() {
-  const now = new Date();
-  const yyyy = now.getFullYear();
-  const mm = String(now.getMonth() + 1).padStart(2, "0");
-  const dd = String(now.getDate()).padStart(2, "0");
-  const random = Math.floor(1000 + Math.random() * 9000);
-  return `ORD-${yyyy}${mm}${dd}-${random}`;
-}
+type IncomingLineItem = {
+  label: string;
+  amount: number;
+};
 
 const SELECTION_META_SEPARATOR = "|||";
+
+function generateOrderNumber() {
+  const now = new Date();
+  const yyyy = now.getFullYear().toString();
+  const mm = String(now.getMonth() + 1).padStart(2, "0");
+  const dd = String(now.getDate()).padStart(2, "0");
+  const suffix = Math.random().toString(36).slice(2, 6).toUpperCase();
+
+  return `FO-${yyyy}${mm}${dd}-${suffix}`;
+}
 
 function buildSelectionRows(selections: IncomingSelection[]) {
   return selections.flatMap((selection: IncomingSelection) => {
@@ -39,7 +41,7 @@ function buildSelectionRows(selections: IncomingSelection[]) {
       {
         optionGroupNameSnapshot: selection.groupName,
         optionChoiceNameSnapshot: selection.choiceLabel,
-        priceDeltaSnapshot: selection.baseAmount,
+        priceDeltaSnapshot: Number(selection.baseAmount || 0),
       },
     ];
 
@@ -49,7 +51,7 @@ function buildSelectionRows(selections: IncomingSelection[]) {
         optionChoiceNameSnapshot: `${selection.choiceLabel}${SELECTION_META_SEPARATOR}${selection.leatherName}${
           selection.leatherGrade ? ` (${selection.leatherGrade})` : ""
         }`,
-        priceDeltaSnapshot: selection.leatherSurcharge || 0,
+        priceDeltaSnapshot: Number(selection.leatherSurcharge || 0),
       });
     }
 
@@ -98,16 +100,25 @@ function buildSelectionsText(selections: IncomingSelection[]) {
 export async function POST(request: Request) {
   try {
     const session = await auth();
-    const userId = session?.user?.id || null;
+
+    if (!session?.user?.email) {
+      return NextResponse.json(
+        { error: "You must be signed in to place an order." },
+        { status: 401 }
+      );
+    }
 
     const body = await request.json();
 
+    const signedInEmail = session.user.email.toLowerCase();
+    const signedInName =
+      session.user.name?.trim() || signedInEmail.split("@")[0] || "Customer";
+
     const productId = String(body.productId || "").trim();
+    const customerName = String(body.customerName || "").trim() || signedInName;
+    const customerPhone = String(body.customerPhone || "").trim() || null;
+    const notes = String(body.notes || "").trim() || null;
     const productName = String(body.productName || "").trim();
-    const customerName = String(body.customerName || "").trim();
-    const customerEmail = String(body.customerEmail || "").trim();
-    const customerPhone = String(body.customerPhone || "").trim();
-    const notes = String(body.notes || "").trim();
     const basePrice = Number(body.basePrice || 0);
     const total = Number(body.total || 0);
     const submitToFactory = Boolean(body.submitToFactory);
@@ -120,9 +131,9 @@ export async function POST(request: Request) {
       ? (body.lineItems as IncomingLineItem[])
       : [];
 
-    if (!productId || !productName) {
+    if (!productId) {
       return NextResponse.json(
-        { error: "Product information is required." },
+        { error: "Product is required." },
         { status: 400 }
       );
     }
@@ -134,42 +145,52 @@ export async function POST(request: Request) {
       );
     }
 
-    if (!customerEmail) {
+    if (selections.length === 0) {
       return NextResponse.json(
-        { error: "Customer email is required." },
+        { error: "At least one selection is required." },
         { status: 400 }
       );
     }
 
-    const orderNumber = generateOrderNumber();
-    const initialStatus = submitToFactory ? "SENT_TO_FACTORY" : "DRAFT";
+    const product = await prisma.product.findUnique({
+      where: { id: productId },
+      select: {
+        id: true,
+        name: true,
+        active: true,
+      },
+    });
 
-    const order = await prisma.order.create({
+    if (!product || !product.active) {
+      return NextResponse.json(
+        { error: "Product not found." },
+        { status: 404 }
+      );
+    }
+
+    const selectionRows = buildSelectionRows(selections);
+    const orderNumber = generateOrderNumber();
+    const nextStatus = submitToFactory ? "SENT_TO_FACTORY" : "DRAFT";
+
+    const createdOrder = await prisma.order.create({
       data: {
         orderNumber,
         customerName,
-        customerEmail,
-        customerPhone: customerPhone || null,
-        status: initialStatus,
-        subtotal: total,
+        customerEmail: signedInEmail,
+        customerPhone,
+        notes,
+        status: nextStatus,
         total,
-        notes: notes || null,
-        userId,
-        ...(submitToFactory
-          ? {
-              sentToFactoryAt: new Date(),
-            }
-          : {}),
+        sentToFactoryAt: submitToFactory ? new Date() : null,
         items: {
           create: [
             {
               productId,
-              productNameSnapshot: productName,
+              productNameSnapshot: productName || product.name,
               basePriceSnapshot: basePrice,
-              quantity: 1,
               lineTotal: total,
               selections: {
-                create: buildSelectionRows(selections),
+                create: selectionRows,
               },
             },
           ],
@@ -177,21 +198,13 @@ export async function POST(request: Request) {
         revisions: {
           create: {
             revisionNumber: 1,
-            changedBy: customerEmail,
+            changedBy: signedInEmail,
             changeReason: submitToFactory
-              ? "Customer sent order to factory"
-              : "Initial draft creation",
-            beforeJson: {},
+              ? "Order created and sent to factory"
+              : "Order created",
+            beforeJson: Prisma.JsonNull,
             afterJson: {
-              productId,
-              productName,
-              customerName,
-              customerEmail,
-              customerPhone,
-              notes,
-              basePrice,
-              total,
-              status: initialStatus,
+              status: nextStatus,
               selections,
               lineItems,
             },
@@ -204,44 +217,64 @@ export async function POST(request: Request) {
             selections: true,
           },
         },
+        revisions: {
+          orderBy: { createdAt: "desc" },
+        },
+        emailLogs: {
+          orderBy: { createdAt: "desc" },
+        },
+        sheetSyncLogs: {
+          orderBy: { createdAt: "desc" },
+        },
       },
     });
 
     try {
       await sendOrderNotification({
         type: submitToFactory ? "sent_to_factory" : "created",
-        orderNumber,
+        orderNumber: createdOrder.orderNumber,
         customerName,
-        customerEmail,
+        customerEmail: signedInEmail,
         customerPhone,
         notes,
-        productName,
+        productName: productName || product.name,
         total,
-        selections,
+        selections: selections.map((selection: IncomingSelection) => ({
+          groupName: selection.groupName,
+          choiceLabel: selection.choiceLabel,
+          leatherName: selection.leatherName || null,
+          leatherGrade: selection.leatherGrade || null,
+          baseAmount: Number(selection.baseAmount || 0),
+          leatherSurcharge: Number(selection.leatherSurcharge || 0),
+          imageUrl: selection.imageUrl || null,
+          leatherImageUrl: selection.leatherImageUrl || null,
+          laseredBrand: Boolean(selection.laseredBrand),
+          laseredBrandImageUrl: selection.laseredBrandImageUrl || null,
+        })),
       });
 
       await prisma.emailLog.createMany({
         data: [
           {
-            orderId: order.id,
+            orderId: createdOrder.id,
             eventType: submitToFactory
               ? "ORDER_SENT_TO_FACTORY_CUSTOMER"
               : "ORDER_CREATED_CUSTOMER",
-            recipient: customerEmail,
+            recipient: signedInEmail,
             subject: submitToFactory
-              ? `Your order was sent to the factory: ${orderNumber}`
-              : `We received your order draft: ${orderNumber}`,
+              ? `Your order was sent to the factory: ${createdOrder.orderNumber}`
+              : `We received your order draft: ${createdOrder.orderNumber}`,
             status: "SENT",
           },
           {
-            orderId: order.id,
+            orderId: createdOrder.id,
             eventType: submitToFactory
               ? "ORDER_SENT_TO_FACTORY_INTERNAL"
               : "ORDER_CREATED_INTERNAL",
             recipient: process.env.ORDER_NOTIFY_TO || "",
             subject: submitToFactory
-              ? `Order Sent to Factory: ${orderNumber}`
-              : `New Order Draft: ${orderNumber}`,
+              ? `Order Sent to Factory: ${createdOrder.orderNumber}`
+              : `New Order Draft: ${createdOrder.orderNumber}`,
             status: "SENT",
           },
         ],
@@ -251,14 +284,12 @@ export async function POST(request: Request) {
 
       await prisma.emailLog.create({
         data: {
-          orderId: order.id,
-          eventType: submitToFactory
-            ? "ORDER_SENT_TO_FACTORY"
-            : "ORDER_CREATED",
-          recipient: customerEmail,
+          orderId: createdOrder.id,
+          eventType: submitToFactory ? "ORDER_SENT_TO_FACTORY" : "ORDER_CREATED",
+          recipient: signedInEmail,
           subject: submitToFactory
-            ? `Your order was sent to the factory: ${orderNumber}`
-            : `We received your order draft: ${orderNumber}`,
+            ? `Your order was sent to the factory: ${createdOrder.orderNumber}`
+            : `We received your order draft: ${createdOrder.orderNumber}`,
           status: "FAILED",
           errorMessage:
             error instanceof Error ? error.message : "Unknown email error",
@@ -268,13 +299,13 @@ export async function POST(request: Request) {
 
     try {
       await appendOrderRow({
-        eventType: submitToFactory ? "updated" : "created",
-        orderNumber,
-        status: initialStatus,
+        eventType: "created",
+        orderNumber: createdOrder.orderNumber,
+        status: nextStatus,
         customerName,
-        customerEmail,
+        customerEmail: signedInEmail,
         customerPhone,
-        productName,
+        productName: productName || product.name,
         total,
         notes,
         selectionsText: buildSelectionsText(selections),
@@ -282,7 +313,7 @@ export async function POST(request: Request) {
 
       await prisma.sheetSyncLog.create({
         data: {
-          orderId: order.id,
+          orderId: createdOrder.id,
           spreadsheetId: process.env.GOOGLE_SHEETS_SPREADSHEET_ID || null,
           worksheetName: process.env.GOOGLE_SHEETS_TAB_NAME || "Orders",
           spreadsheetRowId: "APPENDED",
@@ -294,7 +325,7 @@ export async function POST(request: Request) {
 
       await prisma.sheetSyncLog.create({
         data: {
-          orderId: order.id,
+          orderId: createdOrder.id,
           spreadsheetId: process.env.GOOGLE_SHEETS_SPREADSHEET_ID || null,
           worksheetName: process.env.GOOGLE_SHEETS_TAB_NAME || "Orders",
           spreadsheetRowId: "APPEND_FAILED",
@@ -305,7 +336,7 @@ export async function POST(request: Request) {
       });
     }
 
-    return NextResponse.json(order, { status: 201 });
+    return NextResponse.json(createdOrder, { status: 201 });
   } catch (error) {
     console.error("CREATE ORDER ERROR:", error);
     return NextResponse.json(

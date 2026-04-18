@@ -1,9 +1,34 @@
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
-import bcrypt from "bcryptjs";
+import { compare } from "bcryptjs";
 import { prisma } from "./lib/prisma";
 
+function normalizeEmail(value: string) {
+  return value.trim().toLowerCase();
+}
+
+function getAllowedSignInEmails() {
+  return (process.env.ALLOWED_SIGNUP_EMAILS || "")
+    .split(",")
+    .map((value) => normalizeEmail(value))
+    .filter(Boolean);
+}
+
+function isEmailAllowed(email?: string | null) {
+  if (!email) return false;
+
+  const allowedEmails = getAllowedSignInEmails();
+
+  if (allowedEmails.length === 0) {
+    return true;
+  }
+
+  return allowedEmails.includes(normalizeEmail(email));
+}
+
 export const { handlers, auth, signIn, signOut } = NextAuth({
+  trustHost: true,
+  secret: process.env.AUTH_SECRET,
   session: {
     strategy: "jwt",
   },
@@ -14,53 +39,95 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     Credentials({
       name: "Credentials",
       credentials: {
-        email: { label: "Email", type: "email" },
-        password: { label: "Password", type: "password" },
+        email: {
+          label: "Email",
+          type: "email",
+        },
+        password: {
+          label: "Password",
+          type: "password",
+        },
       },
       async authorize(credentials) {
-        const email = String(credentials?.email || "").trim().toLowerCase();
-        const password = String(credentials?.password || "");
+        const email = normalizeEmail(String(credentials?.email ?? ""));
+        const password = String(credentials?.password ?? "");
 
         if (!email || !password) {
           return null;
         }
 
-        const user = await prisma.user.findUnique({
+        if (!isEmailAllowed(email)) {
+          return null;
+        }
+
+        const rawUser = (await prisma.user.findUnique({
           where: { email },
-        });
+        })) as Record<string, unknown> | null;
 
-        if (!user || !user.passwordHash) {
+        if (!rawUser) {
           return null;
         }
 
-        const valid = await bcrypt.compare(password, user.passwordHash);
+        const passwordHash =
+          typeof rawUser.passwordHash === "string"
+            ? rawUser.passwordHash
+            : typeof rawUser.password === "string"
+            ? rawUser.password
+            : null;
 
-        if (!valid) {
+        if (!passwordHash) {
           return null;
         }
+
+        const passwordMatches = await compare(password, passwordHash);
+
+        if (!passwordMatches) {
+          return null;
+        }
+
+        const userId =
+          typeof rawUser.id === "string" ? rawUser.id : email;
+
+        const userEmail =
+          typeof rawUser.email === "string" ? rawUser.email : email;
+
+        const userName =
+          typeof rawUser.name === "string" && rawUser.name.trim().length > 0
+            ? rawUser.name
+            : userEmail.split("@")[0];
 
         return {
-          id: user.id,
-          name: user.name,
-          email: user.email,
-          role: user.role,
+          id: userId,
+          email: userEmail,
+          name: userName,
         };
       },
     }),
   ],
   callbacks: {
+    async signIn({ user }) {
+      return isEmailAllowed(user.email);
+    },
     async jwt({ token, user }) {
-      if (user) {
-        token.userId = user.id;
-        token.role = (user as { role?: string }).role || "CUSTOMER";
+      if (user?.email) {
+        token.email = user.email;
       }
+
+      if (user?.name) {
+        token.name = user.name;
+      }
+
       return token;
     },
     async session({ session, token }) {
-      if (session.user) {
-        session.user.id = String(token.userId || "");
-        session.user.role = String(token.role || "CUSTOMER");
+      if (session.user && typeof token.email === "string") {
+        session.user.email = token.email;
       }
+
+      if (session.user && typeof token.name === "string") {
+        session.user.name = token.name;
+      }
+
       return session;
     },
   },

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { auth } from "../../../auth";
 import { prisma } from "../../../lib/prisma";
 import { formatCurrency } from "../../../lib/utils";
 import ProductBuilder from "./product-builder";
@@ -65,6 +66,7 @@ type LeatherRecord = {
 
 export default async function ProductPage({ params }: PageProps) {
   const { slug } = await params;
+  const session = await auth();
 
   const product = (await prisma.product.findUnique({
     where: { slug },
@@ -121,7 +123,9 @@ export default async function ProductPage({ params }: PageProps) {
             ? null
             : Number(choice.gradeEMBUpcharge),
         gradeHOHUpcharge:
-          choice.gradeHOHUpcharge === null ? null : Number(choice.gradeHOHUpcharge),
+          choice.gradeHOHUpcharge === null
+            ? null
+            : Number(choice.gradeHOHUpcharge),
         gradeAxisUpcharge:
           choice.gradeAxisUpcharge === null
             ? null
@@ -239,10 +243,27 @@ export default async function ProductPage({ params }: PageProps) {
             </p>
           </div>
 
-          <ProductBuilder
-            product={serializedProduct}
-            leathers={serializedLeathers}
-          />
+          {session?.user ? (
+            <ProductBuilder
+              product={serializedProduct}
+              leathers={serializedLeathers}
+            />
+          ) : (
+            <div className="rounded-2xl border border-dashed bg-white/70 p-10 text-center">
+              <p className="text-xl font-semibold text-slate-900">
+                Sign in required
+              </p>
+              <p className="mt-3 text-sm text-slate-500">
+                You need an approved account before you can build and send an
+                order.
+              </p>
+              <div className="mt-6">
+                <Link href="/login" className="button-primary">
+                  Go to Sign In
+                </Link>
+              </div>
+            </div>
+          )}
         </section>
       </div>
     </main>
