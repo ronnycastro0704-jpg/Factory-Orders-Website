@@ -91,8 +91,8 @@ export default async function HomePage({ searchParams }: PageProps) {
                 <Link href="/my/orders" className="button-secondary">
                   View My Orders
                 </Link>
-                <Link href="/admin" className="button-secondary">
-                  Admin Dashboard
+                <Link href="/admin/orders" className="button-secondary">
+                  Admin Orders
                 </Link>
               </div>
             </div>

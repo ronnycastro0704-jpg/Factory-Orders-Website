@@ -50,10 +50,13 @@ export default async function SiteHeader() {
               {showAdmin ? (
                 <>
                   <Link href="/admin/products" className="button-primary">
-                    Manage Products
+                    Open Admin
                   </Link>
-                  <Link href="/admin" className="button-secondary">
-                    Admin Dashboard
+                  <Link href="/admin/orders" className="button-secondary">
+                    Admin Orders
+                  </Link>
+                  <Link href="/admin/leathers" className="button-secondary">
+                    Leathers
                   </Link>
                 </>
               ) : null}
@@ -98,10 +101,13 @@ export default async function SiteHeader() {
             {showAdmin ? (
               <>
                 <Link href="/admin/products" className="button-primary">
-                  Manage Products
+                  Open Admin
                 </Link>
-                <Link href="/admin" className="button-secondary">
-                  Admin
+                <Link href="/admin/orders" className="button-secondary">
+                  Orders
+                </Link>
+                <Link href="/admin/leathers" className="button-secondary">
+                  Leathers
                 </Link>
               </>
             ) : null}
