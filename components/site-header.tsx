@@ -1,16 +1,6 @@
 import Link from "next/link";
 import { auth, signOut } from "@/auth";
-
-function isAdminEmail(email?: string | null) {
-  if (!email) return false;
-
-  const adminEmails = (process.env.ADMIN_EMAILS || "")
-    .split(",")
-    .map((value) => value.trim().toLowerCase())
-    .filter(Boolean);
-
-  return adminEmails.includes(email.toLowerCase());
-}
+import { isAdminEmail } from "@/lib/admin";
 
 export default async function SiteHeader() {
   const session = await auth();
