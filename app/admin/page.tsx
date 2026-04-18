@@ -1,164 +1,252 @@
 import Link from "next/link";
 import { prisma } from "../../lib/prisma";
+import { formatCurrency } from "../../lib/utils";
 
-type RecentOrderItem = {
-  id: string;
-  productNameSnapshot: string;
-};
-
-type RecentOrder = {
+type OrderCard = {
   id: string;
   orderNumber: string;
   customerName: string;
   customerEmail: string;
   status: string;
-  items: RecentOrderItem[];
+  total: unknown;
+  createdAt: Date;
+  items: {
+    id: string;
+    productNameSnapshot: string;
+  }[];
 };
+
+function formatDate(date: Date) {
+  return new Intl.DateTimeFormat("en-US", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(date);
+}
+
+function getStatusClasses(status: string) {
+  switch (status) {
+    case "SENT_TO_FACTORY":
+      return "bg-amber-50 text-amber-700 border-amber-200";
+    case "COMPLETED":
+      return "bg-green-50 text-green-700 border-green-200";
+    case "CHANGED":
+      return "bg-blue-50 text-blue-700 border-blue-200";
+    case "DRAFT":
+      return "bg-slate-100 text-slate-700 border-slate-200";
+    case "CANCELLED":
+      return "bg-red-50 text-red-700 border-red-200";
+    default:
+      return "bg-white text-slate-700 border-slate-200";
+  }
+}
 
 export default async function AdminDashboardPage() {
   const [
     totalOrders,
-    draftOrders,
-    changedOrders,
-    sentOrders,
+    sentToFactoryOrders,
     completedOrders,
-    failedEmails,
-    failedSheets,
-    recentOrdersRaw,
+    activeProducts,
+    leatherCount,
+    recentOrders,
   ] = await Promise.all([
     prisma.order.count(),
-    prisma.order.count({ where: { status: "DRAFT" } }),
-    prisma.order.count({ where: { status: "CHANGED" } }),
-    prisma.order.count({ where: { status: "SENT_TO_FACTORY" } }),
-    prisma.order.count({ where: { status: "COMPLETED" } }),
-    prisma.emailLog.count({ where: { status: "FAILED" } }),
-    prisma.sheetSyncLog.count({ where: { status: "FAILED" } }),
+    prisma.order.count({
+      where: { status: "SENT_TO_FACTORY" },
+    }),
+    prisma.order.count({
+      where: { status: "COMPLETED" },
+    }),
+    prisma.product.count({
+      where: { active: true },
+    }),
+    prisma.leather.count({
+      where: { active: true },
+    }),
     prisma.order.findMany({
       orderBy: { createdAt: "desc" },
       take: 8,
       include: {
-        items: true,
+        items: {
+          select: {
+            id: true,
+            productNameSnapshot: true,
+          },
+        },
       },
     }),
   ]);
 
-  const recentOrders = recentOrdersRaw as RecentOrder[];
+  const recentOrdersTyped = recentOrders as OrderCard[];
 
   return (
-    <main className="min-h-screen bg-slate-50 p-8 text-slate-900">
-      <div className="mx-auto max-w-6xl space-y-8">
-        <div>
-          <p className="text-sm text-slate-500">Admin</p>
-          <h1 className="text-4xl font-bold">Dashboard</h1>
-          <p className="mt-2 text-slate-600">
-            Monitor orders, failures, and factory flow at a glance.
-          </p>
-        </div>
+    <main className="min-h-screen p-4 sm:p-6 lg:p-8">
+      <div className="page-shell">
+        <section className="page-header">
+          <div className="grid gap-8 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
+            <div>
+              <p className="mb-3 inline-flex rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-slate-600">
+                Admin Dashboard
+              </p>
 
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <Link
-            href="/admin/orders"
-            className="rounded-2xl border bg-white p-5 shadow-sm transition hover:bg-slate-50"
-          >
-            <p className="text-sm text-slate-500">Total Orders</p>
-            <p className="mt-2 text-3xl font-bold">{totalOrders}</p>
-          </Link>
+              <h1 className="text-4xl font-bold sm:text-5xl">
+                Manage products, orders, leathers, and factory flow.
+              </h1>
 
-          <Link
-            href="/admin/orders?status=CHANGED"
-            className="rounded-2xl border bg-white p-5 shadow-sm transition hover:bg-slate-50"
-          >
-            <p className="text-sm text-slate-500">Changed</p>
-            <p className="mt-2 text-3xl font-bold">{changedOrders}</p>
-          </Link>
+              <p className="mt-5 max-w-2xl text-base sm:text-lg text-slate-600">
+                Review recent activity, manage your catalog, and keep the order
+                system clean and easy for both customers and factory workers.
+              </p>
 
-          <Link
-            href="/admin/orders?status=SENT_TO_FACTORY"
-            className="rounded-2xl border bg-white p-5 shadow-sm transition hover:bg-slate-50"
-          >
-            <p className="text-sm text-slate-500">Sent to Factory</p>
-            <p className="mt-2 text-3xl font-bold">{sentOrders}</p>
-          </Link>
+              <div className="mt-8 flex flex-wrap gap-3">
+                <Link href="/admin/orders" className="button-primary">
+                  View Orders
+                </Link>
+                <Link href="/admin/products" className="button-secondary">
+                  Manage Products
+                </Link>
+                <Link href="/admin/leathers" className="button-secondary">
+                  Manage Leathers
+                </Link>
+              </div>
+            </div>
 
-          <Link
-            href="/admin/orders?status=COMPLETED"
-            className="rounded-2xl border bg-white p-5 shadow-sm transition hover:bg-slate-50"
-          >
-            <p className="text-sm text-slate-500">Completed</p>
-            <p className="mt-2 text-3xl font-bold">{completedOrders}</p>
-          </Link>
-        </div>
+            <div className="section-card-strong">
+              <h2 className="text-2xl font-semibold">Quick Access</h2>
+              <div className="mt-5 grid gap-3">
+                <Link href="/admin/products" className="premium-grid-card">
+                  <p className="text-lg font-semibold">Products</p>
+                  <p className="mt-1 text-sm text-slate-500">
+                    Add, edit, remove, and organize product options.
+                  </p>
+                </Link>
 
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <Link
-            href="/admin/orders?status=DRAFT"
-            className="rounded-2xl border bg-white p-5 shadow-sm transition hover:bg-slate-50"
-          >
-            <p className="text-sm text-slate-500">Draft</p>
-            <p className="mt-2 text-3xl font-bold">{draftOrders}</p>
-          </Link>
+                <Link href="/admin/orders" className="premium-grid-card">
+                  <p className="text-lg font-semibold">Orders</p>
+                  <p className="mt-1 text-sm text-slate-500">
+                    Review submitted orders and send them to the factory.
+                  </p>
+                </Link>
 
-          <Link
-            href="/admin/orders?emailStatus=FAILED"
-            className="rounded-2xl border bg-white p-5 shadow-sm transition hover:bg-slate-50"
-          >
-            <p className="text-sm text-slate-500">Failed Emails</p>
-            <p className="mt-2 text-3xl font-bold">{failedEmails}</p>
-          </Link>
+                <Link href="/admin/leathers" className="premium-grid-card">
+                  <p className="text-lg font-semibold">Leathers</p>
+                  <p className="mt-1 text-sm text-slate-500">
+                    Maintain leather library, grades, and images.
+                  </p>
+                </Link>
+              </div>
+            </div>
+          </div>
+        </section>
 
-          <Link
-            href="/admin/orders?sheetStatus=FAILED"
-            className="rounded-2xl border bg-white p-5 shadow-sm transition hover:bg-slate-50"
-          >
-            <p className="text-sm text-slate-500">Failed Sheets Sync</p>
-            <p className="mt-2 text-3xl font-bold">{failedSheets}</p>
-          </Link>
-        </div>
+        <section className="grid gap-6 md:grid-cols-2 xl:grid-cols-5">
+          <div className="section-card-strong">
+            <p className="text-xs uppercase tracking-[0.16em] text-slate-500">
+              Total Orders
+            </p>
+            <p className="mt-3 text-4xl font-bold">{totalOrders}</p>
+          </div>
 
-        <div className="rounded-2xl border bg-white p-6 shadow-sm">
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-2xl font-semibold">Recent Orders</h2>
-            <Link
-              href="/admin/orders"
-              className="text-sm font-medium text-blue-600 hover:underline"
-            >
-              View all
+          <div className="section-card-strong">
+            <p className="text-xs uppercase tracking-[0.16em] text-slate-500">
+              Sent to Factory
+            </p>
+            <p className="mt-3 text-4xl font-bold">{sentToFactoryOrders}</p>
+          </div>
+
+          <div className="section-card-strong">
+            <p className="text-xs uppercase tracking-[0.16em] text-slate-500">
+              Completed
+            </p>
+            <p className="mt-3 text-4xl font-bold">{completedOrders}</p>
+          </div>
+
+          <div className="section-card-strong">
+            <p className="text-xs uppercase tracking-[0.16em] text-slate-500">
+              Active Products
+            </p>
+            <p className="mt-3 text-4xl font-bold">{activeProducts}</p>
+          </div>
+
+          <div className="section-card-strong">
+            <p className="text-xs uppercase tracking-[0.16em] text-slate-500">
+              Active Leathers
+            </p>
+            <p className="mt-3 text-4xl font-bold">{leatherCount}</p>
+          </div>
+        </section>
+
+        <section className="mt-8 section-card-strong">
+          <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <p className="text-sm font-medium uppercase tracking-[0.18em] text-slate-500">
+                Recent Orders
+              </p>
+              <h2 className="mt-2 text-3xl font-bold">Latest Activity</h2>
+            </div>
+
+            <Link href="/admin/orders" className="button-secondary">
+              Open Full Orders Page
             </Link>
           </div>
 
-          <div className="space-y-4">
-            {recentOrders.length === 0 ? (
-              <p className="text-slate-500">No orders yet.</p>
-            ) : (
-              recentOrders.map((order: RecentOrder) => (
-                <div
-                  key={order.id}
-                  className="rounded-xl border p-4 transition hover:bg-slate-50"
-                >
-                  <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                    <div>
-                      <p className="text-lg font-semibold">{order.orderNumber}</p>
-                      <p className="text-sm text-slate-500">
-                        {order.customerName} • {order.customerEmail}
-                      </p>
-                      <p className="mt-1 text-sm text-slate-500">
-                        {order.items[0]?.productNameSnapshot || "No product"} •{" "}
-                        {order.status}
-                      </p>
-                    </div>
+          {recentOrdersTyped.length === 0 ? (
+            <div className="rounded-2xl border border-dashed bg-white/70 p-10 text-center">
+              <p className="text-lg font-semibold text-slate-700">
+                No orders yet.
+              </p>
+              <p className="mt-2 text-sm text-slate-500">
+                Orders will appear here once customers begin using the builder.
+              </p>
+            </div>
+          ) : (
+            <div className="grid gap-4 xl:grid-cols-2">
+              {recentOrdersTyped.map((order: OrderCard) => {
+                const firstItem = order.items[0];
 
-                    <Link
-                      href={`/admin/orders/${order.id}`}
-                      className="rounded-lg bg-slate-900 px-3 py-2 text-sm text-white hover:bg-slate-800"
-                    >
-                      Open
-                    </Link>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
+                return (
+                  <Link
+                    key={order.id}
+                    href={`/admin/orders/${order.id}`}
+                    className="premium-grid-card"
+                  >
+                    <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                      <div>
+                        <p className="text-lg font-semibold">{order.orderNumber}</p>
+                        <p className="mt-1 text-sm text-slate-500">
+                          {order.customerName}
+                        </p>
+                        <p className="text-sm text-slate-500">
+                          {order.customerEmail}
+                        </p>
+
+                        <div className="mt-4 space-y-1 text-sm text-slate-600">
+                          <p>
+                            Product: {firstItem?.productNameSnapshot || "—"}
+                          </p>
+                          <p>Created: {formatDate(order.createdAt)}</p>
+                        </div>
+                      </div>
+
+                      <div className="sm:text-right">
+                        <span
+                          className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${getStatusClasses(
+                            order.status
+                          )}`}
+                        >
+                          {order.status.replaceAll("_", " ")}
+                        </span>
+
+                        <p className="mt-4 text-2xl font-bold text-slate-900">
+                          {formatCurrency(Number(order.total))}
+                        </p>
+                      </div>
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          )}
+        </section>
       </div>
     </main>
   );

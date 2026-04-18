@@ -1,7 +1,8 @@
+import Link from "next/link";
+import { notFound } from "next/navigation";
 import { prisma } from "../../../lib/prisma";
 import { formatCurrency } from "../../../lib/utils";
 import ProductBuilder from "./product-builder";
-import { notFound } from "next/navigation";
 
 type PageProps = {
   params: Promise<{
@@ -13,11 +14,13 @@ type ProductChoice = {
   id: string;
   label: string;
   value: string | null;
-  isBinaryOption: boolean;
   description: string | null;
   imageUrl: string | null;
   priceDelta: unknown;
   usesLeatherGrades: boolean;
+  appliesLeatherSurcharge: boolean;
+  allowsLaseredBrand: boolean;
+  isBinaryOption: boolean;
   gradeAUpcharge: unknown | null;
   gradeBUpcharge: unknown | null;
   gradeEMBUpcharge: unknown | null;
@@ -27,8 +30,6 @@ type ProductChoice = {
   comUpcharge: unknown | null;
   displayOrder: number;
   active: boolean;
-  allowsLaseredBrand: boolean;
-  appliesLeatherSurcharge: boolean;
 };
 
 type ProductGroup = {
@@ -81,7 +82,7 @@ export default async function ProductPage({ params }: PageProps) {
     },
   })) as ProductRecord | null;
 
-  if (!product) {
+  if (!product || !product.active) {
     notFound();
   }
 
@@ -93,10 +94,6 @@ export default async function ProductPage({ params }: PageProps) {
   const serializedProduct = {
     id: product.id,
     name: product.name,
-    slug: product.slug,
-    description: product.description,
-    sku: product.sku,
-    active: product.active,
     basePrice: Number(product.basePrice),
     optionGroups: product.optionGroups.map((group: ProductGroup) => ({
       id: group.id,
@@ -104,19 +101,17 @@ export default async function ProductPage({ params }: PageProps) {
       slug: group.slug,
       type: group.type,
       required: group.required,
-      displayOrder: group.displayOrder,
-      active: group.active,
       choices: group.choices.map((choice: ProductChoice) => ({
         id: choice.id,
         label: choice.label,
-        appliesLeatherSurcharge: choice.appliesLeatherSurcharge,
-        allowsLaseredBrand: choice.allowsLaseredBrand,
-        isBinaryOption: choice.isBinaryOption,
         value: choice.value,
         description: choice.description,
         imageUrl: choice.imageUrl,
         priceDelta: Number(choice.priceDelta),
         usesLeatherGrades: choice.usesLeatherGrades,
+        appliesLeatherSurcharge: choice.appliesLeatherSurcharge,
+        allowsLaseredBrand: choice.allowsLaseredBrand,
+        isBinaryOption: choice.isBinaryOption,
         gradeAUpcharge:
           choice.gradeAUpcharge === null ? null : Number(choice.gradeAUpcharge),
         gradeBUpcharge:
@@ -126,9 +121,7 @@ export default async function ProductPage({ params }: PageProps) {
             ? null
             : Number(choice.gradeEMBUpcharge),
         gradeHOHUpcharge:
-          choice.gradeHOHUpcharge === null
-            ? null
-            : Number(choice.gradeHOHUpcharge),
+          choice.gradeHOHUpcharge === null ? null : Number(choice.gradeHOHUpcharge),
         gradeAxisUpcharge:
           choice.gradeAxisUpcharge === null
             ? null
@@ -139,8 +132,6 @@ export default async function ProductPage({ params }: PageProps) {
             : Number(choice.gradeBuffaloUpcharge),
         comUpcharge:
           choice.comUpcharge === null ? null : Number(choice.comUpcharge),
-        displayOrder: choice.displayOrder,
-        active: choice.active,
       })),
     })),
   };
@@ -154,40 +145,105 @@ export default async function ProductPage({ params }: PageProps) {
   }));
 
   return (
-    <main className="min-h-screen bg-white p-8 text-slate-900">
-      <div className="mx-auto max-w-6xl">
-        <p className="mb-2 text-sm text-slate-500">Product Builder</p>
-
-        <div className="grid gap-8 lg:grid-cols-[320px_1fr] lg:items-start">
-          <div>
-            {product.imageUrl ? (
-              <img
-                src={product.imageUrl}
-                alt={product.name}
-                className="w-full rounded-2xl border object-cover shadow-sm"
-              />
-            ) : (
-              <div className="flex h-72 w-full items-center justify-center rounded-2xl border bg-slate-100 text-sm text-slate-400 shadow-sm">
-                No Product Image
-              </div>
-            )}
+    <main className="min-h-screen p-4 sm:p-6 lg:p-8">
+      <div className="page-shell">
+        <section className="page-header">
+          <div className="mb-6 flex flex-wrap items-center gap-3 text-sm">
+            <Link href="/" className="button-secondary">
+              ← Back to Products
+            </Link>
+            <span className="status-pill">SKU: {product.sku || "—"}</span>
+            <span className="status-pill">
+              {product.optionGroups.length} option group
+              {product.optionGroups.length === 1 ? "" : "s"}
+            </span>
+            <span className="status-pill">
+              {leathers.length} leather
+              {leathers.length === 1 ? "" : "s"}
+            </span>
           </div>
 
-          <div>
-            <h1 className="text-4xl font-bold">{product.name}</h1>
-            <p className="mt-2 text-slate-600">{product.description}</p>
-            <p className="mt-4 text-lg font-medium">
-              Base Price: {formatCurrency(Number(product.basePrice))}
+          <div className="grid gap-8 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
+            <div className="section-card">
+              <div className="image-frame">
+                {product.imageUrl ? (
+                  <div className="flex h-[340px] items-center justify-center overflow-hidden rounded-2xl bg-white p-4">
+                    <img
+                      src={product.imageUrl}
+                      alt={product.name}
+                      className="h-full w-full object-contain"
+                    />
+                  </div>
+                ) : (
+                  <div className="flex h-[340px] items-center justify-center rounded-2xl bg-slate-100 text-sm text-slate-400">
+                    No Product Image
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div>
+              <p className="text-sm font-medium uppercase tracking-[0.2em] text-slate-500">
+                Configure Product
+              </p>
+              <h1 className="mt-3 text-4xl font-bold sm:text-5xl">
+                {product.name}
+              </h1>
+
+              <p className="mt-5 max-w-2xl text-base sm:text-lg text-slate-600">
+                {product.description ||
+                  "Customize this product section by section, choose leather where needed, and generate a clean factory-ready order."}
+              </p>
+
+              <div className="mt-8 grid gap-4 sm:grid-cols-3">
+                <div className="soft-panel">
+                  <p className="text-xs uppercase tracking-[0.16em] text-slate-500">
+                    Base Price
+                  </p>
+                  <p className="mt-2 text-2xl font-bold text-slate-900">
+                    {formatCurrency(Number(product.basePrice))}
+                  </p>
+                </div>
+
+                <div className="soft-panel">
+                  <p className="text-xs uppercase tracking-[0.16em] text-slate-500">
+                    Option Groups
+                  </p>
+                  <p className="mt-2 text-2xl font-bold text-slate-900">
+                    {product.optionGroups.length}
+                  </p>
+                </div>
+
+                <div className="soft-panel">
+                  <p className="text-xs uppercase tracking-[0.16em] text-slate-500">
+                    Leather Library
+                  </p>
+                  <p className="mt-2 text-2xl font-bold text-slate-900">
+                    {leathers.length}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="section-card-strong">
+          <div className="mb-6">
+            <p className="text-sm font-medium uppercase tracking-[0.18em] text-slate-500">
+              Builder
+            </p>
+            <h2 className="mt-2 text-3xl font-bold">Customize Your Order</h2>
+            <p className="mt-2 text-sm text-slate-500">
+              Select the options you want, assign leather where needed, and send
+              the final order to the factory.
             </p>
           </div>
-        </div>
 
-        <div className="mt-8">
           <ProductBuilder
             product={serializedProduct}
             leathers={serializedLeathers}
           />
-        </div>
+        </section>
       </div>
     </main>
   );
