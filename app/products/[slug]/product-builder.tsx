@@ -505,12 +505,13 @@ export default function ProductBuilder({ product, leathers }: Props) {
   return (
     <div className="grid gap-8 lg:grid-cols-[1.4fr_0.8fr]">
       <div className="space-y-6">
-        {activeQuickPick ? (
-          <div className="rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
-            Quick pick <span className="font-semibold">{activeQuickPick.choice.label}</span>{" "}
-            is selected. Other option groups are locked.
-          </div>
-        ) : null}
+{activeQuickPick ? (
+  <div className="rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
+    Quick pick <span className="font-semibold">{activeQuickPick.choice.label}</span>{" "}
+    is selected. Other leather-based groups are locked, but non-leather options
+    like nails can still be selected.
+  </div>
+) : null}
 
         {product.optionGroups.map((group) => {
           const selectedChoiceIds = selectedOptions[group.id] || [];
@@ -525,8 +526,10 @@ export default function ProductBuilder({ product, leathers }: Props) {
             : false;
 
           const isMultiSelect = group.type === "MULTI_SELECT";
-          const groupDisabled =
-            Boolean(activeQuickPick) && group.id !== activeQuickPick?.groupId;
+const groupDisabled =
+  Boolean(activeQuickPick) &&
+  group.id !== activeQuickPick?.groupId &&
+  group.choices.some((choice) => choice.usesLeatherGrades);
 
           return (
             <div
@@ -551,13 +554,13 @@ export default function ProductBuilder({ product, leathers }: Props) {
                 ) : null}
               </div>
 
-              {groupDisabled && activeQuickPick ? (
-                <div className="mb-4 rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
-                  Disabled because quick pick{" "}
-                  <span className="font-semibold">{activeQuickPick.choice.label}</span>{" "}
-                  is selected.
-                </div>
-              ) : null}
+{groupDisabled && activeQuickPick ? (
+  <div className="mb-4 rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
+    Disabled because quick pick{" "}
+    <span className="font-semibold">{activeQuickPick.choice.label}</span>{" "}
+    is selected and this group uses leather selection.
+  </div>
+) : null}
 
               <div className={groupDisabled ? "pointer-events-none select-none" : ""}>
                 {isBinaryGroup && binaryChoice ? (
