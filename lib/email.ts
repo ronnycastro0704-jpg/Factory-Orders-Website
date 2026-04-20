@@ -86,7 +86,41 @@ function buildSelectionsText(selections: OrderSelection[]) {
     .join("\n\n");
 }
 
-function buildSelectionsHtml(selections: OrderSelection[]) {
+function buildFactorySelectionsText(selections: OrderSelection[]) {
+  return selections
+    .map((selection, index) => {
+      const lines = [`${index + 1}. ${selection.groupName}: ${selection.choiceLabel}`];
+
+      if (selection.leatherName) {
+        lines.push(
+          `   Leather: ${selection.leatherName}${
+            selection.leatherGrade ? ` (${selection.leatherGrade})` : ""
+          }`
+        );
+      }
+
+      if (selection.laseredBrand) {
+        lines.push("   Lasered Brand: Yes");
+      }
+
+      if (selection.imageUrl) {
+        lines.push(`   Option Image: ${selection.imageUrl}`);
+      }
+
+      if (selection.leatherImageUrl) {
+        lines.push(`   Leather Image: ${selection.leatherImageUrl}`);
+      }
+
+      if (selection.laseredBrandImageUrl) {
+        lines.push(`   Brand Image: ${selection.laseredBrandImageUrl}`);
+      }
+
+      return lines.join("\n");
+    })
+    .join("\n\n");
+}
+
+function buildCustomerSelectionsHtml(selections: OrderSelection[]) {
   return selections
     .map((selection, index) => {
       const color = getSectionColor(index);
@@ -98,9 +132,7 @@ function buildSelectionsHtml(selections: OrderSelection[]) {
       const safeLeatherGrade = selection.leatherGrade
         ? escapeHtml(selection.leatherGrade)
         : "";
-      const safeImageUrl = selection.imageUrl
-        ? escapeHtml(selection.imageUrl)
-        : "";
+      const safeImageUrl = selection.imageUrl ? escapeHtml(selection.imageUrl) : "";
       const safeLeatherImageUrl = selection.leatherImageUrl
         ? escapeHtml(selection.leatherImageUrl)
         : "";
@@ -176,6 +208,104 @@ function buildSelectionsHtml(selections: OrderSelection[]) {
                 : ""
             }
           </div>
+        </div>
+      `;
+    })
+    .join("");
+}
+
+function buildFactorySelectionsHtml(selections: OrderSelection[]) {
+  return selections
+    .map((selection, index) => {
+      const color = getSectionColor(index);
+      const safeGroupName = escapeHtml(selection.groupName);
+      const safeChoiceLabel = escapeHtml(selection.choiceLabel);
+      const safeLeatherName = selection.leatherName
+        ? escapeHtml(selection.leatherName)
+        : "";
+      const safeLeatherGrade = selection.leatherGrade
+        ? escapeHtml(selection.leatherGrade)
+        : "";
+      const safeImageUrl = selection.imageUrl ? escapeHtml(selection.imageUrl) : "";
+      const safeLeatherImageUrl = selection.leatherImageUrl
+        ? escapeHtml(selection.leatherImageUrl)
+        : "";
+      const safeLaseredBrandImageUrl = selection.laseredBrandImageUrl
+        ? escapeHtml(selection.laseredBrandImageUrl)
+        : "";
+
+      return `
+        <div style="border:1px solid #e5e7eb;border-left:6px solid ${color};border-radius:12px;padding:10px 12px;margin-bottom:10px;background:#ffffff;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
+            <tr>
+              <td style="vertical-align:top;padding-right:12px;">
+                <div style="display:inline-block;background:${color};color:#ffffff;font-weight:700;font-size:11px;padding:4px 8px;border-radius:999px;margin-bottom:6px;">
+                  ${safeGroupName.toUpperCase()}
+                </div>
+                <div style="font-size:15px;font-weight:700;color:#111827;line-height:1.35;">
+                  ${safeChoiceLabel}
+                </div>
+                ${
+                  selection.leatherName
+                    ? `<div style="font-size:13px;color:#334155;line-height:1.4;margin-top:4px;">
+                        Leather: ${safeLeatherName}${
+                          selection.leatherGrade ? ` (${safeLeatherGrade})` : ""
+                        }
+                      </div>`
+                    : ""
+                }
+                ${
+                  selection.laseredBrand
+                    ? `<div style="font-size:13px;color:#334155;line-height:1.4;margin-top:4px;">
+                        Lasered Brand: Yes
+                      </div>`
+                    : ""
+                }
+              </td>
+              <td style="vertical-align:top;width:292px;">
+                <table role="presentation" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
+                  <tr>
+                    ${
+                      safeImageUrl
+                        ? `<td style="padding-left:8px;">
+                            <div style="font-size:10px;font-weight:700;color:#64748b;margin-bottom:4px;text-align:center;">OPTION</div>
+                            <img
+                              src="${safeImageUrl}"
+                              alt="${safeChoiceLabel}"
+                              style="width:84px;height:84px;object-fit:contain;border-radius:10px;border:1px solid #cbd5e1;background:#ffffff;display:block;"
+                            />
+                          </td>`
+                        : ""
+                    }
+                    ${
+                      safeLeatherImageUrl
+                        ? `<td style="padding-left:8px;">
+                            <div style="font-size:10px;font-weight:700;color:#64748b;margin-bottom:4px;text-align:center;">LEATHER</div>
+                            <img
+                              src="${safeLeatherImageUrl}"
+                              alt="${safeLeatherName || "Leather"}"
+                              style="width:84px;height:84px;object-fit:contain;border-radius:10px;border:1px solid #cbd5e1;background:#ffffff;display:block;"
+                            />
+                          </td>`
+                        : ""
+                    }
+                    ${
+                      safeLaseredBrandImageUrl
+                        ? `<td style="padding-left:8px;">
+                            <div style="font-size:10px;font-weight:700;color:#64748b;margin-bottom:4px;text-align:center;">BRAND</div>
+                            <img
+                              src="${safeLaseredBrandImageUrl}"
+                              alt="Lasered Brand"
+                              style="width:84px;height:84px;object-fit:contain;border-radius:10px;border:1px solid #cbd5e1;background:#ffffff;display:block;"
+                            />
+                          </td>`
+                        : ""
+                    }
+                  </tr>
+                </table>
+              </td>
+            </tr>
+          </table>
         </div>
       `;
     })
@@ -267,33 +397,39 @@ export async function sendOrderNotification(input: SendOrderEmailInput) {
     notes ? `Notes: ${notes}` : "",
     "",
     "FACTORY SECTIONS:",
-    buildSelectionsText(selections),
+    buildFactorySelectionsText(selections),
   ]
     .filter(Boolean)
     .join("\n");
 
   const internalHtml = `
-    <div style="font-family:Arial,sans-serif;max-width:1100px;margin:0 auto;padding:24px;background:#f8fafc;color:#111827;">
-      <h1 style="margin:0 0 16px 0;font-size:24px;">${escapeHtml(
+    <div style="font-family:Arial,sans-serif;max-width:860px;margin:0 auto;padding:14px;background:#f8fafc;color:#111827;">
+      <h1 style="margin:0 0 10px 0;font-size:22px;line-height:1.2;">${escapeHtml(
         copy.internalSubject
       )}</h1>
 
-      <div style="background:#ffffff;border:1px solid #e5e7eb;border-radius:12px;padding:20px;margin-bottom:20px;">
-        <p><strong>Order Number:</strong> ${escapeHtml(orderNumber)}</p>
-        <p><strong>Customer:</strong> ${escapeHtml(customerName)}</p>
-        <p><strong>Email:</strong> ${escapeHtml(customerEmail)}</p>
-        ${
-          customerPhone
-            ? `<p><strong>Phone:</strong> ${escapeHtml(customerPhone)}</p>`
-            : ""
-        }
-        <p><strong>Product:</strong> ${escapeHtml(productName)}</p>
-        <p><strong>Total:</strong> ${formatCurrency(total)}</p>
-        ${notes ? `<p><strong>Notes:</strong> ${escapeHtml(notes)}</p>` : ""}
+      <div style="background:#ffffff;border:1px solid #e5e7eb;border-radius:12px;padding:14px 16px;margin-bottom:14px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
+          <tr>
+            <td style="font-size:14px;line-height:1.55;color:#111827;vertical-align:top;">
+              <div><strong>Order Number:</strong> ${escapeHtml(orderNumber)}</div>
+              <div><strong>Customer:</strong> ${escapeHtml(customerName)}</div>
+              <div><strong>Email:</strong> ${escapeHtml(customerEmail)}</div>
+              ${
+                customerPhone
+                  ? `<div><strong>Phone:</strong> ${escapeHtml(customerPhone)}</div>`
+                  : ""
+              }
+              <div><strong>Product:</strong> ${escapeHtml(productName)}</div>
+              <div><strong>Total:</strong> ${formatCurrency(total)}</div>
+              ${notes ? `<div style="margin-top:6px;"><strong>Notes:</strong> ${escapeHtml(notes)}</div>` : ""}
+            </td>
+          </tr>
+        </table>
       </div>
 
-      <h2 style="font-size:22px;margin:0 0 16px 0;">Factory Sections</h2>
-      ${buildSelectionsHtml(selections)}
+      <h2 style="font-size:18px;margin:0 0 10px 0;line-height:1.2;">Factory Sections</h2>
+      ${buildFactorySelectionsHtml(selections)}
     </div>
   `;
 
@@ -341,7 +477,7 @@ export async function sendOrderNotification(input: SendOrderEmailInput) {
       </div>
 
       <h2 style="font-size:22px;margin:0 0 16px 0;">Selections</h2>
-      ${buildSelectionsHtml(selections)}
+      ${buildCustomerSelectionsHtml(selections)}
 
       <p style="margin-top:24px;font-size:14px;color:#475569;">
         If you need help, reply to this email.
