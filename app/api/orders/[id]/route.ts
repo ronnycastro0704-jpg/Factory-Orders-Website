@@ -30,6 +30,14 @@ type IncomingLineItem = {
 
 const SELECTION_META_SEPARATOR = "|||";
 
+function normalizeEmail(value: string) {
+  return value.trim().toLowerCase();
+}
+
+function isValidEmail(email: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
 function isAdminEmail(email?: string | null) {
   if (!email) return false;
 
@@ -114,7 +122,13 @@ export async function GET(_: Request, context: RouteContext) {
       );
     }
 
+    const viewerEmail = normalizeEmail(session.user.email);
     const { id } = await context.params;
+
+    const viewerUser = await prisma.user.findUnique({
+      where: { email: viewerEmail },
+      select: { id: true },
+    });
 
     const order = await prisma.order.findUnique({
       where: { id },
@@ -140,9 +154,14 @@ export async function GET(_: Request, context: RouteContext) {
       return NextResponse.json({ error: "Order not found." }, { status: 404 });
     }
 
-    const viewerEmail = session.user.email.toLowerCase();
-    const allowed =
-      order.customerEmail.toLowerCase() === viewerEmail || isAdminEmail(viewerEmail);
+    const isSubmitter =
+      Boolean(order.userId) &&
+      Boolean(viewerUser?.id) &&
+      order.userId === viewerUser?.id;
+
+    const isCustomer = normalizeEmail(order.customerEmail) === viewerEmail;
+
+    const allowed = isSubmitter || isCustomer || isAdminEmail(viewerEmail);
 
     if (!allowed) {
       return NextResponse.json(
@@ -172,10 +191,18 @@ export async function PUT(request: Request, context: RouteContext) {
       );
     }
 
+    const viewerEmail = normalizeEmail(session.user.email);
+    const viewerUser = await prisma.user.findUnique({
+      where: { email: viewerEmail },
+      select: { id: true },
+    });
+
     const { id } = await context.params;
     const body = await request.json();
 
     const customerName = String(body.customerName || "").trim();
+    const customerEmailRaw = String(body.customerEmail || "").trim();
+    const customerEmail = normalizeEmail(customerEmailRaw);
     const customerPhone = String(body.customerPhone || "").trim() || null;
     const notes = String(body.notes || "").trim() || null;
     const changeReason = String(body.changeReason || "").trim() || "Order updated";
@@ -194,6 +221,13 @@ export async function PUT(request: Request, context: RouteContext) {
     if (!customerName) {
       return NextResponse.json(
         { error: "Customer name is required." },
+        { status: 400 }
+      );
+    }
+
+    if (!customerEmail || !isValidEmail(customerEmail)) {
+      return NextResponse.json(
+        { error: "A valid customer email is required." },
         { status: 400 }
       );
     }
@@ -224,9 +258,14 @@ export async function PUT(request: Request, context: RouteContext) {
       return NextResponse.json({ error: "Order not found." }, { status: 404 });
     }
 
-    const viewerEmail = session.user.email.toLowerCase();
-    const allowed =
-      order.customerEmail.toLowerCase() === viewerEmail || isAdminEmail(viewerEmail);
+    const isSubmitter =
+      Boolean(order.userId) &&
+      Boolean(viewerUser?.id) &&
+      order.userId === viewerUser?.id;
+
+    const isCustomer = normalizeEmail(order.customerEmail) === viewerEmail;
+
+    const allowed = isSubmitter || isCustomer || isAdminEmail(viewerEmail);
 
     if (!allowed) {
       return NextResponse.json(
@@ -246,6 +285,7 @@ export async function PUT(request: Request, context: RouteContext) {
         where: { id },
         data: {
           customerName,
+          customerEmail,
           customerPhone,
           notes,
           total,
@@ -305,7 +345,7 @@ export async function PUT(request: Request, context: RouteContext) {
         type: "updated",
         orderNumber: updatedOrder.orderNumber,
         customerName,
-        customerEmail: updatedOrder.customerEmail,
+        customerEmail,
         customerPhone,
         notes,
         productName: productName || item.productNameSnapshot,
@@ -329,7 +369,7 @@ export async function PUT(request: Request, context: RouteContext) {
           {
             orderId: id,
             eventType: "ORDER_UPDATED_CUSTOMER",
-            recipient: updatedOrder.customerEmail,
+            recipient: customerEmail,
             subject: `Your order was updated: ${updatedOrder.orderNumber}`,
             status: "SENT",
           },
@@ -349,7 +389,7 @@ export async function PUT(request: Request, context: RouteContext) {
         data: {
           orderId: id,
           eventType: "ORDER_UPDATED",
-          recipient: updatedOrder.customerEmail,
+          recipient: customerEmail,
           subject: `Your order was updated: ${updatedOrder.orderNumber}`,
           status: "FAILED",
           errorMessage:
@@ -364,7 +404,7 @@ export async function PUT(request: Request, context: RouteContext) {
         orderNumber: updatedOrder.orderNumber,
         status: nextStatus,
         customerName,
-        customerEmail: updatedOrder.customerEmail,
+        customerEmail,
         customerPhone,
         productName: productName || item.productNameSnapshot,
         total,

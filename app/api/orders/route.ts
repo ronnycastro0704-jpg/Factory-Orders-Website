@@ -25,6 +25,14 @@ type IncomingLineItem = {
 
 const SELECTION_META_SEPARATOR = "|||";
 
+function normalizeEmail(value: string) {
+  return value.trim().toLowerCase();
+}
+
+function isValidEmail(email: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
 function generateOrderNumber() {
   const now = new Date();
   const yyyy = now.getFullYear().toString();
@@ -110,12 +118,14 @@ export async function POST(request: Request) {
 
     const body = await request.json();
 
-    const signedInEmail = session.user.email.toLowerCase();
+    const signedInEmail = normalizeEmail(session.user.email);
     const signedInName =
       session.user.name?.trim() || signedInEmail.split("@")[0] || "Customer";
 
     const productId = String(body.productId || "").trim();
     const customerName = String(body.customerName || "").trim() || signedInName;
+    const customerEmailRaw = String(body.customerEmail || "").trim();
+    const customerEmail = normalizeEmail(customerEmailRaw || signedInEmail);
     const customerPhone = String(body.customerPhone || "").trim() || null;
     const notes = String(body.notes || "").trim() || null;
     const productName = String(body.productName || "").trim();
@@ -145,6 +155,13 @@ export async function POST(request: Request) {
       );
     }
 
+    if (!customerEmail || !isValidEmail(customerEmail)) {
+      return NextResponse.json(
+        { error: "A valid customer email is required." },
+        { status: 400 }
+      );
+    }
+
     if (selections.length === 0) {
       return NextResponse.json(
         { error: "At least one selection is required." },
@@ -168,6 +185,11 @@ export async function POST(request: Request) {
       );
     }
 
+    const submittingUser = await prisma.user.findUnique({
+      where: { email: signedInEmail },
+      select: { id: true },
+    });
+
     const selectionRows = buildSelectionRows(selections);
     const orderNumber = generateOrderNumber();
     const nextStatus = submitToFactory ? "SENT_TO_FACTORY" : "DRAFT";
@@ -176,12 +198,13 @@ export async function POST(request: Request) {
       data: {
         orderNumber,
         customerName,
-        customerEmail: signedInEmail,
+        customerEmail,
         customerPhone,
         notes,
         status: nextStatus,
         total,
         sentToFactoryAt: submitToFactory ? new Date() : null,
+        ...(submittingUser?.id ? { userId: submittingUser.id } : {}),
         items: {
           create: [
             {
@@ -234,7 +257,7 @@ export async function POST(request: Request) {
         type: submitToFactory ? "sent_to_factory" : "created",
         orderNumber: createdOrder.orderNumber,
         customerName,
-        customerEmail: signedInEmail,
+        customerEmail,
         customerPhone,
         notes,
         productName: productName || product.name,
@@ -260,7 +283,7 @@ export async function POST(request: Request) {
             eventType: submitToFactory
               ? "ORDER_SENT_TO_FACTORY_CUSTOMER"
               : "ORDER_CREATED_CUSTOMER",
-            recipient: signedInEmail,
+            recipient: customerEmail,
             subject: submitToFactory
               ? `Your order was sent to the factory: ${createdOrder.orderNumber}`
               : `We received your order draft: ${createdOrder.orderNumber}`,
@@ -286,7 +309,7 @@ export async function POST(request: Request) {
         data: {
           orderId: createdOrder.id,
           eventType: submitToFactory ? "ORDER_SENT_TO_FACTORY" : "ORDER_CREATED",
-          recipient: signedInEmail,
+          recipient: customerEmail,
           subject: submitToFactory
             ? `Your order was sent to the factory: ${createdOrder.orderNumber}`
             : `We received your order draft: ${createdOrder.orderNumber}`,
@@ -303,7 +326,7 @@ export async function POST(request: Request) {
         orderNumber: createdOrder.orderNumber,
         status: nextStatus,
         customerName,
-        customerEmail: signedInEmail,
+        customerEmail,
         customerPhone,
         productName: productName || product.name,
         total,
