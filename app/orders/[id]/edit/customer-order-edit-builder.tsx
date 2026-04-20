@@ -491,12 +491,25 @@ export default function CustomerOrderEditBuilder({
             ? selectedChoiceIds.includes(binaryChoice.id)
             : false;
 
+          const isMultiSelect = group.type === "MULTI_SELECT";
+
           return (
             <div key={group.id} className="rounded-2xl border p-5 shadow-sm">
-              <h2 className="text-xl font-semibold">{group.name}</h2>
-              <p className="mb-4 mt-1 text-sm text-slate-500">
-                {group.required ? "Required" : "Optional"}
-              </p>
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-xl font-semibold">{group.name}</h2>
+                  <p className="mt-1 text-sm text-slate-500">
+                    {group.required ? "Required" : "Optional"}
+                    {isMultiSelect ? " · You can select more than one" : ""}
+                  </p>
+                </div>
+
+                {selectedChoiceIds.length > 0 ? (
+                  <span className="rounded-full border bg-green-50 px-3 py-1 text-xs font-semibold text-green-700">
+                    {selectedChoiceIds.length} selected
+                  </span>
+                ) : null}
+              </div>
 
               {isBinaryGroup && binaryChoice ? (
                 <div className="grid gap-3 sm:grid-cols-2">
@@ -505,12 +518,19 @@ export default function CustomerOrderEditBuilder({
                     onClick={() => setSingleChoice(group.id, binaryChoice.id)}
                     className={`rounded-xl border p-4 text-left transition ${
                       binarySelected
-                        ? "border-slate-900 ring-2 ring-slate-900"
-                        : "border-slate-200 hover:border-slate-400"
+                        ? "border-[var(--brand)] bg-[var(--brand-soft)] ring-2 ring-[var(--brand)]"
+                        : "border-slate-200 bg-white hover:border-slate-400"
                     }`}
                   >
-                    <p className="font-semibold">Yes</p>
-                    <p className="mt-1 text-sm text-slate-500">
+                    <div className="flex items-center justify-between">
+                      <p className="font-semibold">Yes</p>
+                      {binarySelected ? (
+                        <span className="rounded-full bg-[var(--brand)] px-2 py-1 text-xs font-semibold text-white">
+                          Selected
+                        </span>
+                      ) : null}
+                    </div>
+                    <p className="mt-2 text-sm text-slate-500">
                       {binaryChoice.priceDelta === 0
                         ? "Included"
                         : `+${formatCurrency(binaryChoice.priceDelta)}`}
@@ -522,15 +542,22 @@ export default function CustomerOrderEditBuilder({
                     onClick={() => clearGroupSelection(group.id)}
                     className={`rounded-xl border p-4 text-left transition ${
                       !binarySelected
-                        ? "border-slate-900 ring-2 ring-slate-900"
-                        : "border-slate-200 hover:border-slate-400"
+                        ? "border-[var(--brand)] bg-[var(--brand-soft)] ring-2 ring-[var(--brand)]"
+                        : "border-slate-200 bg-white hover:border-slate-400"
                     }`}
                   >
-                    <p className="font-semibold">No</p>
-                    <p className="mt-1 text-sm text-slate-500">No extra charge</p>
+                    <div className="flex items-center justify-between">
+                      <p className="font-semibold">No</p>
+                      {!binarySelected ? (
+                        <span className="rounded-full bg-slate-700 px-2 py-1 text-xs font-semibold text-white">
+                          Current
+                        </span>
+                      ) : null}
+                    </div>
+                    <p className="mt-2 text-sm text-slate-500">No extra charge</p>
                   </button>
                 </div>
-              ) : group.type === "MULTI_SELECT" ? (
+              ) : isMultiSelect ? (
                 <div className="grid gap-4 sm:grid-cols-2">
                   {group.choices.map((choice) => {
                     const isSelected = selectedChoiceIds.includes(choice.id);
@@ -540,14 +567,26 @@ export default function CustomerOrderEditBuilder({
                         key={choice.id}
                         type="button"
                         onClick={() => toggleMultiChoice(group.id, choice.id)}
-                        className={`overflow-hidden rounded-xl border text-left transition ${
+                        className={`relative overflow-hidden rounded-2xl border text-left transition ${
                           isSelected
-                            ? "border-slate-900 ring-2 ring-slate-900"
-                            : "border-slate-200 hover:border-slate-400"
+                            ? "border-[var(--brand)] bg-[var(--brand-soft)] ring-2 ring-[var(--brand)]"
+                            : "border-slate-200 bg-white hover:border-slate-400"
                         }`}
                       >
+                        <div className="absolute right-3 top-3 z-10">
+                          <div
+                            className={`flex h-7 w-7 items-center justify-center rounded-full border text-sm font-bold ${
+                              isSelected
+                                ? "border-[var(--brand)] bg-[var(--brand)] text-white"
+                                : "border-slate-300 bg-white text-slate-400"
+                            }`}
+                          >
+                            {isSelected ? "✓" : ""}
+                          </div>
+                        </div>
+
                         {choice.imageUrl ? (
-                          <div className="flex h-40 w-full items-center justify-center bg-white p-3">
+                          <div className="flex h-48 w-full items-center justify-center bg-white p-4">
                             <img
                               src={choice.imageUrl}
                               alt={choice.label}
@@ -555,7 +594,7 @@ export default function CustomerOrderEditBuilder({
                             />
                           </div>
                         ) : (
-                          <div className="flex h-40 w-full items-center justify-center bg-slate-100 text-sm text-slate-400">
+                          <div className="flex h-48 w-full items-center justify-center bg-slate-100 text-sm text-slate-400">
                             No Image
                           </div>
                         )}
@@ -575,6 +614,18 @@ export default function CustomerOrderEditBuilder({
                                 : `+${formatCurrency(choice.priceDelta)}`}
                             </div>
                           </div>
+
+                          <div className="mt-4">
+                            <span
+                              className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
+                                isSelected
+                                  ? "bg-[var(--brand)] text-white"
+                                  : "bg-slate-100 text-slate-600"
+                              }`}
+                            >
+                              {isSelected ? "Selected" : "Click to select"}
+                            </span>
+                          </div>
                         </div>
                       </button>
                     );
@@ -590,14 +641,20 @@ export default function CustomerOrderEditBuilder({
                         key={choice.id}
                         type="button"
                         onClick={() => setSingleChoice(group.id, choice.id)}
-                        className={`overflow-hidden rounded-xl border text-left transition ${
+                        className={`relative overflow-hidden rounded-2xl border text-left transition ${
                           isSelected
-                            ? "border-slate-900 ring-2 ring-slate-900"
-                            : "border-slate-200 hover:border-slate-400"
+                            ? "border-[var(--brand)] bg-[var(--brand-soft)] ring-2 ring-[var(--brand)]"
+                            : "border-slate-200 bg-white hover:border-slate-400"
                         }`}
                       >
+                        {isSelected ? (
+                          <div className="absolute right-3 top-3 z-10 rounded-full bg-[var(--brand)] px-2 py-1 text-xs font-semibold text-white">
+                            Selected
+                          </div>
+                        ) : null}
+
                         {choice.imageUrl ? (
-                          <div className="flex h-40 w-full items-center justify-center bg-white p-3">
+                          <div className="flex h-48 w-full items-center justify-center bg-white p-4">
                             <img
                               src={choice.imageUrl}
                               alt={choice.label}
@@ -605,7 +662,7 @@ export default function CustomerOrderEditBuilder({
                             />
                           </div>
                         ) : (
-                          <div className="flex h-40 w-full items-center justify-center bg-slate-100 text-sm text-slate-400">
+                          <div className="flex h-48 w-full items-center justify-center bg-slate-100 text-sm text-slate-400">
                             No Image
                           </div>
                         )}
@@ -642,7 +699,12 @@ export default function CustomerOrderEditBuilder({
                         key={selectionKey}
                         className="rounded-xl border bg-slate-50 p-4"
                       >
-                        <p className="mb-3 font-semibold">{choice.label}</p>
+                        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                          <p className="font-semibold">{choice.label}</p>
+                          <span className="rounded-full bg-green-100 px-3 py-1 text-xs font-semibold text-green-700">
+                            Selected
+                          </span>
+                        </div>
 
                         {choice.usesLeatherGrades ? (
                           <div className="mb-4">
