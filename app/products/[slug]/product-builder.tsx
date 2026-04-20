@@ -562,15 +562,15 @@ export default function ProductBuilder({ product, leathers }: Props) {
                           </div>
                         </div>
 
-                        {choice.imageUrl ? (
-                          <div className="flex h-48 w-full items-center justify-center bg-white p-4">
-                            <img
-                              src={choice.imageUrl}
-                              alt={choice.label}
-                              className="h-full w-full object-contain"
-                            />
-                          </div>
-                        ) : (
+{choice.imageUrl ? (
+  <div className="flex h-64 w-full items-center justify-center bg-white p-6">
+    <img
+      src={choice.imageUrl}
+      alt={choice.label}
+      className="max-h-[82%] max-w-[82%] object-contain"
+    />
+  </div>
+) : (
                           <div className="flex h-48 w-full items-center justify-center bg-slate-100 text-sm text-slate-400">
                             No Image
                           </div>
@@ -629,16 +629,15 @@ export default function ProductBuilder({ product, leathers }: Props) {
                             Selected
                           </div>
                         ) : null}
-
-                        {choice.imageUrl ? (
-                          <div className="flex h-48 w-full items-center justify-center bg-white p-4">
-                            <img
-                              src={choice.imageUrl}
-                              alt={choice.label}
-                              className="h-full w-full object-contain"
-                            />
-                          </div>
-                        ) : (
+{choice.imageUrl ? (
+  <div className="flex h-64 w-full items-center justify-center bg-white p-6">
+    <img
+      src={choice.imageUrl}
+      alt={choice.label}
+      className="max-h-[82%] max-w-[82%] object-contain"
+    />
+  </div>
+) : (
                           <div className="flex h-48 w-full items-center justify-center bg-slate-100 text-sm text-slate-400">
                             No Image
                           </div>
