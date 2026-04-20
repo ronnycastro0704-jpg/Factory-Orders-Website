@@ -42,6 +42,7 @@ export async function PUT(request: Request, context: RouteContext) {
         : true;
     const allowsLaseredBrand = Boolean(body.allowsLaseredBrand);
     const isBinaryOption = Boolean(body.isBinaryOption);
+    const isQuickPick = Boolean(body.isQuickPick);
     const active =
       typeof body.active === "boolean" ? body.active : true;
 
@@ -114,6 +115,7 @@ export async function PUT(request: Request, context: RouteContext) {
         appliesLeatherSurcharge,
         allowsLaseredBrand,
         isBinaryOption,
+        isQuickPick,
         active,
         gradeAUpcharge: usesLeatherGrades ? gradeAUpcharge : null,
         gradeBUpcharge: usesLeatherGrades ? gradeBUpcharge : null,

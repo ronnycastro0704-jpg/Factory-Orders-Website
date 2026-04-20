@@ -22,6 +22,7 @@ type OptionChoiceItem = {
   appliesLeatherSurcharge: boolean;
   allowsLaseredBrand: boolean;
   isBinaryOption: boolean;
+  isQuickPick: boolean;
   gradeAUpcharge: unknown | null;
   gradeBUpcharge: unknown | null;
   gradeEMBUpcharge: unknown | null;
@@ -100,7 +101,7 @@ export default async function AdminProductDetailPage({ params }: PageProps) {
             <h2 className="text-2xl font-semibold">Create Option Group</h2>
             <p className="mt-2 text-sm text-slate-500">
               Add configurable sections like inside back, outside back, arms,
-              nails, or seat.
+              nails, seat, or a quick-pick package group.
             </p>
 
             <div className="mt-6">
@@ -160,16 +161,46 @@ export default async function AdminProductDetailPage({ params }: PageProps) {
                             >
                               <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                                 <div className="flex-1">
-                                  <p className="font-semibold">{choice.label}</p>
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    <p className="font-semibold">{choice.label}</p>
+
+                                    {choice.isQuickPick ? (
+                                      <span className="rounded-full bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-800">
+                                        Quick Pick
+                                      </span>
+                                    ) : null}
+
+                                    {choice.isBinaryOption ? (
+                                      <span className="rounded-full bg-blue-100 px-2 py-1 text-xs font-semibold text-blue-800">
+                                        Binary
+                                      </span>
+                                    ) : null}
+
+                                    {choice.allowsLaseredBrand ? (
+                                      <span className="rounded-full bg-purple-100 px-2 py-1 text-xs font-semibold text-purple-800">
+                                        Lasered Brand
+                                      </span>
+                                    ) : null}
+
+                                    {choice.usesLeatherGrades ? (
+                                      <span className="rounded-full bg-emerald-100 px-2 py-1 text-xs font-semibold text-emerald-800">
+                                        Leather Choice
+                                      </span>
+                                    ) : null}
+                                  </div>
+
                                   <p className="text-sm text-slate-500">
                                     Value: {choice.value || "—"}
                                   </p>
+
                                   <p className="mt-1 text-sm text-slate-600">
                                     {choice.description || "No description"}
                                   </p>
+
                                   <p className="mt-1 text-sm text-slate-500">
                                     Display Order: {choice.displayOrder}
                                   </p>
+
                                   <p className="mt-1 text-sm text-slate-500">
                                     {choice.active ? "Active" : "Inactive"}
                                   </p>
@@ -215,15 +246,10 @@ export default async function AdminProductDetailPage({ params }: PageProps) {
                                     </>
                                   ) : null}
 
-                                  {choice.allowsLaseredBrand ? (
-                                    <p className="mt-3 text-sm font-medium text-slate-700">
-                                      Allows Lasered Brand
-                                    </p>
-                                  ) : null}
-
-                                  {choice.isBinaryOption ? (
-                                    <p className="mt-2 text-sm font-medium text-slate-700">
-                                      Binary Option: Yes/No
+                                  {choice.isQuickPick ? (
+                                    <p className="mt-3 text-sm font-medium text-amber-800">
+                                      Quick Pick: selecting this option locks the
+                                      other builder groups for the customer.
                                     </p>
                                   ) : null}
 
@@ -243,6 +269,7 @@ export default async function AdminProductDetailPage({ params }: PageProps) {
                                       allowsLaseredBrand:
                                         choice.allowsLaseredBrand,
                                       isBinaryOption: choice.isBinaryOption,
+                                      isQuickPick: choice.isQuickPick,
                                       gradeAUpcharge:
                                         choice.gradeAUpcharge === null
                                           ? null
@@ -281,6 +308,7 @@ export default async function AdminProductDetailPage({ params }: PageProps) {
                                   <p className="text-sm font-medium text-slate-700">
                                     Base Add-On: ${money(choice.priceDelta)}
                                   </p>
+
                                   {choice.imageUrl ? (
                                     <img
                                       src={choice.imageUrl}

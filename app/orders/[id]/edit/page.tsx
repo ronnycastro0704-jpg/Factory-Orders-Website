@@ -35,6 +35,7 @@ type ProductChoice = {
   appliesLeatherSurcharge: boolean;
   allowsLaseredBrand: boolean;
   isBinaryOption: boolean;
+  isQuickPick: boolean;
   gradeAUpcharge: unknown | null;
   gradeBUpcharge: unknown | null;
   gradeEMBUpcharge: unknown | null;
@@ -177,10 +178,7 @@ export default async function CustomerOrderEditPage({ params }: PageProps) {
         (choice: ProductChoice) => choice.isBinaryOption
       );
 
-      if (
-        binaryChoice &&
-        baseSelection.optionChoiceNameSnapshot === "Yes"
-      ) {
+      if (binaryChoice && baseSelection.optionChoiceNameSnapshot === "Yes") {
         matchedChoice = binaryChoice;
       }
     }
@@ -304,6 +302,7 @@ export default async function CustomerOrderEditPage({ params }: PageProps) {
         appliesLeatherSurcharge: choice.appliesLeatherSurcharge,
         allowsLaseredBrand: choice.allowsLaseredBrand,
         isBinaryOption: choice.isBinaryOption,
+        isQuickPick: choice.isQuickPick,
         gradeAUpcharge:
           choice.gradeAUpcharge === null ? null : Number(choice.gradeAUpcharge),
         gradeBUpcharge:

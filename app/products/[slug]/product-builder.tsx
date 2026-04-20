@@ -15,6 +15,7 @@ type Choice = {
   appliesLeatherSurcharge: boolean;
   allowsLaseredBrand: boolean;
   isBinaryOption: boolean;
+  isQuickPick: boolean;
   gradeAUpcharge: number | null;
   gradeBUpcharge: number | null;
   gradeEMBUpcharge: number | null;
@@ -150,11 +151,43 @@ export default function ProductBuilder({ product, leathers }: Props) {
   const [saveMessage, setSaveMessage] = useState("");
   const [saveError, setSaveError] = useState("");
 
+  const activeQuickPick = useMemo(() => {
+    for (const group of product.optionGroups) {
+      const selectedChoiceIds = selectedOptions[group.id] || [];
+
+      for (const choiceId of selectedChoiceIds) {
+        const choice = group.choices.find((item) => item.id === choiceId);
+
+        if (choice?.isQuickPick) {
+          return {
+            groupId: group.id,
+            choice,
+          };
+        }
+      }
+    }
+
+    return null;
+  }, [product.optionGroups, selectedOptions]);
+
   function setSingleChoice(groupId: string, choiceId: string) {
-    setSelectedOptions((prev) => ({
-      ...prev,
-      [groupId]: [choiceId],
-    }));
+    const group = product.optionGroups.find((item) => item.id === groupId);
+    const choice = group?.choices.find((item) => item.id === choiceId);
+
+    if (!choice) return;
+
+    if (choice.isQuickPick) {
+      setSelectedOptions({
+        [groupId]: [choiceId],
+      });
+      return;
+    }
+
+    setSelectedOptions((prev) => {
+      const next = activeQuickPick ? {} : { ...prev };
+      next[groupId] = [choiceId];
+      return next;
+    });
   }
 
   function clearGroupSelection(groupId: string) {
@@ -166,12 +199,25 @@ export default function ProductBuilder({ product, leathers }: Props) {
   }
 
   function toggleMultiChoice(groupId: string, choiceId: string) {
+    const group = product.optionGroups.find((item) => item.id === groupId);
+    const choice = group?.choices.find((item) => item.id === choiceId);
+
+    if (!group || !choice) return;
+
+    if (choice.isQuickPick) {
+      setSelectedOptions({
+        [groupId]: [choiceId],
+      });
+      return;
+    }
+
     setSelectedOptions((prev) => {
-      const current = prev[groupId] || [];
+      const base = activeQuickPick ? {} : { ...prev };
+      const current = base[groupId] || [];
       const exists = current.includes(choiceId);
 
       return {
-        ...prev,
+        ...base,
         [groupId]: exists
           ? current.filter((id) => id !== choiceId)
           : [...current, choiceId],
@@ -459,6 +505,13 @@ export default function ProductBuilder({ product, leathers }: Props) {
   return (
     <div className="grid gap-8 lg:grid-cols-[1.4fr_0.8fr]">
       <div className="space-y-6">
+        {activeQuickPick ? (
+          <div className="rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
+            Quick pick <span className="font-semibold">{activeQuickPick.choice.label}</span>{" "}
+            is selected. Other option groups are locked.
+          </div>
+        ) : null}
+
         {product.optionGroups.map((group) => {
           const selectedChoiceIds = selectedOptions[group.id] || [];
           const selectedChoicesForGroup = group.choices.filter((choice) =>
@@ -472,9 +525,16 @@ export default function ProductBuilder({ product, leathers }: Props) {
             : false;
 
           const isMultiSelect = group.type === "MULTI_SELECT";
+          const groupDisabled =
+            Boolean(activeQuickPick) && group.id !== activeQuickPick?.groupId;
 
           return (
-            <div key={group.id} className="rounded-2xl border p-5 shadow-sm">
+            <div
+              key={group.id}
+              className={`rounded-2xl border p-5 shadow-sm ${
+                groupDisabled ? "opacity-50" : ""
+              }`}
+            >
               <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <h2 className="text-xl font-semibold">{group.name}</h2>
@@ -491,183 +551,203 @@ export default function ProductBuilder({ product, leathers }: Props) {
                 ) : null}
               </div>
 
-              {isBinaryGroup && binaryChoice ? (
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <button
-                    type="button"
-                    onClick={() => setSingleChoice(group.id, binaryChoice.id)}
-                    className={`rounded-xl border p-4 text-left transition ${
-                      binarySelected
-                        ? "border-[var(--brand)] bg-[var(--brand-soft)] ring-2 ring-[var(--brand)]"
-                        : "border-slate-200 bg-white hover:border-slate-400"
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <p className="font-semibold">Yes</p>
-                      {binarySelected ? (
-                        <span className="rounded-full bg-[var(--brand)] px-2 py-1 text-xs font-semibold text-white">
-                          Selected
-                        </span>
-                      ) : null}
-                    </div>
-                    <p className="mt-2 text-sm text-slate-500">
-                      {binaryChoice.priceDelta === 0
-                        ? "Included"
-                        : `+${formatCurrency(binaryChoice.priceDelta)}`}
-                    </p>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => clearGroupSelection(group.id)}
-                    className={`rounded-xl border p-4 text-left transition ${
-                      !binarySelected
-                        ? "border-[var(--brand)] bg-[var(--brand-soft)] ring-2 ring-[var(--brand)]"
-                        : "border-slate-200 bg-white hover:border-slate-400"
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <p className="font-semibold">No</p>
-                      {!binarySelected ? (
-                        <span className="rounded-full bg-slate-700 px-2 py-1 text-xs font-semibold text-white">
-                          Current
-                        </span>
-                      ) : null}
-                    </div>
-                    <p className="mt-2 text-sm text-slate-500">No extra charge</p>
-                  </button>
+              {groupDisabled && activeQuickPick ? (
+                <div className="mb-4 rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
+                  Disabled because quick pick{" "}
+                  <span className="font-semibold">{activeQuickPick.choice.label}</span>{" "}
+                  is selected.
                 </div>
-              ) : isMultiSelect ? (
-                <div className="grid gap-4 sm:grid-cols-2">
-                  {group.choices.map((choice) => {
-                    const isSelected = selectedChoiceIds.includes(choice.id);
+              ) : null}
 
-                    return (
-                      <button
-                        key={choice.id}
-                        type="button"
-                        onClick={() => toggleMultiChoice(group.id, choice.id)}
-                        className={`relative overflow-hidden rounded-2xl border text-left transition ${
-                          isSelected
-                            ? "border-[var(--brand)] bg-[var(--brand-soft)] ring-2 ring-[var(--brand)]"
-                            : "border-slate-200 bg-white hover:border-slate-400"
-                        }`}
-                      >
-                        <div className="absolute right-3 top-3 z-10">
-                          <div
-                            className={`flex h-7 w-7 items-center justify-center rounded-full border text-sm font-bold ${
-                              isSelected
-                                ? "border-[var(--brand)] bg-[var(--brand)] text-white"
-                                : "border-slate-300 bg-white text-slate-400"
-                            }`}
-                          >
-                            {isSelected ? "✓" : ""}
-                          </div>
-                        </div>
+              <div className={groupDisabled ? "pointer-events-none select-none" : ""}>
+                {isBinaryGroup && binaryChoice ? (
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <button
+                      type="button"
+                      onClick={() => setSingleChoice(group.id, binaryChoice.id)}
+                      className={`rounded-xl border p-4 text-left transition ${
+                        binarySelected
+                          ? "border-[var(--brand)] bg-[var(--brand-soft)] ring-2 ring-[var(--brand)]"
+                          : "border-slate-200 bg-white hover:border-slate-400"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <p className="font-semibold">Yes</p>
+                        {binarySelected ? (
+                          <span className="rounded-full bg-[var(--brand)] px-2 py-1 text-xs font-semibold text-white">
+                            Selected
+                          </span>
+                        ) : null}
+                      </div>
+                      <p className="mt-2 text-sm text-slate-500">
+                        {binaryChoice.priceDelta === 0
+                          ? "Included"
+                          : `+${formatCurrency(binaryChoice.priceDelta)}`}
+                      </p>
+                    </button>
 
-                        {choice.imageUrl ? (
-                          <div className="flex h-64 w-full items-center justify-center bg-white p-8">
-                            <img
-                              src={choice.imageUrl}
-                              alt={choice.label}
-                              className="max-h-[76%] max-w-[76%] object-contain"
-                            />
-                          </div>
-                        ) : (
-                          <div className="flex h-64 w-full items-center justify-center bg-slate-100 text-sm text-slate-400">
-                            No Image
-                          </div>
-                        )}
+                    <button
+                      type="button"
+                      onClick={() => clearGroupSelection(group.id)}
+                      className={`rounded-xl border p-4 text-left transition ${
+                        !binarySelected
+                          ? "border-[var(--brand)] bg-[var(--brand-soft)] ring-2 ring-[var(--brand)]"
+                          : "border-slate-200 bg-white hover:border-slate-400"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <p className="font-semibold">No</p>
+                        {!binarySelected ? (
+                          <span className="rounded-full bg-slate-700 px-2 py-1 text-xs font-semibold text-white">
+                            Current
+                          </span>
+                        ) : null}
+                      </div>
+                      <p className="mt-2 text-sm text-slate-500">No extra charge</p>
+                    </button>
+                  </div>
+                ) : isMultiSelect ? (
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    {group.choices.map((choice) => {
+                      const isSelected = selectedChoiceIds.includes(choice.id);
 
-                        <div className="p-4">
-                          <div className="flex items-start justify-between gap-3">
-                            <div>
-                              <p className="font-semibold">{choice.label}</p>
-                              <p className="mt-1 text-sm text-slate-500">
-                                {choice.description || "No description"}
-                              </p>
-                            </div>
-
-                            <div className="whitespace-nowrap text-sm font-medium">
-                              {choice.priceDelta === 0
-                                ? "Included"
-                                : `+${formatCurrency(choice.priceDelta)}`}
-                            </div>
-                          </div>
-
-                          <div className="mt-4">
-                            <span
-                              className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
+                      return (
+                        <button
+                          key={choice.id}
+                          type="button"
+                          onClick={() => toggleMultiChoice(group.id, choice.id)}
+                          className={`relative overflow-hidden rounded-2xl border text-left transition ${
+                            isSelected
+                              ? "border-[var(--brand)] bg-[var(--brand-soft)] ring-2 ring-[var(--brand)]"
+                              : "border-slate-200 bg-white hover:border-slate-400"
+                          }`}
+                        >
+                          <div className="absolute right-3 top-3 z-10">
+                            <div
+                              className={`flex h-7 w-7 items-center justify-center rounded-full border text-sm font-bold ${
                                 isSelected
-                                  ? "bg-[var(--brand)] text-white"
-                                  : "bg-slate-100 text-slate-600"
+                                  ? "border-[var(--brand)] bg-[var(--brand)] text-white"
+                                  : "border-slate-300 bg-white text-slate-400"
                               }`}
                             >
-                              {isSelected ? "Selected" : "Click to select"}
-                            </span>
-                          </div>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              ) : (
-                <div className="grid gap-4 sm:grid-cols-2">
-                  {group.choices.map((choice) => {
-                    const isSelected = selectedChoiceIds.includes(choice.id);
-
-                    return (
-                      <button
-                        key={choice.id}
-                        type="button"
-                        onClick={() => setSingleChoice(group.id, choice.id)}
-                        className={`relative overflow-hidden rounded-2xl border text-left transition ${
-                          isSelected
-                            ? "border-[var(--brand)] bg-[var(--brand-soft)] ring-2 ring-[var(--brand)]"
-                            : "border-slate-200 bg-white hover:border-slate-400"
-                        }`}
-                      >
-                        {isSelected ? (
-                          <div className="absolute right-3 top-3 z-10 rounded-full bg-[var(--brand)] px-2 py-1 text-xs font-semibold text-white">
-                            Selected
-                          </div>
-                        ) : null}
-
-                        {choice.imageUrl ? (
-                          <div className="flex h-64 w-full items-center justify-center bg-white p-8">
-                            <img
-                              src={choice.imageUrl}
-                              alt={choice.label}
-                              className="max-h-[76%] max-w-[76%] object-contain"
-                            />
-                          </div>
-                        ) : (
-                          <div className="flex h-64 w-full items-center justify-center bg-slate-100 text-sm text-slate-400">
-                            No Image
-                          </div>
-                        )}
-
-                        <div className="p-4">
-                          <div className="flex items-start justify-between gap-3">
-                            <div>
-                              <p className="font-semibold">{choice.label}</p>
-                              <p className="mt-1 text-sm text-slate-500">
-                                {choice.description || "No description"}
-                              </p>
-                            </div>
-
-                            <div className="whitespace-nowrap text-sm font-medium">
-                              {choice.priceDelta === 0
-                                ? "Included"
-                                : `+${formatCurrency(choice.priceDelta)}`}
+                              {isSelected ? "✓" : ""}
                             </div>
                           </div>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
+
+                          {choice.imageUrl ? (
+                            <div className="flex h-64 w-full items-center justify-center bg-white p-8">
+                              <img
+                                src={choice.imageUrl}
+                                alt={choice.label}
+                                className="max-h-[76%] max-w-[76%] object-contain"
+                              />
+                            </div>
+                          ) : (
+                            <div className="flex h-64 w-full items-center justify-center bg-slate-100 text-sm text-slate-400">
+                              No Image
+                            </div>
+                          )}
+
+                          <div className="p-4">
+                            <div className="flex items-start justify-between gap-3">
+                              <div>
+                                <p className="font-semibold">{choice.label}</p>
+                                {choice.isQuickPick ? (
+                                  <span className="mt-2 inline-flex rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800">
+                                    Quick Pick
+                                  </span>
+                                ) : null}
+                                <p className="mt-1 text-sm text-slate-500">
+                                  {choice.description || "No description"}
+                                </p>
+                              </div>
+
+                              <div className="whitespace-nowrap text-sm font-medium">
+                                {choice.priceDelta === 0
+                                  ? "Included"
+                                  : `+${formatCurrency(choice.priceDelta)}`}
+                              </div>
+                            </div>
+
+                            <div className="mt-4">
+                              <span
+                                className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
+                                  isSelected
+                                    ? "bg-[var(--brand)] text-white"
+                                    : "bg-slate-100 text-slate-600"
+                                }`}
+                              >
+                                {isSelected ? "Selected" : "Click to select"}
+                              </span>
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    {group.choices.map((choice) => {
+                      const isSelected = selectedChoiceIds.includes(choice.id);
+
+                      return (
+                        <button
+                          key={choice.id}
+                          type="button"
+                          onClick={() => setSingleChoice(group.id, choice.id)}
+                          className={`relative overflow-hidden rounded-2xl border text-left transition ${
+                            isSelected
+                              ? "border-[var(--brand)] bg-[var(--brand-soft)] ring-2 ring-[var(--brand)]"
+                              : "border-slate-200 bg-white hover:border-slate-400"
+                          }`}
+                        >
+                          {isSelected ? (
+                            <div className="absolute right-3 top-3 z-10 rounded-full bg-[var(--brand)] px-2 py-1 text-xs font-semibold text-white">
+                              Selected
+                            </div>
+                          ) : null}
+
+                          {choice.imageUrl ? (
+                            <div className="flex h-64 w-full items-center justify-center bg-white p-8">
+                              <img
+                                src={choice.imageUrl}
+                                alt={choice.label}
+                                className="max-h-[76%] max-w-[76%] object-contain"
+                              />
+                            </div>
+                          ) : (
+                            <div className="flex h-64 w-full items-center justify-center bg-slate-100 text-sm text-slate-400">
+                              No Image
+                            </div>
+                          )}
+
+                          <div className="p-4">
+                            <div className="flex items-start justify-between gap-3">
+                              <div>
+                                <p className="font-semibold">{choice.label}</p>
+                                {choice.isQuickPick ? (
+                                  <span className="mt-2 inline-flex rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800">
+                                    Quick Pick
+                                  </span>
+                                ) : null}
+                                <p className="mt-1 text-sm text-slate-500">
+                                  {choice.description || "No description"}
+                                </p>
+                              </div>
+
+                              <div className="whitespace-nowrap text-sm font-medium">
+                                {choice.priceDelta === 0
+                                  ? "Included"
+                                  : `+${formatCurrency(choice.priceDelta)}`}
+                              </div>
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
 
               {selectedChoicesForGroup.length > 0 ? (
                 <div className="mt-5 space-y-4">

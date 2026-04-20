@@ -22,6 +22,7 @@ type ProductChoice = {
   appliesLeatherSurcharge: boolean;
   allowsLaseredBrand: boolean;
   isBinaryOption: boolean;
+  isQuickPick: boolean;
   gradeAUpcharge: unknown | null;
   gradeBUpcharge: unknown | null;
   gradeEMBUpcharge: unknown | null;
@@ -114,6 +115,7 @@ export default async function ProductPage({ params }: PageProps) {
         appliesLeatherSurcharge: choice.appliesLeatherSurcharge,
         allowsLaseredBrand: choice.allowsLaseredBrand,
         isBinaryOption: choice.isBinaryOption,
+        isQuickPick: choice.isQuickPick,
         gradeAUpcharge:
           choice.gradeAUpcharge === null ? null : Number(choice.gradeAUpcharge),
         gradeBUpcharge:

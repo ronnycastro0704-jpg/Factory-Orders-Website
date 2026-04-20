@@ -14,6 +14,7 @@ type Choice = {
   appliesLeatherSurcharge: boolean;
   allowsLaseredBrand: boolean;
   isBinaryOption: boolean;
+  isQuickPick: boolean;
   gradeAUpcharge: number | null;
   gradeBUpcharge: number | null;
   gradeEMBUpcharge: number | null;
@@ -53,6 +54,7 @@ export default function OptionChoiceActions({ groupId, choice }: Props) {
     choice.allowsLaseredBrand
   );
   const [isBinaryOption, setIsBinaryOption] = useState(choice.isBinaryOption);
+  const [isQuickPick, setIsQuickPick] = useState(choice.isQuickPick);
   const [active, setActive] = useState(choice.active);
 
   const [gradeAUpcharge, setGradeAUpcharge] = useState(
@@ -131,6 +133,7 @@ export default function OptionChoiceActions({ groupId, choice }: Props) {
             appliesLeatherSurcharge,
             allowsLaseredBrand,
             isBinaryOption,
+            isQuickPick,
             active,
             gradeAUpcharge: usesLeatherGrades ? gradeAUpcharge : "",
             gradeBUpcharge: usesLeatherGrades ? gradeBUpcharge : "",
@@ -340,6 +343,15 @@ export default function OptionChoiceActions({ groupId, choice }: Props) {
       <label className="flex items-center gap-2 text-sm font-medium">
         <input
           type="checkbox"
+          checked={isQuickPick}
+          onChange={(e) => setIsQuickPick(e.target.checked)}
+        />
+        Quick Pick
+      </label>
+
+      <label className="flex items-center gap-2 text-sm font-medium">
+        <input
+          type="checkbox"
           checked={active}
           onChange={(e) => setActive(e.target.checked)}
         />
@@ -440,6 +452,7 @@ export default function OptionChoiceActions({ groupId, choice }: Props) {
             setAppliesLeatherSurcharge(choice.appliesLeatherSurcharge);
             setAllowsLaseredBrand(choice.allowsLaseredBrand);
             setIsBinaryOption(choice.isBinaryOption);
+            setIsQuickPick(choice.isQuickPick);
             setActive(choice.active);
             setGradeAUpcharge(
               choice.gradeAUpcharge === null ? "" : String(choice.gradeAUpcharge)

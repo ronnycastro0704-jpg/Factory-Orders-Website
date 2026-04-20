@@ -61,6 +61,7 @@ model OptionChoice {
   priceDelta    Decimal     @default(0) @db.Decimal(10, 2)
 
   usesLeatherGrades    Boolean  @default(false)
+  isQuickPick Boolean  @default(false)
   allowsLaseredBrand Boolean @default(false)
   isBinaryOption Boolean @default(false)
   appliesLeatherSurcharge Boolean @default(true)

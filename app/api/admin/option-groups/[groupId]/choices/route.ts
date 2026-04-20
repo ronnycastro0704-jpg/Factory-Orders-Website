@@ -26,39 +26,54 @@ export async function POST(request: Request, context: RouteContext) {
         : true;
     const allowsLaseredBrand = Boolean(body.allowsLaseredBrand);
     const isBinaryOption = Boolean(body.isBinaryOption);
+    const isQuickPick = Boolean(body.isQuickPick);
 
     const gradeAUpcharge =
-      body.gradeAUpcharge === "" || body.gradeAUpcharge === null || body.gradeAUpcharge === undefined
+      body.gradeAUpcharge === "" ||
+      body.gradeAUpcharge === null ||
+      body.gradeAUpcharge === undefined
         ? null
         : Number(body.gradeAUpcharge);
 
     const gradeBUpcharge =
-      body.gradeBUpcharge === "" || body.gradeBUpcharge === null || body.gradeBUpcharge === undefined
+      body.gradeBUpcharge === "" ||
+      body.gradeBUpcharge === null ||
+      body.gradeBUpcharge === undefined
         ? null
         : Number(body.gradeBUpcharge);
 
     const gradeEMBUpcharge =
-      body.gradeEMBUpcharge === "" || body.gradeEMBUpcharge === null || body.gradeEMBUpcharge === undefined
+      body.gradeEMBUpcharge === "" ||
+      body.gradeEMBUpcharge === null ||
+      body.gradeEMBUpcharge === undefined
         ? null
         : Number(body.gradeEMBUpcharge);
 
     const gradeHOHUpcharge =
-      body.gradeHOHUpcharge === "" || body.gradeHOHUpcharge === null || body.gradeHOHUpcharge === undefined
+      body.gradeHOHUpcharge === "" ||
+      body.gradeHOHUpcharge === null ||
+      body.gradeHOHUpcharge === undefined
         ? null
         : Number(body.gradeHOHUpcharge);
 
     const gradeAxisUpcharge =
-      body.gradeAxisUpcharge === "" || body.gradeAxisUpcharge === null || body.gradeAxisUpcharge === undefined
+      body.gradeAxisUpcharge === "" ||
+      body.gradeAxisUpcharge === null ||
+      body.gradeAxisUpcharge === undefined
         ? null
         : Number(body.gradeAxisUpcharge);
 
     const gradeBuffaloUpcharge =
-      body.gradeBuffaloUpcharge === "" || body.gradeBuffaloUpcharge === null || body.gradeBuffaloUpcharge === undefined
+      body.gradeBuffaloUpcharge === "" ||
+      body.gradeBuffaloUpcharge === null ||
+      body.gradeBuffaloUpcharge === undefined
         ? null
         : Number(body.gradeBuffaloUpcharge);
 
     const comUpcharge =
-      body.comUpcharge === "" || body.comUpcharge === null || body.comUpcharge === undefined
+      body.comUpcharge === "" ||
+      body.comUpcharge === null ||
+      body.comUpcharge === undefined
         ? null
         : Number(body.comUpcharge);
 
@@ -82,6 +97,7 @@ export async function POST(request: Request, context: RouteContext) {
         appliesLeatherSurcharge,
         allowsLaseredBrand,
         isBinaryOption,
+        isQuickPick,
         gradeAUpcharge,
         gradeBUpcharge,
         gradeEMBUpcharge,

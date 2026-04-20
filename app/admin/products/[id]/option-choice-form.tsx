@@ -22,6 +22,7 @@ export default function CreateOptionChoiceForm({ groupId }: Props) {
   const [appliesLeatherSurcharge, setAppliesLeatherSurcharge] = useState(true);
   const [allowsLaseredBrand, setAllowsLaseredBrand] = useState(false);
   const [isBinaryOption, setIsBinaryOption] = useState(false);
+  const [isQuickPick, setIsQuickPick] = useState(false);
 
   const [gradeAUpcharge, setGradeAUpcharge] = useState("");
   const [gradeBUpcharge, setGradeBUpcharge] = useState("");
@@ -84,6 +85,7 @@ export default function CreateOptionChoiceForm({ groupId }: Props) {
           appliesLeatherSurcharge,
           allowsLaseredBrand,
           isBinaryOption,
+          isQuickPick,
           gradeAUpcharge,
           gradeBUpcharge,
           gradeEMBUpcharge,
@@ -114,6 +116,7 @@ export default function CreateOptionChoiceForm({ groupId }: Props) {
       setAppliesLeatherSurcharge(true);
       setAllowsLaseredBrand(false);
       setIsBinaryOption(false);
+      setIsQuickPick(false);
       setGradeAUpcharge("");
       setGradeBUpcharge("");
       setGradeEMBUpcharge("");
@@ -248,35 +251,79 @@ export default function CreateOptionChoiceForm({ groupId }: Props) {
         Binary Option (Yes/No)
       </label>
 
+      <label className="flex items-center gap-2 text-sm font-medium">
+        <input
+          type="checkbox"
+          checked={isQuickPick}
+          onChange={(e) => setIsQuickPick(e.target.checked)}
+        />
+        Quick Pick
+      </label>
+
+      {isQuickPick ? (
+        <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          Customers who choose this option will skip the rest of the builder and
+          use this package selection instead.
+        </p>
+      ) : null}
+
       {usesLeatherGrades ? (
         <div className="grid gap-3 sm:grid-cols-2">
           <div>
             <label className="mb-1 block text-sm font-medium">Grade A</label>
-            <input className="w-full rounded-lg border px-3 py-2" value={gradeAUpcharge} onChange={(e) => setGradeAUpcharge(e.target.value)} />
+            <input
+              className="w-full rounded-lg border px-3 py-2"
+              value={gradeAUpcharge}
+              onChange={(e) => setGradeAUpcharge(e.target.value)}
+            />
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium">Grade B</label>
-            <input className="w-full rounded-lg border px-3 py-2" value={gradeBUpcharge} onChange={(e) => setGradeBUpcharge(e.target.value)} />
+            <input
+              className="w-full rounded-lg border px-3 py-2"
+              value={gradeBUpcharge}
+              onChange={(e) => setGradeBUpcharge(e.target.value)}
+            />
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium">Grade EMB</label>
-            <input className="w-full rounded-lg border px-3 py-2" value={gradeEMBUpcharge} onChange={(e) => setGradeEMBUpcharge(e.target.value)} />
+            <input
+              className="w-full rounded-lg border px-3 py-2"
+              value={gradeEMBUpcharge}
+              onChange={(e) => setGradeEMBUpcharge(e.target.value)}
+            />
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium">Grade HOH</label>
-            <input className="w-full rounded-lg border px-3 py-2" value={gradeHOHUpcharge} onChange={(e) => setGradeHOHUpcharge(e.target.value)} />
+            <input
+              className="w-full rounded-lg border px-3 py-2"
+              value={gradeHOHUpcharge}
+              onChange={(e) => setGradeHOHUpcharge(e.target.value)}
+            />
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium">Grade Axis</label>
-            <input className="w-full rounded-lg border px-3 py-2" value={gradeAxisUpcharge} onChange={(e) => setGradeAxisUpcharge(e.target.value)} />
+            <input
+              className="w-full rounded-lg border px-3 py-2"
+              value={gradeAxisUpcharge}
+              onChange={(e) => setGradeAxisUpcharge(e.target.value)}
+            />
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium">Grade Buffalo</label>
-            <input className="w-full rounded-lg border px-3 py-2" value={gradeBuffaloUpcharge} onChange={(e) => setGradeBuffaloUpcharge(e.target.value)} />
+            <input
+              className="w-full rounded-lg border px-3 py-2"
+              value={gradeBuffaloUpcharge}
+              onChange={(e) => setGradeBuffaloUpcharge(e.target.value)}
+            />
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium">COM</label>
-            <input className="w-full rounded-lg border px-3 py-2" value={comUpcharge} onChange={(e) => setComUpcharge(e.target.value)} />
+            <input
+              className="w-full rounded-lg border px-3 py-2"
+              value={comUpcharge}
+              onChange={(e) => setComUpcharge(e.target.value)}
+            />
           </div>
         </div>
       ) : null}
