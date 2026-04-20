@@ -1,8 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { formatCurrency } from "../../../lib/utils";
 import Link from "next/link";
+import { formatCurrency } from "../../../lib/utils";
 
 type Choice = {
   id: string;
@@ -122,6 +122,9 @@ export default function ProductBuilder({ product, leathers }: Props) {
   );
 
   const [selectedLeatherBySelectionKey, setSelectedLeatherBySelectionKey] =
+    useState<Record<string, string>>({});
+
+  const [leatherSearchBySelectionKey, setLeatherSearchBySelectionKey] =
     useState<Record<string, string>>({});
 
   const [selectedLaseredBrandBySelectionKey, setSelectedLaseredBrandBySelectionKey] =
@@ -562,16 +565,16 @@ export default function ProductBuilder({ product, leathers }: Props) {
                           </div>
                         </div>
 
-{choice.imageUrl ? (
-  <div className="flex h-64 w-full items-center justify-center bg-white p-6">
-    <img
-      src={choice.imageUrl}
-      alt={choice.label}
-      className="max-h-[82%] max-w-[82%] object-contain"
-    />
-  </div>
-) : (
-                          <div className="flex h-48 w-full items-center justify-center bg-slate-100 text-sm text-slate-400">
+                        {choice.imageUrl ? (
+                          <div className="flex h-64 w-full items-center justify-center bg-white p-8">
+                            <img
+                              src={choice.imageUrl}
+                              alt={choice.label}
+                              className="max-h-[76%] max-w-[76%] object-contain"
+                            />
+                          </div>
+                        ) : (
+                          <div className="flex h-64 w-full items-center justify-center bg-slate-100 text-sm text-slate-400">
                             No Image
                           </div>
                         )}
@@ -629,16 +632,17 @@ export default function ProductBuilder({ product, leathers }: Props) {
                             Selected
                           </div>
                         ) : null}
-{choice.imageUrl ? (
-  <div className="flex h-64 w-full items-center justify-center bg-white p-6">
-    <img
-      src={choice.imageUrl}
-      alt={choice.label}
-      className="max-h-[82%] max-w-[82%] object-contain"
-    />
-  </div>
-) : (
-                          <div className="flex h-48 w-full items-center justify-center bg-slate-100 text-sm text-slate-400">
+
+                        {choice.imageUrl ? (
+                          <div className="flex h-64 w-full items-center justify-center bg-white p-8">
+                            <img
+                              src={choice.imageUrl}
+                              alt={choice.label}
+                              className="max-h-[76%] max-w-[76%] object-contain"
+                            />
+                          </div>
+                        ) : (
+                          <div className="flex h-64 w-full items-center justify-center bg-slate-100 text-sm text-slate-400">
                             No Image
                           </div>
                         )}
@@ -669,6 +673,26 @@ export default function ProductBuilder({ product, leathers }: Props) {
                 <div className="mt-5 space-y-4">
                   {selectedChoicesForGroup.map((choice) => {
                     const selectionKey = makeSelectionKey(group.id, choice.id);
+                    const leatherSearch =
+                      leatherSearchBySelectionKey[selectionKey] || "";
+
+                    const filteredLeathers = leathers.filter((leather) => {
+                      const query = leatherSearch.toLowerCase().trim();
+
+                      if (!query) return true;
+
+                      return (
+                        leather.name.toLowerCase().includes(query) ||
+                        leather.grade.toLowerCase().includes(query) ||
+                        leather.slug.toLowerCase().includes(query)
+                      );
+                    });
+
+                    const selectedLeatherId =
+                      selectedLeatherBySelectionKey[selectionKey] || "";
+                    const selectedLeather = leathers.find(
+                      (leather) => leather.id === selectedLeatherId
+                    );
 
                     return (
                       <div
@@ -683,27 +707,113 @@ export default function ProductBuilder({ product, leathers }: Props) {
                         </div>
 
                         {choice.usesLeatherGrades ? (
-                          <div className="mb-4">
-                            <label className="mb-2 block text-sm font-medium">
-                              Leather for {choice.label}
-                            </label>
-                            <select
-                              className="w-full rounded-lg border bg-white px-3 py-2"
-                              value={selectedLeatherBySelectionKey[selectionKey] || ""}
+                          <div className="mb-4 rounded-xl border bg-white p-4">
+                            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                              <label className="text-sm font-medium">
+                                Leather for {choice.label}
+                              </label>
+                              {selectedLeather ? (
+                                <span className="rounded-full bg-[var(--brand)] px-3 py-1 text-xs font-semibold text-white">
+                                  {selectedLeather.name} · {selectedLeather.grade}
+                                </span>
+                              ) : null}
+                            </div>
+
+                            <input
+                              type="text"
+                              value={leatherSearch}
                               onChange={(e) =>
-                                setSelectedLeatherBySelectionKey((prev) => ({
+                                setLeatherSearchBySelectionKey((prev) => ({
                                   ...prev,
                                   [selectionKey]: e.target.value,
                                 }))
                               }
-                            >
-                              <option value="">Select leather</option>
-                              {leathers.map((leather) => (
-                                <option key={leather.id} value={leather.id}>
-                                  {leather.name}
-                                </option>
-                              ))}
-                            </select>
+                              placeholder="Search leather by name or grade..."
+                              className="mb-3 w-full rounded-lg border bg-white px-3 py-2"
+                            />
+
+                            <div className="mb-3 flex items-center justify-between text-xs text-slate-500">
+                              <span>
+                                {filteredLeathers.length} leather
+                                {filteredLeathers.length === 1 ? "" : "s"} found
+                              </span>
+                              {selectedLeatherId ? (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setSelectedLeatherBySelectionKey((prev) => ({
+                                      ...prev,
+                                      [selectionKey]: "",
+                                    }))
+                                  }
+                                  className="rounded-lg border px-2 py-1 hover:bg-slate-50"
+                                >
+                                  Clear
+                                </button>
+                              ) : null}
+                            </div>
+
+                            {filteredLeathers.length === 0 ? (
+                              <div className="rounded-xl border border-dashed p-6 text-center text-sm text-slate-500">
+                                No leathers found.
+                              </div>
+                            ) : (
+                              <div className="grid max-h-[28rem] gap-3 overflow-y-auto pr-1 sm:grid-cols-2 xl:grid-cols-3">
+                                {filteredLeathers.map((leather) => {
+                                  const isSelectedLeather =
+                                    selectedLeatherId === leather.id;
+
+                                  return (
+                                    <button
+                                      key={leather.id}
+                                      type="button"
+                                      onClick={() =>
+                                        setSelectedLeatherBySelectionKey((prev) => ({
+                                          ...prev,
+                                          [selectionKey]: leather.id,
+                                        }))
+                                      }
+                                      className={`overflow-hidden rounded-xl border text-left transition ${
+                                        isSelectedLeather
+                                          ? "border-[var(--brand)] bg-[var(--brand-soft)] ring-2 ring-[var(--brand)]"
+                                          : "border-slate-200 bg-white hover:border-slate-400"
+                                      }`}
+                                    >
+                                      <div className="flex h-28 items-center justify-center bg-white p-3">
+                                        {leather.imageUrl ? (
+                                          <img
+                                            src={leather.imageUrl}
+                                            alt={leather.name}
+                                            className="max-h-full max-w-full object-contain"
+                                          />
+                                        ) : (
+                                          <div className="text-xs text-slate-400">
+                                            No Image
+                                          </div>
+                                        )}
+                                      </div>
+
+                                      <div className="p-3">
+                                        <div className="flex items-start justify-between gap-2">
+                                          <p className="font-semibold text-slate-900">
+                                            {leather.name}
+                                          </p>
+                                          {isSelectedLeather ? (
+                                            <span className="rounded-full bg-[var(--brand)] px-2 py-1 text-[10px] font-semibold text-white">
+                                              Selected
+                                            </span>
+                                          ) : null}
+                                        </div>
+
+                                        <p className="mt-2 inline-flex rounded-full bg-slate-100 px-2 py-1 text-xs font-medium text-slate-700">
+                                          {leather.grade}
+                                        </p>
+                                      </div>
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            )}
                           </div>
                         ) : null}
 
