@@ -104,47 +104,6 @@ function buildSelectionRows(selections: IncomingSelection[]) {
   });
 }
 
-function buildSelectionsText(selections: IncomingSelection[]) {
-  return selections
-    .map((selection: IncomingSelection) => {
-      const lines = [
-        `${selection.groupName}: ${selection.choiceLabel}`,
-        `QTY: ${sanitizeQuantity(selection.quantity)}`,
-      ];
-
-      const partNumber = String(
-        selection.partNumber || selection.choiceValue || ""
-      ).trim();
-
-      if (partNumber) {
-        lines.push(`Part #: ${partNumber}`);
-      }
-
-      if (selection.frameNeededCode) {
-        lines.push(`Frame Needed: ${selection.frameNeededCode}`);
-      }
-
-      if (selection.leatherName) {
-        lines.push(
-          `Leather: ${selection.leatherName}${
-            selection.leatherGrade ? ` (${selection.leatherGrade})` : ""
-          }`
-        );
-      }
-
-      if (selection.isBodyLeather) {
-        lines.push("Body Leather: Yes");
-      }
-
-      if (selection.laseredBrand) {
-        lines.push("Lasered Brand: Yes");
-      }
-
-      return lines.join(" | ");
-    })
-    .join(" || ");
-}
-
 function buildBodyLeather(selections: IncomingSelection[]) {
   const uniqueValues = new Set<string>();
 
