@@ -1,16 +1,17 @@
 import { google } from "googleapis";
 
+type SheetPartInput = {
+  partNumber: string;
+  frameNeeded?: string | null;
+  quantity: number;
+};
+
 type SheetRowInput = {
-  eventType: "created" | "updated";
-  orderNumber: string;
-  status: string;
+  poNumber?: string | null;
   customerName: string;
-  customerEmail: string;
-  customerPhone?: string | null;
-  productName: string;
-  total: number;
-  notes?: string | null;
-  selectionsText: string;
+  bodyLeather?: string | null;
+  dateSold?: string | Date | null;
+  parts: SheetPartInput[];
 };
 
 function getGoogleAuth() {
@@ -28,6 +29,17 @@ function getGoogleAuth() {
   });
 }
 
+function formatDateSold(value?: string | Date | null) {
+  const date = value ? new Date(value) : new Date();
+
+  if (Number.isNaN(date.getTime())) {
+    const fallback = new Date();
+    return `${fallback.getMonth() + 1}/${fallback.getDate()}/${fallback.getFullYear()}`;
+  }
+
+  return `${date.getMonth() + 1}/${date.getDate()}/${date.getFullYear()}`;
+}
+
 export async function appendOrderRow(input: SheetRowInput) {
   const spreadsheetId = process.env.GOOGLE_SHEETS_SPREADSHEET_ID;
   const tabName = process.env.GOOGLE_SHEETS_TAB_NAME || "Orders";
@@ -36,29 +48,33 @@ export async function appendOrderRow(input: SheetRowInput) {
     throw new Error("Missing GOOGLE_SHEETS_SPREADSHEET_ID.");
   }
 
+  if (!input.parts || input.parts.length === 0) {
+    throw new Error("No parts were provided for Google Sheets.");
+  }
+
   const auth = getGoogleAuth();
   const sheets = google.sheets({ version: "v4", auth });
 
-  const row = [
-    new Date().toISOString(),
-    input.eventType,
-    input.orderNumber,
-    input.status,
+  const dateSold = formatDateSold(input.dateSold);
+
+  const rows = input.parts.map((part) => [
+    input.poNumber || "",
     input.customerName,
-    input.customerEmail,
-    input.customerPhone || "",
-    input.productName,
-    input.total,
-    input.notes || "",
-    input.selectionsText,
-  ];
+    part.partNumber || "",
+    part.frameNeeded || "",
+    Number(part.quantity || 0),
+    dateSold,
+    "", // Due Date
+    "", // MILL FIRST
+    input.bodyLeather || "",
+  ]);
 
   await sheets.spreadsheets.values.append({
     spreadsheetId,
-    range: `${tabName}!A:K`,
+    range: `${tabName}!A:I`,
     valueInputOption: "USER_ENTERED",
     requestBody: {
-      values: [row],
+      values: rows,
     },
   });
 }

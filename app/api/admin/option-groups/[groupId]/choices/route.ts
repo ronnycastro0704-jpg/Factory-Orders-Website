@@ -18,6 +18,7 @@ export async function POST(request: Request, context: RouteContext) {
     const imageUrl = String(body.imageUrl || "").trim();
     const priceDelta = Number(body.priceDelta || 0);
     const displayOrder = Number(body.displayOrder || 0);
+    const frameNeededCode = String(body.frameNeededCode || "").trim();
 
     const usesLeatherGrades = Boolean(body.usesLeatherGrades);
     const appliesLeatherSurcharge =
@@ -27,6 +28,7 @@ export async function POST(request: Request, context: RouteContext) {
     const allowsLaseredBrand = Boolean(body.allowsLaseredBrand);
     const isBinaryOption = Boolean(body.isBinaryOption);
     const isQuickPick = Boolean(body.isQuickPick);
+    const isBodyLeather = Boolean(body.isBodyLeather);
 
     const gradeAUpcharge =
       body.gradeAUpcharge === "" ||
@@ -93,18 +95,20 @@ export async function POST(request: Request, context: RouteContext) {
         imageUrl: imageUrl || null,
         priceDelta,
         displayOrder,
+        frameNeededCode: frameNeededCode || null,
         usesLeatherGrades,
         appliesLeatherSurcharge,
         allowsLaseredBrand,
         isBinaryOption,
         isQuickPick,
-        gradeAUpcharge,
-        gradeBUpcharge,
-        gradeEMBUpcharge,
-        gradeHOHUpcharge,
-        gradeAxisUpcharge,
-        gradeBuffaloUpcharge,
-        comUpcharge,
+        isBodyLeather: usesLeatherGrades ? isBodyLeather : false,
+        gradeAUpcharge: usesLeatherGrades ? gradeAUpcharge : null,
+        gradeBUpcharge: usesLeatherGrades ? gradeBUpcharge : null,
+        gradeEMBUpcharge: usesLeatherGrades ? gradeEMBUpcharge : null,
+        gradeHOHUpcharge: usesLeatherGrades ? gradeHOHUpcharge : null,
+        gradeAxisUpcharge: usesLeatherGrades ? gradeAxisUpcharge : null,
+        gradeBuffaloUpcharge: usesLeatherGrades ? gradeBuffaloUpcharge : null,
+        comUpcharge: usesLeatherGrades ? comUpcharge : null,
         active: true,
       },
     });

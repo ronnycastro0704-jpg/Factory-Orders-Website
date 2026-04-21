@@ -24,6 +24,11 @@ type SavedOrderItem = {
   selections: SavedSelection[];
 };
 
+type SavedRevision = {
+  id: string;
+  afterJson: unknown;
+};
+
 type ProductChoice = {
   id: string;
   label: string;
@@ -36,6 +41,8 @@ type ProductChoice = {
   allowsLaseredBrand: boolean;
   isBinaryOption: boolean;
   isQuickPick: boolean;
+  isBodyLeather: boolean;
+  frameNeededCode: string | null;
   gradeAUpcharge: unknown | null;
   gradeBUpcharge: unknown | null;
   gradeEMBUpcharge: unknown | null;
@@ -72,6 +79,12 @@ type LeatherRecord = {
   imageUrl: string | null;
 };
 
+type RevisionSelection = {
+  groupName: string;
+  choiceLabel: string;
+  quantity: number;
+};
+
 const SELECTION_META_SEPARATOR = "|||";
 
 function makeSelectionKey(groupId: string, choiceId: string) {
@@ -94,6 +107,58 @@ function parseScopedValue(raw: string) {
   };
 }
 
+function sanitizeQuantity(value: unknown) {
+  const parsed = Number(value ?? 1);
+
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return 1;
+  }
+
+  return Math.max(1, Math.round(parsed));
+}
+
+function extractRevisionSelections(afterJson: unknown): RevisionSelection[] {
+  if (!afterJson || typeof afterJson !== "object") {
+    return [];
+  }
+
+  const selections = (afterJson as { selections?: unknown }).selections;
+
+  if (!Array.isArray(selections)) {
+    return [];
+  }
+
+  return selections
+    .map((item) => {
+      if (!item || typeof item !== "object") {
+        return null;
+      }
+
+      const selection = item as {
+        groupName?: unknown;
+        choiceLabel?: unknown;
+        quantity?: unknown;
+      };
+
+      return {
+        groupName:
+          typeof selection.groupName === "string" ? selection.groupName : "",
+        choiceLabel:
+          typeof selection.choiceLabel === "string" ? selection.choiceLabel : "",
+        quantity: sanitizeQuantity(selection.quantity),
+      };
+    })
+    .filter(
+      (
+        item
+      ): item is {
+        groupName: string;
+        choiceLabel: string;
+        quantity: number;
+      } => Boolean(item && item.groupName && item.choiceLabel)
+    );
+}
+
 export default async function CustomerOrderEditPage({ params }: PageProps) {
   const { id } = await params;
 
@@ -104,6 +169,10 @@ export default async function CustomerOrderEditPage({ params }: PageProps) {
         include: {
           selections: true,
         },
+      },
+      revisions: {
+        orderBy: { createdAt: "desc" },
+        take: 1,
       },
     },
   });
@@ -143,6 +212,9 @@ export default async function CustomerOrderEditPage({ params }: PageProps) {
     orderBy: { name: "asc" },
   })) as LeatherRecord[];
 
+  const latestRevision = order.revisions[0] as SavedRevision | undefined;
+  const revisionSelections = extractRevisionSelections(latestRevision?.afterJson);
+
   const initialSelectedOptions: Record<string, string[]> = {};
   const initialSelectedLeatherBySelectionKey: Record<string, string> = {};
   const initialSelectedLaseredBrandBySelectionKey: Record<string, "yes" | "no"> =
@@ -151,6 +223,7 @@ export default async function CustomerOrderEditPage({ params }: PageProps) {
     string,
     string
   > = {};
+  const initialQuantityBySelectionKey: Record<string, number> = {};
 
   const baseSelections = item.selections.filter(
     (selection: SavedSelection) =>
@@ -279,6 +352,22 @@ export default async function CustomerOrderEditPage({ params }: PageProps) {
       initialSelectedLaseredBrandImageUrlBySelectionKey[selectionKey] =
         parseScopedValue(matchingLaseredBrandImage.optionChoiceNameSnapshot).value;
     }
+
+    const revisionChoiceLabel = matchedChoice.isBinaryOption
+      ? "Yes"
+      : matchedChoice.label;
+
+    const revisionSelection = revisionSelections.find(
+      (selection) =>
+        selection.groupName === group.name &&
+        selection.choiceLabel === revisionChoiceLabel
+    );
+
+    if (revisionSelection) {
+      initialQuantityBySelectionKey[selectionKey] = sanitizeQuantity(
+        revisionSelection.quantity
+      );
+    }
   }
 
   const serializedProduct = {
@@ -303,6 +392,8 @@ export default async function CustomerOrderEditPage({ params }: PageProps) {
         allowsLaseredBrand: choice.allowsLaseredBrand,
         isBinaryOption: choice.isBinaryOption,
         isQuickPick: choice.isQuickPick,
+        isBodyLeather: choice.isBodyLeather,
+        frameNeededCode: choice.frameNeededCode,
         gradeAUpcharge:
           choice.gradeAUpcharge === null ? null : Number(choice.gradeAUpcharge),
         gradeBUpcharge:
@@ -364,6 +455,8 @@ export default async function CustomerOrderEditPage({ params }: PageProps) {
             initialCustomerEmail={order.customerEmail}
             initialCustomerPhone={order.customerPhone || ""}
             initialNotes={order.notes || ""}
+            initialPoNumber={order.poNumber || ""}
+            initialQuantityBySelectionKey={initialQuantityBySelectionKey}
           />
         </div>
       </div>

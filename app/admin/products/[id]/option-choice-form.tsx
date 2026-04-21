@@ -17,12 +17,14 @@ export default function CreateOptionChoiceForm({ groupId }: Props) {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [priceDelta, setPriceDelta] = useState("0");
   const [displayOrder, setDisplayOrder] = useState("0");
+  const [frameNeededCode, setFrameNeededCode] = useState("");
 
   const [usesLeatherGrades, setUsesLeatherGrades] = useState(false);
   const [appliesLeatherSurcharge, setAppliesLeatherSurcharge] = useState(true);
   const [allowsLaseredBrand, setAllowsLaseredBrand] = useState(false);
   const [isBinaryOption, setIsBinaryOption] = useState(false);
   const [isQuickPick, setIsQuickPick] = useState(false);
+  const [isBodyLeather, setIsBodyLeather] = useState(false);
 
   const [gradeAUpcharge, setGradeAUpcharge] = useState("");
   const [gradeBUpcharge, setGradeBUpcharge] = useState("");
@@ -81,11 +83,13 @@ export default function CreateOptionChoiceForm({ groupId }: Props) {
           imageUrl: finalImageUrl,
           priceDelta: Number(priceDelta),
           displayOrder: Number(displayOrder),
+          frameNeededCode,
           usesLeatherGrades,
           appliesLeatherSurcharge,
           allowsLaseredBrand,
           isBinaryOption,
           isQuickPick,
+          isBodyLeather,
           gradeAUpcharge,
           gradeBUpcharge,
           gradeEMBUpcharge,
@@ -112,11 +116,13 @@ export default function CreateOptionChoiceForm({ groupId }: Props) {
       setImageFile(null);
       setPriceDelta("0");
       setDisplayOrder("0");
+      setFrameNeededCode("");
       setUsesLeatherGrades(false);
       setAppliesLeatherSurcharge(true);
       setAllowsLaseredBrand(false);
       setIsBinaryOption(false);
       setIsQuickPick(false);
+      setIsBodyLeather(false);
       setGradeAUpcharge("");
       setGradeBUpcharge("");
       setGradeEMBUpcharge("");
@@ -150,12 +156,22 @@ export default function CreateOptionChoiceForm({ groupId }: Props) {
       </div>
 
       <div>
-        <label className="mb-1 block text-sm font-medium">Value</label>
+        <label className="mb-1 block text-sm font-medium">Value / Part #</label>
         <input
           className="w-full rounded-lg border px-3 py-2"
           value={value}
           onChange={(e) => setValue(e.target.value)}
-          placeholder="tufted"
+          placeholder="10025 or tufted"
+        />
+      </div>
+
+      <div>
+        <label className="mb-1 block text-sm font-medium">Frame Needed Code</label>
+        <input
+          className="w-full rounded-lg border px-3 py-2"
+          value={frameNeededCode}
+          onChange={(e) => setFrameNeededCode(e.target.value)}
+          placeholder="100002"
         />
       </div>
 
@@ -217,20 +233,38 @@ export default function CreateOptionChoiceForm({ groupId }: Props) {
         <input
           type="checkbox"
           checked={usesLeatherGrades}
-          onChange={(e) => setUsesLeatherGrades(e.target.checked)}
+          onChange={(e) => {
+            const checked = e.target.checked;
+            setUsesLeatherGrades(checked);
+
+            if (!checked) {
+              setIsBodyLeather(false);
+            }
+          }}
         />
         Enable leather grade pricing
       </label>
 
       {usesLeatherGrades ? (
-        <label className="flex items-center gap-2 text-sm font-medium">
-          <input
-            type="checkbox"
-            checked={appliesLeatherSurcharge}
-            onChange={(e) => setAppliesLeatherSurcharge(e.target.checked)}
-          />
-          Applies Leather Surcharge
-        </label>
+        <>
+          <label className="flex items-center gap-2 text-sm font-medium">
+            <input
+              type="checkbox"
+              checked={appliesLeatherSurcharge}
+              onChange={(e) => setAppliesLeatherSurcharge(e.target.checked)}
+            />
+            Applies Leather Surcharge
+          </label>
+
+          <label className="flex items-center gap-2 text-sm font-medium">
+            <input
+              type="checkbox"
+              checked={isBodyLeather}
+              onChange={(e) => setIsBodyLeather(e.target.checked)}
+            />
+            Body Leather
+          </label>
+        </>
       ) : null}
 
       <label className="flex items-center gap-2 text-sm font-medium">

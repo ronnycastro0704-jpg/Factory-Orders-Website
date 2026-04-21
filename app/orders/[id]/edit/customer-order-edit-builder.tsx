@@ -16,6 +16,8 @@ type Choice = {
   allowsLaseredBrand: boolean;
   isBinaryOption: boolean;
   isQuickPick: boolean;
+  isBodyLeather: boolean;
+  frameNeededCode?: string | null;
   gradeAUpcharge: number | null;
   gradeBUpcharge: number | null;
   gradeEMBUpcharge: number | null;
@@ -62,6 +64,8 @@ type Props = {
   initialCustomerEmail: string;
   initialCustomerPhone: string;
   initialNotes: string;
+  initialPoNumber?: string;
+  initialQuantityBySelectionKey?: Record<string, number>;
 };
 
 type PriceLine = {
@@ -74,6 +78,8 @@ type SelectedChoiceDetail = {
   groupName: string;
   choiceId: string;
   choiceLabel: string;
+  choiceValue: string | null;
+  partNumber: string | null;
   baseAmount: number;
   usesLeatherGrades: boolean;
   isBinaryOption: boolean;
@@ -82,6 +88,9 @@ type SelectedChoiceDetail = {
   imageUrl?: string | null;
   laseredBrand: boolean;
   laseredBrandImageUrl?: string | null;
+  quantity: number;
+  frameNeededCode: string | null;
+  isBodyLeather: boolean;
 };
 
 const SINGLE_APPLY_GRADES = new Set(["Grade A", "Grade B", "COM"]);
@@ -94,6 +103,16 @@ const REPEATING_GRADES = new Set([
 
 function makeSelectionKey(groupId: string, choiceId: string) {
   return `${groupId}:::${choiceId}`;
+}
+
+function sanitizeQuantity(value: number | null | undefined) {
+  const parsed = Number(value ?? 1);
+
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return 1;
+  }
+
+  return Math.max(1, Math.round(parsed));
 }
 
 function getLeatherSurcharge(choice: Choice, grade: string) {
@@ -140,6 +159,8 @@ export default function CustomerOrderEditBuilder({
   initialCustomerEmail,
   initialCustomerPhone,
   initialNotes,
+  initialPoNumber = "",
+  initialQuantityBySelectionKey = {},
 }: Props) {
   const [selectedOptions, setSelectedOptions] =
     useState<Record<string, string[]>>(initialSelectedOptions);
@@ -149,6 +170,10 @@ export default function CustomerOrderEditBuilder({
 
   const [leatherSearchBySelectionKey, setLeatherSearchBySelectionKey] =
     useState<Record<string, string>>({});
+
+  const [quantityBySelectionKey, setQuantityBySelectionKey] = useState<
+    Record<string, number>
+  >(initialQuantityBySelectionKey);
 
   const [selectedLaseredBrandBySelectionKey, setSelectedLaseredBrandBySelectionKey] =
     useState<Record<string, "yes" | "no">>(
@@ -167,6 +192,7 @@ export default function CustomerOrderEditBuilder({
     setSelectedLaseredBrandFileBySelectionKey,
   ] = useState<Record<string, File | null>>({});
 
+  const [poNumber, setPoNumber] = useState(initialPoNumber);
   const [customerName, setCustomerName] = useState(initialCustomerName);
   const [customerEmail, setCustomerEmail] = useState(initialCustomerEmail);
   const [customerPhone, setCustomerPhone] = useState(initialCustomerPhone);
@@ -317,6 +343,8 @@ export default function CustomerOrderEditBuilder({
             groupName: group.name,
             choiceId: selectedChoice.id,
             choiceLabel: selectedChoice.label,
+            choiceValue: selectedChoice.value || null,
+            partNumber: selectedChoice.value || null,
             baseAmount: selectedChoice.priceDelta,
             usesLeatherGrades: selectedChoice.usesLeatherGrades,
             isBinaryOption: selectedChoice.isBinaryOption,
@@ -327,6 +355,9 @@ export default function CustomerOrderEditBuilder({
             laseredBrandImageUrl: laseredBrand
               ? selectedLaseredBrandImageUrlBySelectionKey[selectionKey] || null
               : null,
+            quantity: sanitizeQuantity(quantityBySelectionKey[selectionKey]),
+            frameNeededCode: selectedChoice.frameNeededCode || null,
+            isBodyLeather: selectedChoice.isBodyLeather,
           };
         })
         .filter(Boolean) as SelectedChoiceDetail[];
@@ -338,6 +369,7 @@ export default function CustomerOrderEditBuilder({
     selectedLaseredBrandBySelectionKey,
     selectedLaseredBrandImageUrlBySelectionKey,
     leathers,
+    quantityBySelectionKey,
   ]);
 
   const allPriceLines = useMemo<PriceLine[]>(() => {
@@ -411,6 +443,8 @@ export default function CustomerOrderEditBuilder({
       return {
         groupName: item.groupName,
         choiceLabel: item.isBinaryOption ? "Yes" : item.choiceLabel,
+        choiceValue: item.choiceValue,
+        partNumber: item.partNumber,
         leatherName: item.selectedLeather?.name || null,
         leatherGrade: item.selectedLeather?.grade || null,
         baseAmount: item.baseAmount,
@@ -421,6 +455,9 @@ export default function CustomerOrderEditBuilder({
         laseredBrandImageUrl: item.laseredBrand
           ? uploadedBrandUrls[selectionKey] || item.laseredBrandImageUrl || null
           : null,
+        quantity: item.quantity,
+        frameNeededCode: item.frameNeededCode,
+        isBodyLeather: item.isBodyLeather && Boolean(item.selectedLeather),
       };
     });
 
@@ -451,6 +488,7 @@ export default function CustomerOrderEditBuilder({
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
+          poNumber,
           customerName,
           customerEmail,
           customerPhone,
@@ -494,6 +532,7 @@ export default function CustomerOrderEditBuilder({
         },
         body: JSON.stringify({
           productName: product.name,
+          poNumber,
           customerName,
           customerEmail,
           customerPhone,
@@ -528,13 +567,13 @@ export default function CustomerOrderEditBuilder({
   return (
     <div className="grid gap-8 lg:grid-cols-[1.4fr_0.8fr]">
       <div className="space-y-6">
-{activeQuickPick ? (
-  <div className="rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
-    Quick pick <span className="font-semibold">{activeQuickPick.choice.label}</span>{" "}
-    is selected. Other leather-based groups are locked, but non-leather options
-    like nails can still be selected.
-  </div>
-) : null}
+        {activeQuickPick ? (
+          <div className="rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
+            Quick pick <span className="font-semibold">{activeQuickPick.choice.label}</span>{" "}
+            is selected. Other leather-based groups are locked, but non-leather options
+            like nails can still be selected.
+          </div>
+        ) : null}
 
         {product.optionGroups.map((group) => {
           const selectedChoiceIds = selectedOptions[group.id] || [];
@@ -549,10 +588,10 @@ export default function CustomerOrderEditBuilder({
             : false;
 
           const isMultiSelect = group.type === "MULTI_SELECT";
-const groupDisabled =
-  Boolean(activeQuickPick) &&
-  group.id !== activeQuickPick?.groupId &&
-  group.choices.some((choice) => choice.usesLeatherGrades);
+          const groupDisabled =
+            Boolean(activeQuickPick) &&
+            group.id !== activeQuickPick?.groupId &&
+            group.choices.some((choice) => choice.usesLeatherGrades);
 
           return (
             <div
@@ -577,13 +616,13 @@ const groupDisabled =
                 ) : null}
               </div>
 
-{groupDisabled && activeQuickPick ? (
-  <div className="mb-4 rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
-    Disabled because quick pick{" "}
-    <span className="font-semibold">{activeQuickPick.choice.label}</span>{" "}
-    is selected and this group uses leather selection.
-  </div>
-) : null}
+              {groupDisabled && activeQuickPick ? (
+                <div className="mb-4 rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
+                  Disabled because quick pick{" "}
+                  <span className="font-semibold">{activeQuickPick.choice.label}</span>{" "}
+                  is selected and this group uses leather selection.
+                </div>
+              ) : null}
 
               <div className={groupDisabled ? "pointer-events-none select-none" : ""}>
                 {isBinaryGroup && binaryChoice ? (
@@ -812,6 +851,42 @@ const groupDisabled =
                           </span>
                         </div>
 
+                        <div className="mb-4 grid gap-3 sm:grid-cols-2">
+                          <div>
+                            <label className="mb-1 block text-sm font-medium">
+                              Quantity
+                            </label>
+                            <input
+                              type="number"
+                              min={1}
+                              step={1}
+                              className="w-full rounded-lg border bg-white px-3 py-2"
+                              value={quantityBySelectionKey[selectionKey] ?? 1}
+                              onChange={(e) =>
+                                setQuantityBySelectionKey((prev) => ({
+                                  ...prev,
+                                  [selectionKey]: sanitizeQuantity(Number(e.target.value)),
+                                }))
+                              }
+                            />
+                          </div>
+
+                          <div className="rounded-lg border bg-white px-3 py-2 text-sm text-slate-600">
+                            <div>
+                              <span className="font-medium">Part #:</span>{" "}
+                              {choice.value || "—"}
+                            </div>
+                            <div className="mt-1">
+                              <span className="font-medium">Frame Needed:</span>{" "}
+                              {choice.frameNeededCode || "—"}
+                            </div>
+                            <div className="mt-1">
+                              <span className="font-medium">Body Leather:</span>{" "}
+                              {choice.isBodyLeather ? "Yes" : "No"}
+                            </div>
+                          </div>
+                        </div>
+
                         {choice.usesLeatherGrades ? (
                           <div className="mb-4 rounded-xl border bg-white p-4">
                             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
@@ -985,6 +1060,16 @@ const groupDisabled =
           <h2 className="text-xl font-semibold">Customer Information</h2>
 
           <div className="mt-4 space-y-4">
+            <div>
+              <label className="mb-1 block text-sm font-medium">PO #</label>
+              <input
+                className="w-full rounded-lg border px-3 py-2"
+                value={poNumber}
+                onChange={(e) => setPoNumber(e.target.value)}
+                placeholder="Optional PO number"
+              />
+            </div>
+
             <div>
               <label className="mb-1 block text-sm font-medium">Name</label>
               <input

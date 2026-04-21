@@ -87,6 +87,9 @@ model Order {
   customerName    String
   customerEmail   String
   customerPhone   String?
+  poNumber String?
+  frameNeededCode String?
+  isBodyLeather Boolean @default(false)
   status          OrderStatus @default(DRAFT)
   subtotal        Decimal     @default(0) @db.Decimal(10, 2)
   total           Decimal     @default(0) @db.Decimal(10, 2)

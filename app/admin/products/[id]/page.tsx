@@ -23,6 +23,8 @@ type OptionChoiceItem = {
   allowsLaseredBrand: boolean;
   isBinaryOption: boolean;
   isQuickPick: boolean;
+  isBodyLeather: boolean;
+  frameNeededCode: string | null;
   gradeAUpcharge: unknown | null;
   gradeBUpcharge: unknown | null;
   gradeEMBUpcharge: unknown | null;
@@ -187,10 +189,26 @@ export default async function AdminProductDetailPage({ params }: PageProps) {
                                         Leather Choice
                                       </span>
                                     ) : null}
+
+                                    {choice.isBodyLeather ? (
+                                      <span className="rounded-full bg-rose-100 px-2 py-1 text-xs font-semibold text-rose-800">
+                                        Body Leather
+                                      </span>
+                                    ) : null}
+
+                                    {choice.frameNeededCode ? (
+                                      <span className="rounded-full bg-orange-100 px-2 py-1 text-xs font-semibold text-orange-800">
+                                        Frame Needed
+                                      </span>
+                                    ) : null}
                                   </div>
 
                                   <p className="text-sm text-slate-500">
-                                    Value: {choice.value || "—"}
+                                    Value / Part #: {choice.value || "—"}
+                                  </p>
+
+                                  <p className="mt-1 text-sm text-slate-500">
+                                    Frame Needed Code: {choice.frameNeededCode || "—"}
                                   </p>
 
                                   <p className="mt-1 text-sm text-slate-600">
@@ -243,6 +261,11 @@ export default async function AdminProductDetailPage({ params }: PageProps) {
                                           ? "Applied"
                                           : "Not Applied"}
                                       </p>
+
+                                      <p className="mt-1 text-sm font-medium text-slate-700">
+                                        Body Leather:{" "}
+                                        {choice.isBodyLeather ? "Yes" : "No"}
+                                      </p>
                                     </>
                                   ) : null}
 
@@ -270,6 +293,8 @@ export default async function AdminProductDetailPage({ params }: PageProps) {
                                         choice.allowsLaseredBrand,
                                       isBinaryOption: choice.isBinaryOption,
                                       isQuickPick: choice.isQuickPick,
+                                      isBodyLeather: choice.isBodyLeather,
+                                      frameNeededCode: choice.frameNeededCode,
                                       gradeAUpcharge:
                                         choice.gradeAUpcharge === null
                                           ? null

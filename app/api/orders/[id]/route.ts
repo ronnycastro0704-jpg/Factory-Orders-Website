@@ -13,6 +13,8 @@ type RouteContext = {
 type IncomingSelection = {
   groupName: string;
   choiceLabel: string;
+  choiceValue?: string | null;
+  partNumber?: string | null;
   leatherName?: string | null;
   leatherGrade?: string | null;
   baseAmount: number;
@@ -21,6 +23,9 @@ type IncomingSelection = {
   leatherImageUrl?: string | null;
   laseredBrand?: boolean;
   laseredBrandImageUrl?: string | null;
+  quantity?: number | null;
+  frameNeededCode?: string | null;
+  isBodyLeather?: boolean;
 };
 
 type IncomingLineItem = {
@@ -47,6 +52,16 @@ function isAdminEmail(email?: string | null) {
     .filter(Boolean);
 
   return adminEmails.includes(email.toLowerCase());
+}
+
+function sanitizeQuantity(value: number | null | undefined) {
+  const parsed = Number(value ?? 1);
+
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return 1;
+  }
+
+  return Math.max(1, Math.round(parsed));
 }
 
 function buildSelectionRows(selections: IncomingSelection[]) {
@@ -92,7 +107,22 @@ function buildSelectionRows(selections: IncomingSelection[]) {
 function buildSelectionsText(selections: IncomingSelection[]) {
   return selections
     .map((selection: IncomingSelection) => {
-      const lines = [`${selection.groupName}: ${selection.choiceLabel}`];
+      const lines = [
+        `${selection.groupName}: ${selection.choiceLabel}`,
+        `QTY: ${sanitizeQuantity(selection.quantity)}`,
+      ];
+
+      const partNumber = String(
+        selection.partNumber || selection.choiceValue || ""
+      ).trim();
+
+      if (partNumber) {
+        lines.push(`Part #: ${partNumber}`);
+      }
+
+      if (selection.frameNeededCode) {
+        lines.push(`Frame Needed: ${selection.frameNeededCode}`);
+      }
 
       if (selection.leatherName) {
         lines.push(
@@ -102,6 +132,10 @@ function buildSelectionsText(selections: IncomingSelection[]) {
         );
       }
 
+      if (selection.isBodyLeather) {
+        lines.push("Body Leather: Yes");
+      }
+
       if (selection.laseredBrand) {
         lines.push("Lasered Brand: Yes");
       }
@@ -109,6 +143,40 @@ function buildSelectionsText(selections: IncomingSelection[]) {
       return lines.join(" | ");
     })
     .join(" || ");
+}
+
+function buildBodyLeather(selections: IncomingSelection[]) {
+  const uniqueValues = new Set<string>();
+
+  for (const selection of selections) {
+    if (!selection.isBodyLeather || !selection.leatherName) {
+      continue;
+    }
+
+    const leatherValue = `${selection.leatherName}${
+      selection.leatherGrade ? ` (${selection.leatherGrade})` : ""
+    }`.trim();
+
+    if (leatherValue) {
+      uniqueValues.add(leatherValue);
+    }
+  }
+
+  return Array.from(uniqueValues).join(", ");
+}
+
+function buildSheetParts(selections: IncomingSelection[]) {
+  return selections.map((selection) => {
+    const partNumber = String(
+      selection.partNumber || selection.choiceValue || selection.choiceLabel || ""
+    ).trim();
+
+    return {
+      partNumber,
+      frameNeeded: String(selection.frameNeededCode || "").trim() || null,
+      quantity: sanitizeQuantity(selection.quantity),
+    };
+  });
 }
 
 export async function GET(_: Request, context: RouteContext) {
@@ -200,6 +268,7 @@ export async function PUT(request: Request, context: RouteContext) {
     const { id } = await context.params;
     const body = await request.json();
 
+    const poNumber = String(body.poNumber || "").trim() || null;
     const customerName = String(body.customerName || "").trim();
     const customerEmailRaw = String(body.customerEmail || "").trim();
     const customerEmail = normalizeEmail(customerEmailRaw);
@@ -279,11 +348,14 @@ export async function PUT(request: Request, context: RouteContext) {
     const nextRevisionNumber =
       order.revisions.length > 0 ? order.revisions[0].revisionNumber + 1 : 1;
     const nextStatus = order.status === "DRAFT" ? "DRAFT" : "CHANGED";
+    const bodyLeather = buildBodyLeather(selections);
+    const parts = buildSheetParts(selections);
 
     const [updatedOrder] = await prisma.$transaction([
       prisma.order.update({
         where: { id },
         data: {
+          poNumber,
           customerName,
           customerEmail,
           customerPhone,
@@ -330,9 +402,11 @@ export async function PUT(request: Request, context: RouteContext) {
           changeReason,
           beforeJson: {
             status: order.status,
+            poNumber: order.poNumber,
           },
           afterJson: {
             status: nextStatus,
+            poNumber,
             selections,
             lineItems,
           },
@@ -400,16 +474,11 @@ export async function PUT(request: Request, context: RouteContext) {
 
     try {
       await appendOrderRow({
-        eventType: "updated",
-        orderNumber: updatedOrder.orderNumber,
-        status: nextStatus,
+        poNumber,
         customerName,
-        customerEmail,
-        customerPhone,
-        productName: productName || item.productNameSnapshot,
-        total,
-        notes,
-        selectionsText: buildSelectionsText(selections),
+        bodyLeather: bodyLeather || null,
+        dateSold: new Date(),
+        parts,
       });
 
       await prisma.sheetSyncLog.create({

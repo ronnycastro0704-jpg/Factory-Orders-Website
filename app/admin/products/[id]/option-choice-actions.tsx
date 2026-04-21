@@ -15,6 +15,8 @@ type Choice = {
   allowsLaseredBrand: boolean;
   isBinaryOption: boolean;
   isQuickPick: boolean;
+  isBodyLeather: boolean;
+  frameNeededCode: string | null;
   gradeAUpcharge: number | null;
   gradeBUpcharge: number | null;
   gradeEMBUpcharge: number | null;
@@ -43,6 +45,9 @@ export default function OptionChoiceActions({ groupId, choice }: Props) {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [priceDelta, setPriceDelta] = useState(String(choice.priceDelta));
   const [displayOrder, setDisplayOrder] = useState(String(choice.displayOrder));
+  const [frameNeededCode, setFrameNeededCode] = useState(
+    choice.frameNeededCode || ""
+  );
 
   const [usesLeatherGrades, setUsesLeatherGrades] = useState(
     choice.usesLeatherGrades
@@ -55,6 +60,7 @@ export default function OptionChoiceActions({ groupId, choice }: Props) {
   );
   const [isBinaryOption, setIsBinaryOption] = useState(choice.isBinaryOption);
   const [isQuickPick, setIsQuickPick] = useState(choice.isQuickPick);
+  const [isBodyLeather, setIsBodyLeather] = useState(choice.isBodyLeather);
   const [active, setActive] = useState(choice.active);
 
   const [gradeAUpcharge, setGradeAUpcharge] = useState(
@@ -129,11 +135,13 @@ export default function OptionChoiceActions({ groupId, choice }: Props) {
             imageUrl: finalImageUrl,
             priceDelta: Number(priceDelta),
             displayOrder: Number(displayOrder),
+            frameNeededCode,
             usesLeatherGrades,
             appliesLeatherSurcharge,
             allowsLaseredBrand,
             isBinaryOption,
             isQuickPick,
+            isBodyLeather,
             active,
             gradeAUpcharge: usesLeatherGrades ? gradeAUpcharge : "",
             gradeBUpcharge: usesLeatherGrades ? gradeBUpcharge : "",
@@ -237,11 +245,21 @@ export default function OptionChoiceActions({ groupId, choice }: Props) {
       </div>
 
       <div>
-        <label className="mb-1 block text-sm font-medium">Value</label>
+        <label className="mb-1 block text-sm font-medium">Value / Part #</label>
         <input
           className="w-full rounded-lg border px-3 py-2"
           value={value}
           onChange={(e) => setValue(e.target.value)}
+        />
+      </div>
+
+      <div>
+        <label className="mb-1 block text-sm font-medium">Frame Needed Code</label>
+        <input
+          className="w-full rounded-lg border px-3 py-2"
+          value={frameNeededCode}
+          onChange={(e) => setFrameNeededCode(e.target.value)}
+          placeholder="100002"
         />
       </div>
 
@@ -306,20 +324,38 @@ export default function OptionChoiceActions({ groupId, choice }: Props) {
         <input
           type="checkbox"
           checked={usesLeatherGrades}
-          onChange={(e) => setUsesLeatherGrades(e.target.checked)}
+          onChange={(e) => {
+            const checked = e.target.checked;
+            setUsesLeatherGrades(checked);
+
+            if (!checked) {
+              setIsBodyLeather(false);
+            }
+          }}
         />
         Enable leather grade pricing
       </label>
 
       {usesLeatherGrades ? (
-        <label className="flex items-center gap-2 text-sm font-medium">
-          <input
-            type="checkbox"
-            checked={appliesLeatherSurcharge}
-            onChange={(e) => setAppliesLeatherSurcharge(e.target.checked)}
-          />
-          Applies Leather Surcharge
-        </label>
+        <>
+          <label className="flex items-center gap-2 text-sm font-medium">
+            <input
+              type="checkbox"
+              checked={appliesLeatherSurcharge}
+              onChange={(e) => setAppliesLeatherSurcharge(e.target.checked)}
+            />
+            Applies Leather Surcharge
+          </label>
+
+          <label className="flex items-center gap-2 text-sm font-medium">
+            <input
+              type="checkbox"
+              checked={isBodyLeather}
+              onChange={(e) => setIsBodyLeather(e.target.checked)}
+            />
+            Body Leather
+          </label>
+        </>
       ) : null}
 
       <label className="flex items-center gap-2 text-sm font-medium">
@@ -448,11 +484,13 @@ export default function OptionChoiceActions({ groupId, choice }: Props) {
             setImageFile(null);
             setPriceDelta(String(choice.priceDelta));
             setDisplayOrder(String(choice.displayOrder));
+            setFrameNeededCode(choice.frameNeededCode || "");
             setUsesLeatherGrades(choice.usesLeatherGrades);
             setAppliesLeatherSurcharge(choice.appliesLeatherSurcharge);
             setAllowsLaseredBrand(choice.allowsLaseredBrand);
             setIsBinaryOption(choice.isBinaryOption);
             setIsQuickPick(choice.isQuickPick);
+            setIsBodyLeather(choice.isBodyLeather);
             setActive(choice.active);
             setGradeAUpcharge(
               choice.gradeAUpcharge === null ? "" : String(choice.gradeAUpcharge)
