@@ -79,12 +79,6 @@ type LeatherRecord = {
   imageUrl: string | null;
 };
 
-type RevisionSelection = {
-  groupName: string;
-  choiceLabel: string;
-  quantity: number;
-};
-
 const SELECTION_META_SEPARATOR = "|||";
 
 function makeSelectionKey(groupId: string, choiceId: string) {
@@ -117,46 +111,29 @@ function sanitizeQuantity(value: unknown) {
   return Math.max(1, Math.round(parsed));
 }
 
-function extractRevisionSelections(afterJson: unknown): RevisionSelection[] {
+function extractRevisionQuantity(afterJson: unknown) {
   if (!afterJson || typeof afterJson !== "object") {
-    return [];
+    return 1;
   }
 
-  const selections = (afterJson as { selections?: unknown }).selections;
+  const parsed = afterJson as {
+    quantity?: unknown;
+    selections?: unknown;
+  };
 
-  if (!Array.isArray(selections)) {
-    return [];
+  if (parsed.quantity !== undefined) {
+    return sanitizeQuantity(parsed.quantity);
   }
 
-  return selections
-    .map((item) => {
-      if (!item || typeof item !== "object") {
-        return null;
-      }
+  if (Array.isArray(parsed.selections) && parsed.selections.length > 0) {
+    const first = parsed.selections[0];
 
-      const selection = item as {
-        groupName?: unknown;
-        choiceLabel?: unknown;
-        quantity?: unknown;
-      };
+    if (first && typeof first === "object" && "quantity" in first) {
+      return sanitizeQuantity((first as { quantity?: unknown }).quantity);
+    }
+  }
 
-      return {
-        groupName:
-          typeof selection.groupName === "string" ? selection.groupName : "",
-        choiceLabel:
-          typeof selection.choiceLabel === "string" ? selection.choiceLabel : "",
-        quantity: sanitizeQuantity(selection.quantity),
-      };
-    })
-    .filter(
-      (
-        item
-      ): item is {
-        groupName: string;
-        choiceLabel: string;
-        quantity: number;
-      } => Boolean(item && item.groupName && item.choiceLabel)
-    );
+  return 1;
 }
 
 export default async function CustomerOrderEditPage({ params }: PageProps) {
@@ -213,7 +190,7 @@ export default async function CustomerOrderEditPage({ params }: PageProps) {
   })) as LeatherRecord[];
 
   const latestRevision = order.revisions[0] as SavedRevision | undefined;
-  const revisionSelections = extractRevisionSelections(latestRevision?.afterJson);
+  const initialQuantity = extractRevisionQuantity(latestRevision?.afterJson);
 
   const initialSelectedOptions: Record<string, string[]> = {};
   const initialSelectedLeatherBySelectionKey: Record<string, string> = {};
@@ -223,7 +200,6 @@ export default async function CustomerOrderEditPage({ params }: PageProps) {
     string,
     string
   > = {};
-  const initialQuantityBySelectionKey: Record<string, number> = {};
 
   const baseSelections = item.selections.filter(
     (selection: SavedSelection) =>
@@ -352,22 +328,6 @@ export default async function CustomerOrderEditPage({ params }: PageProps) {
       initialSelectedLaseredBrandImageUrlBySelectionKey[selectionKey] =
         parseScopedValue(matchingLaseredBrandImage.optionChoiceNameSnapshot).value;
     }
-
-    const revisionChoiceLabel = matchedChoice.isBinaryOption
-      ? "Yes"
-      : matchedChoice.label;
-
-    const revisionSelection = revisionSelections.find(
-      (selection) =>
-        selection.groupName === group.name &&
-        selection.choiceLabel === revisionChoiceLabel
-    );
-
-    if (revisionSelection) {
-      initialQuantityBySelectionKey[selectionKey] = sanitizeQuantity(
-        revisionSelection.quantity
-      );
-    }
   }
 
   const serializedProduct = {
@@ -456,7 +416,7 @@ export default async function CustomerOrderEditPage({ params }: PageProps) {
             initialCustomerPhone={order.customerPhone || ""}
             initialNotes={order.notes || ""}
             initialPoNumber={order.poNumber || ""}
-            initialQuantityBySelectionKey={initialQuantityBySelectionKey}
+            initialQuantity={initialQuantity}
           />
         </div>
       </div>

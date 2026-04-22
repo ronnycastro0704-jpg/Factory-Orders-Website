@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { auth } from "../../../../auth";
 import { prisma } from "../../../../lib/prisma";
 import { sendOrderNotification } from "../../../../lib/email";
-import { appendOrderRow } from "../../../../lib/sheets";
 
 type RouteContext = {
   params: Promise<{
@@ -101,40 +100,6 @@ function buildSelectionRows(selections: IncomingSelection[]) {
     }
 
     return rows;
-  });
-}
-
-function buildBodyLeather(selections: IncomingSelection[]) {
-  const uniqueValues = new Set<string>();
-
-  for (const selection of selections) {
-    if (!selection.isBodyLeather || !selection.leatherName) {
-      continue;
-    }
-
-    const leatherValue = `${selection.leatherName}${
-      selection.leatherGrade ? ` (${selection.leatherGrade})` : ""
-    }`.trim();
-
-    if (leatherValue) {
-      uniqueValues.add(leatherValue);
-    }
-  }
-
-  return Array.from(uniqueValues).join(", ");
-}
-
-function buildSheetParts(selections: IncomingSelection[]) {
-  return selections.map((selection) => {
-    const partNumber = String(
-      selection.partNumber || selection.choiceValue || selection.choiceLabel || ""
-    ).trim();
-
-    return {
-      partNumber,
-      frameNeeded: String(selection.frameNeededCode || "").trim() || null,
-      quantity: sanitizeQuantity(selection.quantity),
-    };
   });
 }
 
@@ -237,6 +202,9 @@ export async function PUT(request: Request, context: RouteContext) {
     const productName = String(body.productName || "").trim();
     const basePrice = Number(body.basePrice || 0);
     const total = Number(body.total || 0);
+    const quantity = sanitizeQuantity(
+      Number(body.quantity ?? body.orderQuantity ?? body.selections?.[0]?.quantity ?? 1)
+    );
 
     const selections = Array.isArray(body.selections)
       ? (body.selections as IncomingSelection[])
@@ -307,8 +275,6 @@ export async function PUT(request: Request, context: RouteContext) {
     const nextRevisionNumber =
       order.revisions.length > 0 ? order.revisions[0].revisionNumber + 1 : 1;
     const nextStatus = order.status === "DRAFT" ? "DRAFT" : "CHANGED";
-    const bodyLeather = buildBodyLeather(selections);
-    const parts = buildSheetParts(selections);
 
     const [updatedOrder] = await prisma.$transaction([
       prisma.order.update({
@@ -366,6 +332,7 @@ export async function PUT(request: Request, context: RouteContext) {
           afterJson: {
             status: nextStatus,
             poNumber,
+            quantity,
             selections,
             lineItems,
           },
@@ -427,40 +394,6 @@ export async function PUT(request: Request, context: RouteContext) {
           status: "FAILED",
           errorMessage:
             error instanceof Error ? error.message : "Unknown email error",
-        },
-      });
-    }
-
-    try {
-      await appendOrderRow({
-        poNumber,
-        customerName,
-        bodyLeather: bodyLeather || null,
-        dateSold: new Date(),
-        parts,
-      });
-
-      await prisma.sheetSyncLog.create({
-        data: {
-          orderId: id,
-          spreadsheetId: process.env.GOOGLE_SHEETS_SPREADSHEET_ID || null,
-          worksheetName: process.env.GOOGLE_SHEETS_TAB_NAME || "Orders",
-          spreadsheetRowId: "APPENDED",
-          status: "SYNCED",
-        },
-      });
-    } catch (error) {
-      console.error("UPDATE ORDER SHEETS ERROR:", error);
-
-      await prisma.sheetSyncLog.create({
-        data: {
-          orderId: id,
-          spreadsheetId: process.env.GOOGLE_SHEETS_SPREADSHEET_ID || null,
-          worksheetName: process.env.GOOGLE_SHEETS_TAB_NAME || "Orders",
-          spreadsheetRowId: "APPEND_FAILED",
-          status: "FAILED",
-          errorMessage:
-            error instanceof Error ? error.message : "Unknown sheets error",
         },
       });
     }

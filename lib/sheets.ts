@@ -2,8 +2,7 @@ import { google } from "googleapis";
 
 type SheetPartInput = {
   partNumber: string;
-  frameNeeded?: string | null;
-  quantity: number;
+  frameNeeded: string;
 };
 
 type SheetRowInput = {
@@ -11,6 +10,7 @@ type SheetRowInput = {
   customerName: string;
   bodyLeather?: string | null;
   dateSold?: string | Date | null;
+  quantity: number;
   parts: SheetPartInput[];
 };
 
@@ -40,6 +40,16 @@ function formatDateSold(value?: string | Date | null) {
   return `${date.getMonth() + 1}/${date.getDate()}/${date.getFullYear()}`;
 }
 
+function sanitizeQuantity(value: number | null | undefined) {
+  const parsed = Number(value ?? 1);
+
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return 1;
+  }
+
+  return Math.max(1, Math.round(parsed));
+}
+
 export async function appendOrderRow(input: SheetRowInput) {
   const spreadsheetId = process.env.GOOGLE_SHEETS_SPREADSHEET_ID;
   const tabName = process.env.GOOGLE_SHEETS_TAB_NAME || "Orders";
@@ -56,13 +66,14 @@ export async function appendOrderRow(input: SheetRowInput) {
   const sheets = google.sheets({ version: "v4", auth });
 
   const dateSold = formatDateSold(input.dateSold);
+  const quantity = sanitizeQuantity(input.quantity);
 
   const rows = input.parts.map((part) => [
     input.poNumber || "",
     input.customerName,
     part.partNumber || "",
     part.frameNeeded || "",
-    Number(part.quantity || 0),
+    quantity,
     dateSold,
     "", // Due Date
     "", // MILL FIRST

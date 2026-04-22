@@ -76,7 +76,6 @@ type SelectedChoiceDetail = {
   imageUrl?: string | null;
   laseredBrand: boolean;
   laseredBrandImageUrl?: string | null;
-  quantity: number;
   frameNeededCode: string | null;
   isBodyLeather: boolean;
 };
@@ -145,10 +144,6 @@ export default function ProductBuilder({ product, leathers }: Props) {
   const [leatherSearchBySelectionKey, setLeatherSearchBySelectionKey] =
     useState<Record<string, string>>({});
 
-  const [quantityBySelectionKey, setQuantityBySelectionKey] = useState<
-    Record<string, number>
-  >({});
-
   const [selectedLaseredBrandBySelectionKey, setSelectedLaseredBrandBySelectionKey] =
     useState<Record<string, "yes" | "no">>({});
 
@@ -164,6 +159,7 @@ export default function ProductBuilder({ product, leathers }: Props) {
 
   const [savedOrderId, setSavedOrderId] = useState("");
   const [poNumber, setPoNumber] = useState("");
+  const [quantity, setQuantity] = useState(1);
   const [customerName, setCustomerName] = useState("");
   const [customerEmail, setCustomerEmail] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
@@ -325,7 +321,6 @@ export default function ProductBuilder({ product, leathers }: Props) {
             laseredBrandImageUrl: laseredBrand
               ? selectedLaseredBrandImageUrlBySelectionKey[selectionKey] || null
               : null,
-            quantity: sanitizeQuantity(quantityBySelectionKey[selectionKey]),
             frameNeededCode: selectedChoice.frameNeededCode || null,
             isBodyLeather: selectedChoice.isBodyLeather,
           };
@@ -339,7 +334,6 @@ export default function ProductBuilder({ product, leathers }: Props) {
     selectedLaseredBrandBySelectionKey,
     selectedLaseredBrandImageUrlBySelectionKey,
     leathers,
-    quantityBySelectionKey,
   ]);
 
   const allPriceLines = useMemo<PriceLine[]>(() => {
@@ -406,6 +400,7 @@ export default function ProductBuilder({ product, leathers }: Props) {
 
   async function buildSelectionPayload() {
     const uploadedBrandUrls = await uploadLaseredBrandImagesIfNeeded();
+    const orderQuantity = sanitizeQuantity(quantity);
 
     const payloadSelections = selectedChoiceDetails.map((item) => {
       const selectionKey = makeSelectionKey(item.groupId, item.choiceId);
@@ -425,7 +420,7 @@ export default function ProductBuilder({ product, leathers }: Props) {
         laseredBrandImageUrl: item.laseredBrand
           ? uploadedBrandUrls[selectionKey] || item.laseredBrandImageUrl || null
           : null,
-        quantity: item.quantity,
+        quantity: orderQuantity,
         frameNeededCode: item.frameNeededCode,
         isBodyLeather: item.isBodyLeather && Boolean(item.selectedLeather),
       };
@@ -461,6 +456,7 @@ export default function ProductBuilder({ product, leathers }: Props) {
           productId: product.id,
           productName: product.name,
           poNumber,
+          quantity: sanitizeQuantity(quantity),
           customerName,
           customerEmail,
           customerPhone,
@@ -506,6 +502,7 @@ export default function ProductBuilder({ product, leathers }: Props) {
         body: JSON.stringify({
           productName: product.name,
           poNumber,
+          quantity: sanitizeQuantity(quantity),
           customerName,
           customerEmail,
           customerPhone,
@@ -824,44 +821,23 @@ export default function ProductBuilder({ product, leathers }: Props) {
                           </span>
                         </div>
 
-                        <div className="mb-4 grid gap-3 sm:grid-cols-2">
+                        <div className="rounded-lg border bg-white px-3 py-2 text-sm text-slate-600">
                           <div>
-                            <label className="mb-1 block text-sm font-medium">
-                              Quantity
-                            </label>
-                            <input
-                              type="number"
-                              min={1}
-                              step={1}
-                              className="w-full rounded-lg border bg-white px-3 py-2"
-                              value={quantityBySelectionKey[selectionKey] ?? 1}
-                              onChange={(e) =>
-                                setQuantityBySelectionKey((prev) => ({
-                                  ...prev,
-                                  [selectionKey]: sanitizeQuantity(Number(e.target.value)),
-                                }))
-                              }
-                            />
+                            <span className="font-medium">Part #:</span>{" "}
+                            {choice.value || "—"}
                           </div>
-
-                          <div className="rounded-lg border bg-white px-3 py-2 text-sm text-slate-600">
-                            <div>
-                              <span className="font-medium">Part #:</span>{" "}
-                              {choice.value || "—"}
-                            </div>
-                            <div className="mt-1">
-                              <span className="font-medium">Frame Needed:</span>{" "}
-                              {choice.frameNeededCode || "—"}
-                            </div>
-                            <div className="mt-1">
-                              <span className="font-medium">Body Leather:</span>{" "}
-                              {choice.isBodyLeather ? "Yes" : "No"}
-                            </div>
+                          <div className="mt-1">
+                            <span className="font-medium">Frame Needed:</span>{" "}
+                            {choice.frameNeededCode || "—"}
+                          </div>
+                          <div className="mt-1">
+                            <span className="font-medium">Body Leather:</span>{" "}
+                            {choice.isBodyLeather ? "Yes" : "No"}
                           </div>
                         </div>
 
                         {choice.usesLeatherGrades ? (
-                          <div className="mb-4 rounded-xl border bg-white p-4">
+                          <div className="mt-4 rounded-xl border bg-white p-4">
                             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                               <label className="text-sm font-medium">
                                 Leather for {choice.label}
@@ -972,7 +948,7 @@ export default function ProductBuilder({ product, leathers }: Props) {
                         ) : null}
 
                         {choice.allowsLaseredBrand ? (
-                          <div>
+                          <div className="mt-4">
                             <label className="mb-2 block text-sm font-medium">
                               Lasered Brand for {choice.label}
                             </label>
@@ -1040,6 +1016,18 @@ export default function ProductBuilder({ product, leathers }: Props) {
                 value={poNumber}
                 onChange={(e) => setPoNumber(e.target.value)}
                 placeholder="Optional PO number"
+              />
+            </div>
+
+            <div>
+              <label className="mb-1 block text-sm font-medium">Quantity</label>
+              <input
+                type="number"
+                min={1}
+                step={1}
+                className="w-full rounded-lg border px-3 py-2"
+                value={quantity}
+                onChange={(e) => setQuantity(sanitizeQuantity(Number(e.target.value)))}
               />
             </div>
 

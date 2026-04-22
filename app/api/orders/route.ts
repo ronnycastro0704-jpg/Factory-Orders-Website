@@ -119,17 +119,32 @@ function buildBodyLeather(selections: IncomingSelection[]) {
 }
 
 function buildSheetParts(selections: IncomingSelection[]) {
-  return selections.map((selection) => {
-    const partNumber = String(
-      selection.partNumber || selection.choiceValue || selection.choiceLabel || ""
-    ).trim();
+  const seen = new Set<string>();
 
-    return {
-      partNumber,
-      frameNeeded: String(selection.frameNeededCode || "").trim() || null,
-      quantity: sanitizeQuantity(selection.quantity),
-    };
-  });
+  return selections
+    .map((selection) => {
+      const partNumber = String(
+        selection.partNumber || selection.choiceValue || ""
+      ).trim();
+
+      const frameNeeded = String(selection.frameNeededCode || "").trim();
+
+      return {
+        partNumber,
+        frameNeeded,
+      };
+    })
+    .filter((part) => part.partNumber && part.frameNeeded)
+    .filter((part) => {
+      const key = `${part.partNumber}|||${part.frameNeeded}`;
+
+      if (seen.has(key)) {
+        return false;
+      }
+
+      seen.add(key);
+      return true;
+    });
 }
 
 export async function POST(request: Request) {
@@ -160,6 +175,9 @@ export async function POST(request: Request) {
     const basePrice = Number(body.basePrice || 0);
     const total = Number(body.total || 0);
     const submitToFactory = Boolean(body.submitToFactory);
+    const quantity = sanitizeQuantity(
+      Number(body.quantity ?? body.orderQuantity ?? body.selections?.[0]?.quantity ?? 1)
+    );
 
     const selections = Array.isArray(body.selections)
       ? (body.selections as IncomingSelection[])
@@ -221,8 +239,6 @@ export async function POST(request: Request) {
     const selectionRows = buildSelectionRows(selections);
     const orderNumber = generateOrderNumber();
     const nextStatus = submitToFactory ? "SENT_TO_FACTORY" : "DRAFT";
-    const bodyLeather = buildBodyLeather(selections);
-    const parts = buildSheetParts(selections);
 
     const createdOrder = await prisma.order.create({
       data: {
@@ -260,6 +276,7 @@ export async function POST(request: Request) {
             afterJson: {
               status: nextStatus,
               poNumber,
+              quantity,
               selections,
               lineItems,
             },
@@ -352,38 +369,46 @@ export async function POST(request: Request) {
       });
     }
 
-    try {
-      await appendOrderRow({
-        poNumber,
-        customerName,
-        bodyLeather: bodyLeather || null,
-        dateSold: new Date(),
-        parts,
-      });
+    if (submitToFactory) {
+      try {
+        const bodyLeather = buildBodyLeather(selections);
+        const parts = buildSheetParts(selections);
 
-      await prisma.sheetSyncLog.create({
-        data: {
-          orderId: createdOrder.id,
-          spreadsheetId: process.env.GOOGLE_SHEETS_SPREADSHEET_ID || null,
-          worksheetName: process.env.GOOGLE_SHEETS_TAB_NAME || "Orders",
-          spreadsheetRowId: "APPENDED",
-          status: "SYNCED",
-        },
-      });
-    } catch (error) {
-      console.error("ORDER SHEETS ERROR:", error);
+        if (parts.length > 0) {
+          await appendOrderRow({
+            poNumber,
+            customerName,
+            quantity,
+            bodyLeather: bodyLeather || null,
+            dateSold: new Date(),
+            parts,
+          });
+        }
 
-      await prisma.sheetSyncLog.create({
-        data: {
-          orderId: createdOrder.id,
-          spreadsheetId: process.env.GOOGLE_SHEETS_SPREADSHEET_ID || null,
-          worksheetName: process.env.GOOGLE_SHEETS_TAB_NAME || "Orders",
-          spreadsheetRowId: "APPEND_FAILED",
-          status: "FAILED",
-          errorMessage:
-            error instanceof Error ? error.message : "Unknown sheets error",
-        },
-      });
+        await prisma.sheetSyncLog.create({
+          data: {
+            orderId: createdOrder.id,
+            spreadsheetId: process.env.GOOGLE_SHEETS_SPREADSHEET_ID || null,
+            worksheetName: process.env.GOOGLE_SHEETS_TAB_NAME || "Orders",
+            spreadsheetRowId: parts.length > 0 ? "APPENDED" : "NO_PART_ROWS",
+            status: "SYNCED",
+          },
+        });
+      } catch (error) {
+        console.error("ORDER SHEETS ERROR:", error);
+
+        await prisma.sheetSyncLog.create({
+          data: {
+            orderId: createdOrder.id,
+            spreadsheetId: process.env.GOOGLE_SHEETS_SPREADSHEET_ID || null,
+            worksheetName: process.env.GOOGLE_SHEETS_TAB_NAME || "Orders",
+            spreadsheetRowId: "APPEND_FAILED",
+            status: "FAILED",
+            errorMessage:
+              error instanceof Error ? error.message : "Unknown sheets error",
+          },
+        });
+      }
     }
 
     return NextResponse.json(createdOrder, { status: 201 });

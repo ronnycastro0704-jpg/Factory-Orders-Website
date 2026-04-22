@@ -89,19 +89,31 @@ function sanitizeQuantity(value: number | null | undefined) {
   return Math.max(1, Math.round(parsed));
 }
 
-function extractRevisionSelections(revisions: RevisionRecord[]) {
+function extractRevisionData(revisions: RevisionRecord[]) {
   for (const revision of revisions) {
     if (!revision.afterJson || typeof revision.afterJson !== "object") {
       continue;
     }
 
-    const maybeSelections = (revision.afterJson as { selections?: unknown }).selections;
+    const afterJson = revision.afterJson as {
+      selections?: unknown;
+      quantity?: unknown;
+    };
 
-    if (!Array.isArray(maybeSelections)) {
-      continue;
+    const quantity = sanitizeQuantity(
+      typeof afterJson.quantity === "number"
+        ? afterJson.quantity
+        : Number(afterJson.quantity ?? 1)
+    );
+
+    if (!Array.isArray(afterJson.selections)) {
+      return {
+        quantity,
+        selections: [] as RevisionSelection[],
+      };
     }
 
-    return maybeSelections
+    const selections = afterJson.selections
       .map((item) => {
         if (!item || typeof item !== "object") {
           return null;
@@ -177,14 +189,20 @@ function extractRevisionSelections(revisions: RevisionRecord[]) {
         } satisfies RevisionSelection;
       })
       .filter(Boolean) as RevisionSelection[];
+
+    return { quantity, selections };
   }
 
-  return [];
+  return {
+    quantity: 1,
+    selections: [] as RevisionSelection[],
+  };
 }
 
 function buildSelectionsFromItem(
   item: ItemWithSelections,
-  revisionSelections: RevisionSelection[]
+  revisionSelections: RevisionSelection[],
+  orderQuantity: number
 ) {
   const baseSelections = item.selections.filter(
     (selection: SelectionSnapshot) =>
@@ -291,7 +309,7 @@ function buildSelectionsFromItem(
       partNumber:
         revisionMatch?.partNumber ||
         revisionMatch?.choiceValue ||
-        choiceLabel,
+        null,
       leatherName,
       leatherGrade,
       baseAmount:
@@ -305,7 +323,7 @@ function buildSelectionsFromItem(
         parsedLaseredBrandImage ||
         revisionMatch?.laseredBrandImageUrl ||
         null,
-      quantity: sanitizeQuantity(revisionMatch?.quantity),
+      quantity: orderQuantity,
       frameNeededCode: revisionMatch?.frameNeededCode || null,
       isBodyLeather: Boolean(revisionMatch?.isBodyLeather),
     };
@@ -333,17 +351,32 @@ function buildBodyLeather(selections: EnrichedSelection[]) {
 }
 
 function buildSheetParts(selections: EnrichedSelection[]) {
-  return selections.map((selection) => {
-    const partNumber = String(
-      selection.partNumber || selection.choiceValue || selection.choiceLabel || ""
-    ).trim();
+  const seen = new Set<string>();
 
-    return {
-      partNumber,
-      frameNeeded: String(selection.frameNeededCode || "").trim() || null,
-      quantity: sanitizeQuantity(selection.quantity),
-    };
-  });
+  return selections
+    .map((selection) => {
+      const partNumber = String(
+        selection.partNumber || selection.choiceValue || ""
+      ).trim();
+
+      const frameNeeded = String(selection.frameNeededCode || "").trim();
+
+      return {
+        partNumber,
+        frameNeeded,
+      };
+    })
+    .filter((part) => part.partNumber && part.frameNeeded)
+    .filter((part) => {
+      const key = `${part.partNumber}|||${part.frameNeeded}`;
+
+      if (seen.has(key)) {
+        return false;
+      }
+
+      seen.add(key);
+      return true;
+    });
 }
 
 export async function POST(request: Request, context: RouteContext) {
@@ -376,11 +409,15 @@ export async function POST(request: Request, context: RouteContext) {
     }
 
     const item = order.items[0] as ItemWithSelections;
-    const revisionSelections = extractRevisionSelections(
+    const { quantity, selections: revisionSelections } = extractRevisionData(
       order.revisions as RevisionRecord[]
     );
 
-    const selections = buildSelectionsFromItem(item, revisionSelections);
+    const selections = buildSelectionsFromItem(
+      item,
+      revisionSelections,
+      quantity
+    );
 
     const enrichedSelections: EnrichedSelection[] = await Promise.all(
       selections.map(async (selection: EnrichedSelection) => {
@@ -440,6 +477,7 @@ export async function POST(request: Request, context: RouteContext) {
           afterJson: {
             status: nextStatus,
             poNumber: order.poNumber,
+            quantity,
           },
         },
       }),
@@ -521,25 +559,28 @@ export async function POST(request: Request, context: RouteContext) {
       });
     }
 
-    if (action === "sent_to_factory") {
+    if (action === "sent_to_factory" && order.status !== "SENT_TO_FACTORY") {
       try {
         const bodyLeather = buildBodyLeather(enrichedSelections);
         const parts = buildSheetParts(enrichedSelections);
 
-        await appendOrderRow({
-          poNumber: order.poNumber || null,
-          customerName: order.customerName,
-          bodyLeather: bodyLeather || null,
-          dateSold: new Date(),
-          parts,
-        });
+        if (parts.length > 0) {
+          await appendOrderRow({
+            poNumber: order.poNumber || null,
+            customerName: order.customerName,
+            quantity,
+            bodyLeather: bodyLeather || null,
+            dateSold: new Date(),
+            parts,
+          });
+        }
 
         await prisma.sheetSyncLog.create({
           data: {
             orderId: id,
             spreadsheetId: process.env.GOOGLE_SHEETS_SPREADSHEET_ID || null,
             worksheetName: process.env.GOOGLE_SHEETS_TAB_NAME || "Orders",
-            spreadsheetRowId: "APPENDED",
+            spreadsheetRowId: parts.length > 0 ? "APPENDED" : "NO_PART_ROWS",
             status: "SYNCED",
           },
         });

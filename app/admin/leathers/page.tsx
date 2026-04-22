@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { prisma } from "../../../lib/prisma";
 import CreateLeatherForm from "./leather-form";
+import LeatherRowActions from "./leather-row-actions";
 
 type LeatherRow = {
   id: string;
@@ -161,6 +162,16 @@ export default async function AdminLeathersPage() {
                           {leather.grade}
                         </p>
                       </div>
+
+                      <LeatherRowActions
+                        leather={{
+                          id: leather.id,
+                          name: leather.name,
+                          grade: leather.grade,
+                          imageUrl: leather.imageUrl,
+                          active: leather.active,
+                        }}
+                      />
                     </div>
                   </div>
                 ))}
