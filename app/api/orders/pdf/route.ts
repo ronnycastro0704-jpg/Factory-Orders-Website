@@ -272,6 +272,8 @@ export async function POST(request: Request) {
 
     const productName = String(body.productName || "").trim();
     const customerName = String(body.customerName || "").trim();
+    const poNumber = String(body.poNumber || "").trim();
+    const quantity = Number(body.quantity || 1);
     const customerEmail = String(body.customerEmail || "").trim();
     const customerPhone = String(body.customerPhone || "").trim();
     const notes = String(body.notes || "").trim();
@@ -353,6 +355,27 @@ export async function POST(request: Request) {
         fontSize: 12,
       });
     }
+    if (poNumber) {
+  cursorY = drawWrappedText({
+    page,
+    text: `PO #: ${poNumber}`,
+    x: PAGE_MARGIN,
+    y: cursorY,
+    maxWidth: 250,
+    font,
+    fontSize: 12,
+  });
+}
+
+cursorY = drawWrappedText({
+  page,
+  text: `Quantity: ${Number.isFinite(quantity) && quantity > 0 ? Math.round(quantity) : 1}`,
+  x: PAGE_MARGIN,
+  y: cursorY,
+  maxWidth: 250,
+  font,
+  fontSize: 12,
+});
 
     if (notes) {
       cursorY -= 6;

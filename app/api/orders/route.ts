@@ -302,28 +302,32 @@ export async function POST(request: Request) {
     });
 
     try {
-      await sendOrderNotification({
-        type: submitToFactory ? "sent_to_factory" : "created",
-        orderNumber: createdOrder.orderNumber,
-        customerName,
-        customerEmail,
-        customerPhone,
-        notes,
-        productName: productName || product.name,
-        total,
-        selections: selections.map((selection: IncomingSelection) => ({
-          groupName: selection.groupName,
-          choiceLabel: selection.choiceLabel,
-          leatherName: selection.leatherName || null,
-          leatherGrade: selection.leatherGrade || null,
-          baseAmount: Number(selection.baseAmount || 0),
-          leatherSurcharge: Number(selection.leatherSurcharge || 0),
-          imageUrl: selection.imageUrl || null,
-          leatherImageUrl: selection.leatherImageUrl || null,
-          laseredBrand: Boolean(selection.laseredBrand),
-          laseredBrandImageUrl: selection.laseredBrandImageUrl || null,
-        })),
-      });
+await sendOrderNotification({
+  type: submitToFactory ? "sent_to_factory" : "created",
+  orderNumber: createdOrder.orderNumber,
+  poNumber,
+  quantity,
+  customerName,
+  customerEmail,
+  customerPhone,
+  notes,
+  productName: productName || product.name,
+  total,
+  lineItems,
+  selections: selections.map((selection: IncomingSelection) => ({
+    groupName: selection.groupName,
+    choiceLabel: selection.choiceLabel,
+    leatherName: selection.leatherName || null,
+    leatherGrade: selection.leatherGrade || null,
+    baseAmount: Number(selection.baseAmount || 0),
+    leatherSurcharge: Number(selection.leatherSurcharge || 0),
+    imageUrl: selection.imageUrl || null,
+    leatherImageUrl: selection.leatherImageUrl || null,
+    laseredBrand: Boolean(selection.laseredBrand),
+    laseredBrandImageUrl: selection.laseredBrandImageUrl || null,
+    isBodyLeather: Boolean(selection.isBodyLeather),
+  })),
+});
 
       await prisma.emailLog.createMany({
         data: [

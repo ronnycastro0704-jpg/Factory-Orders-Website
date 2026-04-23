@@ -341,28 +341,32 @@ export async function PUT(request: Request, context: RouteContext) {
     ]);
 
     try {
-      await sendOrderNotification({
-        type: "updated",
-        orderNumber: updatedOrder.orderNumber,
-        customerName,
-        customerEmail,
-        customerPhone,
-        notes,
-        productName: productName || item.productNameSnapshot,
-        total,
-        selections: selections.map((selection: IncomingSelection) => ({
-          groupName: selection.groupName,
-          choiceLabel: selection.choiceLabel,
-          leatherName: selection.leatherName || null,
-          leatherGrade: selection.leatherGrade || null,
-          baseAmount: Number(selection.baseAmount || 0),
-          leatherSurcharge: Number(selection.leatherSurcharge || 0),
-          imageUrl: selection.imageUrl || null,
-          leatherImageUrl: selection.leatherImageUrl || null,
-          laseredBrand: Boolean(selection.laseredBrand),
-          laseredBrandImageUrl: selection.laseredBrandImageUrl || null,
-        })),
-      });
+await sendOrderNotification({
+  type: "updated",
+  orderNumber: updatedOrder.orderNumber,
+  poNumber,
+  quantity,
+  customerName,
+  customerEmail,
+  customerPhone,
+  notes,
+  productName: productName || item.productNameSnapshot,
+  total,
+  lineItems,
+  selections: selections.map((selection: IncomingSelection) => ({
+    groupName: selection.groupName,
+    choiceLabel: selection.choiceLabel,
+    leatherName: selection.leatherName || null,
+    leatherGrade: selection.leatherGrade || null,
+    baseAmount: Number(selection.baseAmount || 0),
+    leatherSurcharge: Number(selection.leatherSurcharge || 0),
+    imageUrl: selection.imageUrl || null,
+    leatherImageUrl: selection.leatherImageUrl || null,
+    laseredBrand: Boolean(selection.laseredBrand),
+    laseredBrandImageUrl: selection.laseredBrandImageUrl || null,
+    isBodyLeather: Boolean(selection.isBodyLeather),
+  })),
+});
 
       await prisma.emailLog.createMany({
         data: [

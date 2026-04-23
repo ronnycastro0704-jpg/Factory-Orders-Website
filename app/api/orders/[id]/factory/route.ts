@@ -25,6 +25,11 @@ type RevisionRecord = {
   afterJson: unknown;
 };
 
+type RevisionLineItem = {
+  label: string;
+  amount: number;
+};
+
 type RevisionSelection = {
   groupName: string;
   choiceLabel: string;
@@ -90,6 +95,8 @@ function sanitizeQuantity(value: number | null | undefined) {
 }
 
 function extractRevisionData(revisions: RevisionRecord[]) {
+  let latestQuantity = 1;
+
   for (const revision of revisions) {
     if (!revision.afterJson || typeof revision.afterJson !== "object") {
       continue;
@@ -98,19 +105,43 @@ function extractRevisionData(revisions: RevisionRecord[]) {
     const afterJson = revision.afterJson as {
       selections?: unknown;
       quantity?: unknown;
+      lineItems?: unknown;
     };
 
-    const quantity = sanitizeQuantity(
-      typeof afterJson.quantity === "number"
-        ? afterJson.quantity
-        : Number(afterJson.quantity ?? 1)
-    );
+    if (afterJson.quantity !== undefined) {
+      latestQuantity = sanitizeQuantity(
+        typeof afterJson.quantity === "number"
+          ? afterJson.quantity
+          : Number(afterJson.quantity ?? 1)
+      );
+    }
+
+    const lineItems = Array.isArray(afterJson.lineItems)
+      ? afterJson.lineItems
+          .map((item) => {
+            if (!item || typeof item !== "object") {
+              return null;
+            }
+
+            const line = item as {
+              label?: unknown;
+              amount?: unknown;
+            };
+
+            if (typeof line.label !== "string") {
+              return null;
+            }
+
+            return {
+              label: line.label,
+              amount: Number(line.amount || 0),
+            } satisfies RevisionLineItem;
+          })
+          .filter(Boolean) as RevisionLineItem[]
+      : [];
 
     if (!Array.isArray(afterJson.selections)) {
-      return {
-        quantity,
-        selections: [] as RevisionSelection[],
-      };
+      continue;
     }
 
     const selections = afterJson.selections
@@ -190,12 +221,17 @@ function extractRevisionData(revisions: RevisionRecord[]) {
       })
       .filter(Boolean) as RevisionSelection[];
 
-    return { quantity, selections };
+    return {
+      quantity: latestQuantity,
+      selections,
+      lineItems,
+    };
   }
 
   return {
-    quantity: 1,
+    quantity: latestQuantity,
     selections: [] as RevisionSelection[],
+    lineItems: [] as RevisionLineItem[],
   };
 }
 
@@ -409,9 +445,8 @@ export async function POST(request: Request, context: RouteContext) {
     }
 
     const item = order.items[0] as ItemWithSelections;
-    const { quantity, selections: revisionSelections } = extractRevisionData(
-      order.revisions as RevisionRecord[]
-    );
+const { quantity, selections: revisionSelections, lineItems } =
+  extractRevisionData(order.revisions as RevisionRecord[]);
 
     const selections = buildSelectionsFromItem(
       item,
@@ -484,28 +519,32 @@ export async function POST(request: Request, context: RouteContext) {
     ]);
 
     try {
-      await sendOrderNotification({
-        type: action === "sent_to_factory" ? "sent_to_factory" : "completed",
-        orderNumber: order.orderNumber,
-        customerName: order.customerName,
-        customerEmail: order.customerEmail,
-        customerPhone: order.customerPhone,
-        notes: order.notes,
-        productName: item.productNameSnapshot,
-        total: Number(order.total),
-        selections: enrichedSelections.map((selection) => ({
-          groupName: selection.groupName,
-          choiceLabel: selection.choiceLabel,
-          leatherName: selection.leatherName || null,
-          leatherGrade: selection.leatherGrade || null,
-          baseAmount: Number(selection.baseAmount || 0),
-          leatherSurcharge: Number(selection.leatherSurcharge || 0),
-          imageUrl: selection.imageUrl || null,
-          leatherImageUrl: selection.leatherImageUrl || null,
-          laseredBrand: Boolean(selection.laseredBrand),
-          laseredBrandImageUrl: selection.laseredBrandImageUrl || null,
-        })),
-      });
+await sendOrderNotification({
+  type: action === "sent_to_factory" ? "sent_to_factory" : "completed",
+  orderNumber: order.orderNumber,
+  poNumber: order.poNumber || null,
+  quantity,
+  customerName: order.customerName,
+  customerEmail: order.customerEmail,
+  customerPhone: order.customerPhone,
+  notes: order.notes,
+  productName: item.productNameSnapshot,
+  total: Number(order.total),
+  lineItems,
+  selections: enrichedSelections.map((selection) => ({
+    groupName: selection.groupName,
+    choiceLabel: selection.choiceLabel,
+    leatherName: selection.leatherName || null,
+    leatherGrade: selection.leatherGrade || null,
+    baseAmount: Number(selection.baseAmount || 0),
+    leatherSurcharge: Number(selection.leatherSurcharge || 0),
+    imageUrl: selection.imageUrl || null,
+    leatherImageUrl: selection.leatherImageUrl || null,
+    laseredBrand: Boolean(selection.laseredBrand),
+    laseredBrandImageUrl: selection.laseredBrandImageUrl || null,
+    isBodyLeather: Boolean(selection.isBodyLeather),
+  })),
+});
 
       await prisma.emailLog.createMany({
         data: [

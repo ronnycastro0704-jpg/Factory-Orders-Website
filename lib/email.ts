@@ -7,6 +7,11 @@ function formatCurrency(value: number) {
   }).format(value);
 }
 
+type OrderLineItem = {
+  label: string;
+  amount: number;
+};
+
 type OrderSelection = {
   groupName: string;
   choiceLabel: string;
@@ -18,17 +23,21 @@ type OrderSelection = {
   leatherImageUrl?: string | null;
   laseredBrand?: boolean;
   laseredBrandImageUrl?: string | null;
+  isBodyLeather?: boolean;
 };
 
 type SendOrderEmailInput = {
   type: "created" | "updated" | "sent_to_factory" | "completed";
   orderNumber: string;
+  poNumber?: string | null;
+  quantity?: number | null;
   customerName: string;
   customerEmail: string;
   customerPhone?: string | null;
   notes?: string | null;
   productName: string;
   total: number;
+  lineItems?: OrderLineItem[];
   selections: OrderSelection[];
 };
 
@@ -56,6 +65,54 @@ function escapeHtml(value: string) {
     .replaceAll("'", "&#39;");
 }
 
+function sanitizeQuantity(value: number | null | undefined) {
+  const parsed = Number(value ?? 1);
+
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return 1;
+  }
+
+  return Math.max(1, Math.round(parsed));
+}
+
+function buildBodyLeatherSummary(selections: OrderSelection[]) {
+  const explicit = Array.from(
+    new Set(
+      selections
+        .filter((selection) => selection.isBodyLeather && selection.leatherName)
+        .map((selection) =>
+          `${selection.leatherName}${
+            selection.leatherGrade ? ` (${selection.leatherGrade})` : ""
+          }`.trim()
+        )
+        .filter(Boolean)
+    )
+  );
+
+  if (explicit.length > 0) {
+    return explicit.join(", ");
+  }
+
+  const allLeathers = Array.from(
+    new Set(
+      selections
+        .filter((selection) => selection.leatherName)
+        .map((selection) =>
+          `${selection.leatherName}${
+            selection.leatherGrade ? ` (${selection.leatherGrade})` : ""
+          }`.trim()
+        )
+        .filter(Boolean)
+    )
+  );
+
+  if (allLeathers.length === 1) {
+    return allLeathers[0];
+  }
+
+  return "";
+}
+
 function buildSelectionsText(selections: OrderSelection[]) {
   return selections
     .map((selection, index) => {
@@ -72,6 +129,10 @@ function buildSelectionsText(selections: OrderSelection[]) {
             selection.leatherGrade ? ` (${selection.leatherGrade})` : ""
           }`
         );
+      }
+
+      if (selection.isBodyLeather) {
+        lines.push("Body Leather: Yes");
       }
 
       if (selection.laseredBrand) {
@@ -99,6 +160,10 @@ function buildFactorySelectionsText(selections: OrderSelection[]) {
         );
       }
 
+      if (selection.isBodyLeather) {
+        lines.push("   Body Leather: Yes");
+      }
+
       if (selection.laseredBrand) {
         lines.push("   Lasered Brand: Yes");
       }
@@ -118,6 +183,49 @@ function buildFactorySelectionsText(selections: OrderSelection[]) {
       return lines.join("\n");
     })
     .join("\n\n");
+}
+
+function buildLineItemsText(lineItems: OrderLineItem[]) {
+  if (!lineItems.length) return "";
+
+  return lineItems
+    .map((line) => {
+      const amountText =
+        line.amount === 0 ? "Included" : `+${formatCurrency(line.amount)}`;
+      return `${line.label}: ${amountText}`;
+    })
+    .join("\n");
+}
+
+function buildLineItemsHtml(lineItems: OrderLineItem[]) {
+  if (!lineItems.length) return "";
+
+  const rows = lineItems
+    .map((line) => {
+      const amountText =
+        line.amount === 0 ? "Included" : `+${formatCurrency(line.amount)}`;
+
+      return `
+        <tr>
+          <td style="padding:8px 0;border-bottom:1px solid #e5e7eb;font-size:14px;color:#111827;">
+            ${escapeHtml(line.label)}
+          </td>
+          <td style="padding:8px 0;border-bottom:1px solid #e5e7eb;font-size:14px;color:#111827;text-align:right;font-weight:700;">
+            ${escapeHtml(amountText)}
+          </td>
+        </tr>
+      `;
+    })
+    .join("");
+
+  return `
+    <div style="background:#ffffff;border:1px solid #e5e7eb;border-radius:12px;padding:16px 18px;margin-bottom:18px;">
+      <h2 style="margin:0 0 12px 0;font-size:18px;line-height:1.2;color:#111827;">Itemized Price</h2>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
+        ${rows}
+      </table>
+    </div>
+  `;
 }
 
 function buildCustomerSelectionsHtml(selections: OrderSelection[]) {
@@ -166,6 +274,11 @@ function buildCustomerSelectionsHtml(selections: OrderSelection[]) {
                 : ""
             }
             ${
+              selection.isBodyLeather
+                ? `<p style="margin:0 0 4px 0;font-size:14px;font-weight:700;color:#111827;">Body Leather: Yes</p>`
+                : ""
+            }
+            ${
               hasLaseredBrand
                 ? `<p style="margin:0;font-size:14px;font-weight:700;color:#111827;">Lasered Brand: Yes</p>`
                 : ""
@@ -177,7 +290,9 @@ function buildCustomerSelectionsHtml(selections: OrderSelection[]) {
               <p style="margin:0 0 8px 0;font-size:13px;font-weight:700;color:#475569;">OPTION IMAGE</p>
               ${
                 safeImageUrl
-                  ? `<img src="${safeImageUrl}" alt="${safeChoiceLabel}" style="width:180px;height:180px;object-fit:cover;border-radius:12px;border:2px solid ${color};" />`
+                  ? `<div style="width:180px;height:180px;border-radius:12px;border:2px solid ${color};display:flex;align-items:center;justify-content:center;background:#ffffff;overflow:hidden;">
+                       <img src="${safeImageUrl}" alt="${safeChoiceLabel}" style="width:100%;height:100%;object-fit:contain;" />
+                     </div>`
                   : `<div style="width:180px;height:180px;border-radius:12px;border:2px solid ${color};display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:12px;">No Option Image</div>`
               }
             </div>
@@ -188,7 +303,9 @@ function buildCustomerSelectionsHtml(selections: OrderSelection[]) {
                     <p style="margin:0 0 8px 0;font-size:13px;font-weight:700;color:#475569;">LEATHER IMAGE</p>
                     ${
                       safeLeatherImageUrl
-                        ? `<img src="${safeLeatherImageUrl}" alt="${safeLeatherName}" style="width:180px;height:180px;object-fit:cover;border-radius:12px;border:2px solid ${color};" />`
+                        ? `<div style="width:180px;height:180px;border-radius:12px;border:2px solid ${color};display:flex;align-items:center;justify-content:center;background:#ffffff;overflow:hidden;">
+                             <img src="${safeLeatherImageUrl}" alt="${safeLeatherName}" style="width:100%;height:100%;object-fit:contain;" />
+                           </div>`
                         : `<div style="width:180px;height:180px;border-radius:12px;border:2px solid ${color};display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:12px;">No Leather Image</div>`
                     }
                   </div>`
@@ -201,7 +318,9 @@ function buildCustomerSelectionsHtml(selections: OrderSelection[]) {
                     <p style="margin:0 0 8px 0;font-size:13px;font-weight:700;color:#475569;">LASERED BRAND IMAGE</p>
                     ${
                       safeLaseredBrandImageUrl
-                        ? `<img src="${safeLaseredBrandImageUrl}" alt="Lasered Brand" style="width:180px;height:180px;object-fit:cover;border-radius:12px;border:2px solid ${color};" />`
+                        ? `<div style="width:180px;height:180px;border-radius:12px;border:2px solid ${color};display:flex;align-items:center;justify-content:center;background:#ffffff;overflow:hidden;">
+                             <img src="${safeLaseredBrandImageUrl}" alt="Lasered Brand" style="width:100%;height:100%;object-fit:contain;" />
+                           </div>`
                         : `<div style="width:180px;height:180px;border-radius:12px;border:2px solid ${color};display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:12px;">No Brand Image</div>`
                     }
                   </div>`
@@ -255,6 +374,13 @@ function buildFactorySelectionsHtml(selections: OrderSelection[]) {
                     : ""
                 }
                 ${
+                  selection.isBodyLeather
+                    ? `<div style="font-size:13px;color:#334155;line-height:1.4;margin-top:4px;">
+                        Body Leather: Yes
+                      </div>`
+                    : ""
+                }
+                ${
                   selection.laseredBrand
                     ? `<div style="font-size:13px;color:#334155;line-height:1.4;margin-top:4px;">
                         Lasered Brand: Yes
@@ -269,11 +395,13 @@ function buildFactorySelectionsHtml(selections: OrderSelection[]) {
                       safeImageUrl
                         ? `<td style="padding-left:8px;">
                             <div style="font-size:10px;font-weight:700;color:#64748b;margin-bottom:4px;text-align:center;">OPTION</div>
-                            <img
-                              src="${safeImageUrl}"
-                              alt="${safeChoiceLabel}"
-                              style="width:84px;height:84px;object-fit:contain;border-radius:10px;border:1px solid #cbd5e1;background:#ffffff;display:block;"
-                            />
+                            <div style="width:84px;height:84px;border-radius:10px;border:1px solid #cbd5e1;background:#ffffff;display:flex;align-items:center;justify-content:center;overflow:hidden;">
+                              <img
+                                src="${safeImageUrl}"
+                                alt="${safeChoiceLabel}"
+                                style="width:100%;height:100%;object-fit:contain;display:block;"
+                              />
+                            </div>
                           </td>`
                         : ""
                     }
@@ -281,11 +409,13 @@ function buildFactorySelectionsHtml(selections: OrderSelection[]) {
                       safeLeatherImageUrl
                         ? `<td style="padding-left:8px;">
                             <div style="font-size:10px;font-weight:700;color:#64748b;margin-bottom:4px;text-align:center;">LEATHER</div>
-                            <img
-                              src="${safeLeatherImageUrl}"
-                              alt="${safeLeatherName || "Leather"}"
-                              style="width:84px;height:84px;object-fit:contain;border-radius:10px;border:1px solid #cbd5e1;background:#ffffff;display:block;"
-                            />
+                            <div style="width:84px;height:84px;border-radius:10px;border:1px solid #cbd5e1;background:#ffffff;display:flex;align-items:center;justify-content:center;overflow:hidden;">
+                              <img
+                                src="${safeLeatherImageUrl}"
+                                alt="${safeLeatherName || "Leather"}"
+                                style="width:100%;height:100%;object-fit:contain;display:block;"
+                              />
+                            </div>
                           </td>`
                         : ""
                     }
@@ -293,11 +423,13 @@ function buildFactorySelectionsHtml(selections: OrderSelection[]) {
                       safeLaseredBrandImageUrl
                         ? `<td style="padding-left:8px;">
                             <div style="font-size:10px;font-weight:700;color:#64748b;margin-bottom:4px;text-align:center;">BRAND</div>
-                            <img
-                              src="${safeLaseredBrandImageUrl}"
-                              alt="Lasered Brand"
-                              style="width:84px;height:84px;object-fit:contain;border-radius:10px;border:1px solid #cbd5e1;background:#ffffff;display:block;"
-                            />
+                            <div style="width:84px;height:84px;border-radius:10px;border:1px solid #cbd5e1;background:#ffffff;display:flex;align-items:center;justify-content:center;overflow:hidden;">
+                              <img
+                                src="${safeLaseredBrandImageUrl}"
+                                alt="Lasered Brand"
+                                style="width:100%;height:100%;object-fit:contain;display:block;"
+                              />
+                            </div>
                           </td>`
                         : ""
                     }
@@ -366,12 +498,15 @@ export async function sendOrderNotification(input: SendOrderEmailInput) {
   const {
     type,
     orderNumber,
+    poNumber,
+    quantity,
     customerName,
     customerEmail,
     customerPhone,
     notes,
     productName,
     total,
+    lineItems = [],
     selections,
   } = input;
 
@@ -384,17 +519,27 @@ export async function sendOrderNotification(input: SendOrderEmailInput) {
 
   const transporter = getTransporter();
   const copy = getEmailCopy(type, orderNumber);
+  const safeQuantity = sanitizeQuantity(quantity);
+  const bodyLeatherSummary = buildBodyLeatherSummary(selections);
+  const lineItemsText = buildLineItemsText(lineItems);
+  const lineItemsHtml = buildLineItemsHtml(lineItems);
 
   const internalText = [
     copy.internalSubject,
     "",
     `Order Number: ${orderNumber}`,
+    poNumber ? `PO #: ${poNumber}` : "",
+    `Quantity: ${safeQuantity}`,
     `Customer: ${customerName}`,
     `Email: ${customerEmail}`,
     customerPhone ? `Phone: ${customerPhone}` : "",
     `Product: ${productName}`,
+    bodyLeatherSummary ? `Body Leather: ${bodyLeatherSummary}` : "",
     `Total: ${formatCurrency(total)}`,
     notes ? `Notes: ${notes}` : "",
+    lineItemsText ? "" : "",
+    lineItemsText ? "ITEMIZED PRICE:" : "",
+    lineItemsText || "",
     "",
     "FACTORY SECTIONS:",
     buildFactorySelectionsText(selections),
@@ -413,6 +558,8 @@ export async function sendOrderNotification(input: SendOrderEmailInput) {
           <tr>
             <td style="font-size:14px;line-height:1.55;color:#111827;vertical-align:top;">
               <div><strong>Order Number:</strong> ${escapeHtml(orderNumber)}</div>
+              ${poNumber ? `<div><strong>PO #:</strong> ${escapeHtml(poNumber)}</div>` : ""}
+              <div><strong>Quantity:</strong> ${safeQuantity}</div>
               <div><strong>Customer:</strong> ${escapeHtml(customerName)}</div>
               <div><strong>Email:</strong> ${escapeHtml(customerEmail)}</div>
               ${
@@ -421,12 +568,19 @@ export async function sendOrderNotification(input: SendOrderEmailInput) {
                   : ""
               }
               <div><strong>Product:</strong> ${escapeHtml(productName)}</div>
+              ${
+                bodyLeatherSummary
+                  ? `<div><strong>Body Leather:</strong> ${escapeHtml(bodyLeatherSummary)}</div>`
+                  : ""
+              }
               <div><strong>Total:</strong> ${formatCurrency(total)}</div>
               ${notes ? `<div style="margin-top:6px;"><strong>Notes:</strong> ${escapeHtml(notes)}</div>` : ""}
             </td>
           </tr>
         </table>
       </div>
+
+      ${lineItemsHtml}
 
       <h2 style="font-size:18px;margin:0 0 10px 0;line-height:1.2;">Factory Sections</h2>
       ${buildFactorySelectionsHtml(selections)}
@@ -448,8 +602,14 @@ export async function sendOrderNotification(input: SendOrderEmailInput) {
     copy.customerIntro,
     "",
     `Order Number: ${orderNumber}`,
+    poNumber ? `PO #: ${poNumber}` : "",
+    `Quantity: ${safeQuantity}`,
     `Product: ${productName}`,
+    bodyLeatherSummary ? `Body Leather: ${bodyLeatherSummary}` : "",
     `Total: ${formatCurrency(total)}`,
+    lineItemsText ? "" : "",
+    lineItemsText ? "ITEMIZED PRICE:" : "",
+    lineItemsText || "",
     "",
     "Selections:",
     buildSelectionsText(selections),
@@ -471,10 +631,19 @@ export async function sendOrderNotification(input: SendOrderEmailInput) {
         <p>Hello ${escapeHtml(customerName)},</p>
         <p>${escapeHtml(copy.customerIntro)}</p>
         <p><strong>Order Number:</strong> ${escapeHtml(orderNumber)}</p>
+        ${poNumber ? `<p><strong>PO #:</strong> ${escapeHtml(poNumber)}</p>` : ""}
+        <p><strong>Quantity:</strong> ${safeQuantity}</p>
         <p><strong>Product:</strong> ${escapeHtml(productName)}</p>
+        ${
+          bodyLeatherSummary
+            ? `<p><strong>Body Leather:</strong> ${escapeHtml(bodyLeatherSummary)}</p>`
+            : ""
+        }
         <p><strong>Total:</strong> ${formatCurrency(total)}</p>
         ${notes ? `<p><strong>Notes:</strong> ${escapeHtml(notes)}</p>` : ""}
       </div>
+
+      ${lineItemsHtml}
 
       <h2 style="font-size:22px;margin:0 0 16px 0;">Selections</h2>
       ${buildCustomerSelectionsHtml(selections)}
