@@ -88,6 +88,31 @@ const REPEATING_GRADES = new Set([
   "Grade Buffalo",
 ]);
 
+function keepNonLeatherSelections(
+  prev: Record<string, string[]>,
+  groups: Group[],
+  keepGroupId?: string
+) {
+  const next: Record<string, string[]> = {};
+
+  for (const group of groups) {
+    const current = prev[group.id] || [];
+    if (current.length === 0) continue;
+
+    const groupUsesLeather = group.choices.some((choice) => choice.usesLeatherGrades);
+    const groupHasQuickPick = group.choices.some((choice) => choice.isQuickPick);
+
+    const shouldKeep =
+      group.id === keepGroupId || (!groupUsesLeather && !groupHasQuickPick);
+
+    if (shouldKeep) {
+      next[group.id] = current;
+    }
+  }
+
+  return next;
+}
+
 function makeSelectionKey(groupId: string, choiceId: string) {
   return `${groupId}:::${choiceId}`;
 }
@@ -195,14 +220,16 @@ export default function ProductBuilder({ product, leathers }: Props) {
     if (!choice) return;
 
     if (choice.isQuickPick) {
-      setSelectedOptions({
-        [groupId]: [choiceId],
+      setSelectedOptions((prev) => {
+        const next = keepNonLeatherSelections(prev, product.optionGroups, groupId);
+        next[groupId] = [choiceId];
+        return next;
       });
       return;
     }
 
     setSelectedOptions((prev) => {
-      const next = activeQuickPick ? {} : { ...prev };
+      const next = { ...prev };
       next[groupId] = [choiceId];
       return next;
     });
@@ -223,14 +250,16 @@ export default function ProductBuilder({ product, leathers }: Props) {
     if (!group || !choice) return;
 
     if (choice.isQuickPick) {
-      setSelectedOptions({
-        [groupId]: [choiceId],
+      setSelectedOptions((prev) => {
+        const next = keepNonLeatherSelections(prev, product.optionGroups, groupId);
+        next[groupId] = [choiceId];
+        return next;
       });
       return;
     }
 
     setSelectedOptions((prev) => {
-      const base = activeQuickPick ? {} : { ...prev };
+      const base = { ...prev };
       const current = base[groupId] || [];
       const exists = current.includes(choiceId);
 
@@ -394,9 +423,13 @@ export default function ProductBuilder({ product, leathers }: Props) {
     return lines;
   }, [product.name, product.basePrice, selectedChoiceDetails]);
 
-  const total = useMemo(() => {
+  const unitSubtotal = useMemo(() => {
     return allPriceLines.reduce((sum, line) => sum + line.amount, 0);
   }, [allPriceLines]);
+
+  const total = useMemo(() => {
+    return unitSubtotal * sanitizeQuantity(quantity);
+  }, [unitSubtotal, quantity]);
 
   async function buildSelectionPayload() {
     const uploadedBrandUrls = await uploadLaseredBrandImagesIfNeeded();
@@ -1116,6 +1149,10 @@ export default function ProductBuilder({ product, leathers }: Props) {
       <div className="h-fit rounded-2xl border p-6 shadow-sm">
         <h2 className="text-2xl font-semibold">Itemized Price</h2>
 
+        <div className="mt-2 text-sm text-slate-500">
+          Prices below are per unit.
+        </div>
+
         <div className="mt-4 space-y-3">
           {allPriceLines.map((line) => (
             <div
@@ -1130,9 +1167,21 @@ export default function ProductBuilder({ product, leathers }: Props) {
           ))}
         </div>
 
-        <div className="mt-6 flex justify-between text-xl font-bold">
-          <span>Total</span>
-          <span>{formatCurrency(total)}</span>
+        <div className="mt-6 space-y-3 border-t pt-4">
+          <div className="flex justify-between text-sm text-slate-600">
+            <span>Per Unit Subtotal</span>
+            <span>{formatCurrency(unitSubtotal)}</span>
+          </div>
+
+          <div className="flex justify-between text-sm text-slate-600">
+            <span>Quantity</span>
+            <span>x {sanitizeQuantity(quantity)}</span>
+          </div>
+
+          <div className="flex justify-between text-xl font-bold">
+            <span>Total</span>
+            <span>{formatCurrency(total)}</span>
+          </div>
         </div>
       </div>
     </div>
