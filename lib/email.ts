@@ -537,9 +537,6 @@ export async function sendOrderNotification(input: SendOrderEmailInput) {
     bodyLeatherSummary ? `Body Leather: ${bodyLeatherSummary}` : "",
     `Total: ${formatCurrency(total)}`,
     notes ? `Notes: ${notes}` : "",
-    lineItemsText ? "" : "",
-    lineItemsText ? "ITEMIZED PRICE:" : "",
-    lineItemsText || "",
     "",
     "FACTORY SECTIONS:",
     buildFactorySelectionsText(selections),
@@ -579,8 +576,6 @@ export async function sendOrderNotification(input: SendOrderEmailInput) {
           </tr>
         </table>
       </div>
-
-      ${lineItemsHtml}
 
       <h2 style="font-size:18px;margin:0 0 10px 0;line-height:1.2;">Factory Sections</h2>
       ${buildFactorySelectionsHtml(selections)}
