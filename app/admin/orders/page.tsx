@@ -5,10 +5,16 @@ import { formatCurrency } from "../../../lib/utils";
 type OrderRow = {
   id: string;
   orderNumber: string;
+  poNumber: string | null;
   customerName: string;
   customerEmail: string;
   customerPhone: string | null;
   status: string;
+  overallProductionStatus: string;
+  priority: string;
+  dueDate: Date | null;
+  pickedUp: boolean;
+  quantity: number;
   total: unknown;
   notes: string | null;
   createdAt: Date;
@@ -21,6 +27,13 @@ type OrderRow = {
       optionGroupNameSnapshot: string;
       optionChoiceNameSnapshot: string;
     }[];
+  }[];
+  productionLines: {
+    id: string;
+    partNumber: string;
+    frameNeeded: string;
+    quantity: number;
+    currentStatus: string;
   }[];
   emailLogs: {
     id: string;
@@ -43,6 +56,14 @@ function formatDate(date: Date) {
   }).format(date);
 }
 
+function formatDateOnly(date: Date | null) {
+  if (!date) return "—";
+
+  return new Intl.DateTimeFormat("en-US", {
+    dateStyle: "medium",
+  }).format(date);
+}
+
 function getStatusClasses(status: string) {
   switch (status) {
     case "SENT_TO_FACTORY":
@@ -60,39 +81,85 @@ function getStatusClasses(status: string) {
   }
 }
 
+function getProductionStatusClasses(status: string) {
+  switch (status) {
+    case "NEW":
+      return "bg-slate-100 text-slate-700 border-slate-200";
+    case "WAITING_ON_LEATHER":
+      return "bg-yellow-50 text-yellow-700 border-yellow-200";
+    case "CUTTING":
+    case "SEWING":
+    case "UPHOLSTERY":
+    case "FINAL_ASSEMBLY":
+    case "QC":
+      return "bg-blue-50 text-blue-700 border-blue-200";
+    case "READY":
+      return "bg-emerald-50 text-emerald-700 border-emerald-200";
+    case "PICKED_UP":
+      return "bg-purple-50 text-purple-700 border-purple-200";
+    case "BLOCKED":
+      return "bg-red-50 text-red-700 border-red-200";
+    default:
+      return "bg-white text-slate-700 border-slate-200";
+  }
+}
+
+function getPriorityClasses(priority: string) {
+  switch (priority) {
+    case "RUSH":
+      return "bg-red-50 text-red-700 border-red-200";
+    case "HOLD":
+      return "bg-amber-50 text-amber-700 border-amber-200";
+    default:
+      return "bg-slate-100 text-slate-700 border-slate-200";
+  }
+}
+
 export default async function AdminOrdersPage() {
-  const [totalOrders, draftOrders, sentToFactoryOrders, completedOrders, orders] =
-    await Promise.all([
-      prisma.order.count(),
-      prisma.order.count({
-        where: { status: "DRAFT" },
-      }),
-      prisma.order.count({
-        where: { status: "SENT_TO_FACTORY" },
-      }),
-      prisma.order.count({
-        where: { status: "COMPLETED" },
-      }),
-      prisma.order.findMany({
-        orderBy: { createdAt: "desc" },
-        take: 50,
-        include: {
-          items: {
-            include: {
-              selections: true,
-            },
-          },
-          emailLogs: {
-            orderBy: { createdAt: "desc" },
-            take: 1,
-          },
-          sheetSyncLogs: {
-            orderBy: { createdAt: "desc" },
-            take: 1,
+  const [
+    totalOrders,
+    draftOrders,
+    sentToFactoryOrders,
+    completedOrders,
+    readyOrders,
+    orders,
+  ] = await Promise.all([
+    prisma.order.count(),
+    prisma.order.count({
+      where: { status: "DRAFT" },
+    }),
+    prisma.order.count({
+      where: { status: "SENT_TO_FACTORY" },
+    }),
+    prisma.order.count({
+      where: { status: "COMPLETED" },
+    }),
+    prisma.order.count({
+      where: { overallProductionStatus: "READY" },
+    }),
+    prisma.order.findMany({
+      orderBy: { createdAt: "desc" },
+      take: 50,
+      include: {
+        items: {
+          include: {
+            selections: true,
           },
         },
-      }),
-    ]);
+        productionLines: {
+          orderBy: [{ partNumber: "asc" }, { frameNeeded: "asc" }],
+        },
+        emailLogs: {
+          orderBy: { createdAt: "desc" },
+          take: 1,
+        },
+        sheetSyncLogs: {
+          orderBy: { createdAt: "desc" },
+          take: 1,
+        },
+      },
+    }),
+  ]);
 
   const typedOrders = orders as OrderRow[];
 
@@ -106,11 +173,11 @@ export default async function AdminOrdersPage() {
                 Admin Orders
               </p>
               <h1 className="text-4xl font-bold sm:text-5xl">
-                Track orders and factory status
+                Track orders and production
               </h1>
               <p className="mt-4 max-w-2xl text-base sm:text-lg text-slate-600">
-                Review incoming customer orders, open details, and monitor email
-                and sheet sync activity.
+                Review incoming customer orders, monitor production-line counts,
+                and keep an eye on overall factory progress.
               </p>
             </div>
 
@@ -128,7 +195,7 @@ export default async function AdminOrdersPage() {
           </div>
         </section>
 
-        <section className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
+        <section className="grid gap-6 md:grid-cols-2 xl:grid-cols-5">
           <div className="section-card-strong">
             <p className="text-xs uppercase tracking-[0.16em] text-slate-500">
               Total Orders
@@ -155,6 +222,13 @@ export default async function AdminOrdersPage() {
               Completed
             </p>
             <p className="mt-3 text-4xl font-bold">{completedOrders}</p>
+          </div>
+
+          <div className="section-card-strong">
+            <p className="text-xs uppercase tracking-[0.16em] text-slate-500">
+              Production Ready
+            </p>
+            <p className="mt-3 text-4xl font-bold">{readyOrders}</p>
           </div>
         </section>
 
@@ -191,6 +265,7 @@ export default async function AdminOrdersPage() {
                   (sum, item) => sum + item.selections.length,
                   0
                 );
+                const firstProductionLine = order.productionLines[0];
 
                 return (
                   <Link
@@ -212,6 +287,20 @@ export default async function AdminOrdersPage() {
                             >
                               {order.status.replaceAll("_", " ")}
                             </span>
+                            <span
+                              className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${getProductionStatusClasses(
+                                order.overallProductionStatus
+                              )}`}
+                            >
+                              {order.overallProductionStatus.replaceAll("_", " ")}
+                            </span>
+                            <span
+                              className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${getPriorityClasses(
+                                order.priority
+                              )}`}
+                            >
+                              {order.priority}
+                            </span>
                           </div>
 
                           <p className="mt-2 text-sm text-slate-500">
@@ -225,6 +314,11 @@ export default async function AdminOrdersPage() {
                               {order.customerPhone}
                             </p>
                           ) : null}
+                          {order.poNumber ? (
+                            <p className="mt-1 text-sm font-medium text-slate-700">
+                              PO #: {order.poNumber}
+                            </p>
+                          ) : null}
                         </div>
 
                         <div className="sm:text-right">
@@ -234,10 +328,13 @@ export default async function AdminOrdersPage() {
                           <p className="mt-1 text-2xl font-bold text-slate-900">
                             {formatCurrency(Number(order.total))}
                           </p>
+                          <p className="mt-2 text-sm text-slate-500">
+                            Qty: {order.quantity}
+                          </p>
                         </div>
                       </div>
 
-                      <div className="grid gap-3 sm:grid-cols-2">
+                      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                         <div className="soft-panel">
                           <p className="text-xs uppercase tracking-[0.16em] text-slate-500">
                             Product
@@ -255,7 +352,39 @@ export default async function AdminOrdersPage() {
                             {selectionCount}
                           </p>
                         </div>
+
+                        <div className="soft-panel">
+                          <p className="text-xs uppercase tracking-[0.16em] text-slate-500">
+                            Production Lines
+                          </p>
+                          <p className="mt-2 font-semibold text-slate-900">
+                            {order.productionLines.length}
+                          </p>
+                        </div>
+
+                        <div className="soft-panel">
+                          <p className="text-xs uppercase tracking-[0.16em] text-slate-500">
+                            Due Date
+                          </p>
+                          <p className="mt-2 font-semibold text-slate-900">
+                            {formatDateOnly(order.dueDate)}
+                          </p>
+                        </div>
                       </div>
+
+                      {firstProductionLine ? (
+                        <div className="rounded-xl border bg-white/80 p-3">
+                          <p className="text-xs uppercase tracking-[0.16em] text-slate-500">
+                            First Production Line
+                          </p>
+                          <p className="mt-2 text-sm text-slate-700">
+                            {firstProductionLine.partNumber} / {firstProductionLine.frameNeeded}
+                          </p>
+                          <p className="mt-1 text-sm text-slate-500">
+                            Qty {firstProductionLine.quantity} · {firstProductionLine.currentStatus.replaceAll("_", " ")}
+                          </p>
+                        </div>
+                      ) : null}
 
                       <div className="grid gap-3 sm:grid-cols-3">
                         <div>
@@ -300,6 +429,12 @@ export default async function AdminOrdersPage() {
                           <p className="mt-2 text-sm text-slate-600">
                             {order.notes}
                           </p>
+                        </div>
+                      ) : null}
+
+                      {order.pickedUp ? (
+                        <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm font-medium text-emerald-700">
+                          Picked up
                         </div>
                       ) : null}
                     </div>

@@ -3,7 +3,10 @@ import { Prisma } from "@prisma/client";
 import { auth } from "../../../auth";
 import { prisma } from "../../../lib/prisma";
 import { sendOrderNotification } from "../../../lib/email";
-import { appendOrderRow } from "../../../lib/sheets";
+import {
+  appendOrderRow,
+  appendQuantityLedgerRows,
+} from "../../../lib/sheets";
 
 type IncomingSelection = {
   groupName: string;
@@ -28,7 +31,22 @@ type IncomingLineItem = {
   amount: number;
 };
 
+type OrderPriority = "NORMAL" | "RUSH" | "HOLD";
+
+type ProductionLineSeed = {
+  productNameSnapshot: string;
+  optionGroupNameSnapshot: string | null;
+  optionChoiceNameSnapshot: string | null;
+  partNumber: string;
+  frameNeeded: string;
+  quantity: number;
+  bodyLeather: string | null;
+  dueDate: Date | null;
+  priority: OrderPriority;
+};
+
 const SELECTION_META_SEPARATOR = "|||";
+const ORDER_PRIORITIES = new Set<OrderPriority>(["NORMAL", "RUSH", "HOLD"]);
 
 function normalizeEmail(value: string) {
   return value.trim().toLowerCase();
@@ -56,6 +74,33 @@ function sanitizeQuantity(value: number | null | undefined) {
   }
 
   return Math.max(1, Math.round(parsed));
+}
+
+function normalizePriority(value: unknown): OrderPriority {
+  const raw = String(value || "")
+    .trim()
+    .toUpperCase();
+
+  if (ORDER_PRIORITIES.has(raw as OrderPriority)) {
+    return raw as OrderPriority;
+  }
+
+  return "NORMAL";
+}
+
+function parseOptionalDate(value: unknown) {
+  const raw = String(value || "").trim();
+
+  if (!raw) {
+    return { raw, date: null as Date | null };
+  }
+
+  const date = new Date(raw);
+
+  return {
+    raw,
+    date: Number.isNaN(date.getTime()) ? null : date,
+  };
 }
 
 function buildSelectionRows(selections: IncomingSelection[]) {
@@ -147,6 +192,68 @@ function buildSheetParts(selections: IncomingSelection[]) {
     });
 }
 
+function buildProductionLines(
+  selections: IncomingSelection[],
+  productNameSnapshot: string,
+  quantity: number,
+  bodyLeather: string | null,
+  dueDate: Date | null,
+  priority: OrderPriority
+) {
+  const seen = new Map<string, ProductionLineSeed>();
+
+  for (const selection of selections) {
+    const partNumber = String(
+      selection.partNumber || selection.choiceValue || ""
+    ).trim();
+    const frameNeeded = String(selection.frameNeededCode || "").trim();
+
+    if (!partNumber || !frameNeeded) {
+      continue;
+    }
+
+    const key = `${partNumber}|||${frameNeeded}`;
+
+    if (!seen.has(key)) {
+      seen.set(key, {
+        productNameSnapshot,
+        optionGroupNameSnapshot: selection.groupName || null,
+        optionChoiceNameSnapshot: selection.choiceLabel || null,
+        partNumber,
+        frameNeeded,
+        quantity,
+        bodyLeather,
+        dueDate,
+        priority,
+      });
+    }
+  }
+
+  return Array.from(seen.values());
+}
+
+function buildQuantityLedgerEntries(
+  orderId: string,
+  orderNumber: string,
+  poNumber: string | null,
+  customerName: string,
+  reason: "ORDER_SENT_TO_FACTORY" | "ORDER_EDITED" | "ORDER_CANCELLED",
+  source: string,
+  parts: Array<{ partNumber: string; frameNeeded: string; qtyChange: number }>
+) {
+  return parts.map((part) => ({
+    orderId,
+    orderNumber,
+    poNumber,
+    customerName,
+    partNumber: part.partNumber,
+    frameNeeded: part.frameNeeded,
+    qtyChange: part.qtyChange,
+    reason,
+    source,
+  }));
+}
+
 export async function POST(request: Request) {
   try {
     const session = await auth();
@@ -178,6 +285,9 @@ export async function POST(request: Request) {
     const quantity = sanitizeQuantity(
       Number(body.quantity ?? body.orderQuantity ?? body.selections?.[0]?.quantity ?? 1)
     );
+    const priority = normalizePriority(body.priority);
+    const dueDateInput = parseOptionalDate(body.dueDate);
+    const dueDate = dueDateInput.date;
 
     const selections = Array.isArray(body.selections)
       ? (body.selections as IncomingSelection[])
@@ -204,6 +314,13 @@ export async function POST(request: Request) {
     if (!customerEmail || !isValidEmail(customerEmail)) {
       return NextResponse.json(
         { error: "A valid customer email is required." },
+        { status: 400 }
+      );
+    }
+
+    if (dueDateInput.raw && !dueDate) {
+      return NextResponse.json(
+        { error: "Due date is invalid." },
         { status: 400 }
       );
     }
@@ -239,6 +356,16 @@ export async function POST(request: Request) {
     const selectionRows = buildSelectionRows(selections);
     const orderNumber = generateOrderNumber();
     const nextStatus = submitToFactory ? "SENT_TO_FACTORY" : "DRAFT";
+    const bodyLeather = buildBodyLeather(selections) || null;
+    const parts = buildSheetParts(selections);
+    const productionLines = buildProductionLines(
+      selections,
+      productName || product.name,
+      quantity,
+      bodyLeather,
+      dueDate,
+      priority
+    );
 
     const createdOrder = await prisma.order.create({
       data: {
@@ -249,8 +376,13 @@ export async function POST(request: Request) {
         customerPhone,
         notes,
         status: nextStatus,
+        subtotal: total,
         total,
         sentToFactoryAt: submitToFactory ? new Date() : null,
+        quantity,
+        dueDate,
+        priority,
+        overallProductionStatus: submitToFactory ? "NEW" : "NEW",
         ...(submittingUser?.id ? { userId: submittingUser.id } : {}),
         items: {
           create: [
@@ -258,6 +390,7 @@ export async function POST(request: Request) {
               productId,
               productNameSnapshot: productName || product.name,
               basePriceSnapshot: basePrice,
+              quantity,
               lineTotal: total,
               selections: {
                 create: selectionRows,
@@ -277,6 +410,8 @@ export async function POST(request: Request) {
               status: nextStatus,
               poNumber,
               quantity,
+              priority,
+              dueDate,
               selections,
               lineItems,
             },
@@ -301,33 +436,59 @@ export async function POST(request: Request) {
       },
     });
 
+    if (submitToFactory && productionLines.length > 0) {
+      await prisma.productionLine.createMany({
+        data: productionLines.map((line) => ({
+          orderId: createdOrder.id,
+          ...line,
+        })),
+        skipDuplicates: true,
+      });
+
+      await prisma.quantityLedger.createMany({
+        data: buildQuantityLedgerEntries(
+          createdOrder.id,
+          createdOrder.orderNumber,
+          poNumber,
+          customerName,
+          "ORDER_SENT_TO_FACTORY",
+          "website-create",
+          productionLines.map((line) => ({
+            partNumber: line.partNumber,
+            frameNeeded: line.frameNeeded,
+            qtyChange: line.quantity,
+          }))
+        ),
+      });
+    }
+
     try {
-await sendOrderNotification({
-  type: submitToFactory ? "sent_to_factory" : "created",
-  orderNumber: createdOrder.orderNumber,
-  poNumber,
-  quantity,
-  customerName,
-  customerEmail,
-  customerPhone,
-  notes,
-  productName: productName || product.name,
-  total,
-  lineItems,
-  selections: selections.map((selection: IncomingSelection) => ({
-    groupName: selection.groupName,
-    choiceLabel: selection.choiceLabel,
-    leatherName: selection.leatherName || null,
-    leatherGrade: selection.leatherGrade || null,
-    baseAmount: Number(selection.baseAmount || 0),
-    leatherSurcharge: Number(selection.leatherSurcharge || 0),
-    imageUrl: selection.imageUrl || null,
-    leatherImageUrl: selection.leatherImageUrl || null,
-    laseredBrand: Boolean(selection.laseredBrand),
-    laseredBrandImageUrl: selection.laseredBrandImageUrl || null,
-    isBodyLeather: Boolean(selection.isBodyLeather),
-  })),
-});
+      await sendOrderNotification({
+        type: submitToFactory ? "sent_to_factory" : "created",
+        orderNumber: createdOrder.orderNumber,
+        poNumber,
+        quantity,
+        customerName,
+        customerEmail,
+        customerPhone,
+        notes,
+        productName: productName || product.name,
+        total,
+        lineItems,
+        selections: selections.map((selection: IncomingSelection) => ({
+          groupName: selection.groupName,
+          choiceLabel: selection.choiceLabel,
+          leatherName: selection.leatherName || null,
+          leatherGrade: selection.leatherGrade || null,
+          baseAmount: Number(selection.baseAmount || 0),
+          leatherSurcharge: Number(selection.leatherSurcharge || 0),
+          imageUrl: selection.imageUrl || null,
+          leatherImageUrl: selection.leatherImageUrl || null,
+          laseredBrand: Boolean(selection.laseredBrand),
+          laseredBrandImageUrl: selection.laseredBrandImageUrl || null,
+          isBodyLeather: Boolean(selection.isBodyLeather),
+        })),
+      });
 
       await prisma.emailLog.createMany({
         data: [
@@ -375,28 +536,53 @@ await sendOrderNotification({
 
     if (submitToFactory) {
       try {
-        const bodyLeather = buildBodyLeather(selections);
-        const parts = buildSheetParts(selections);
-
         if (parts.length > 0) {
           await appendOrderRow({
             poNumber,
             customerName,
             quantity,
-            bodyLeather: bodyLeather || null,
+            bodyLeather,
             dateSold: new Date(),
+            dueDate,
             parts,
           });
         }
 
-        await prisma.sheetSyncLog.create({
-          data: {
-            orderId: createdOrder.id,
-            spreadsheetId: process.env.GOOGLE_SHEETS_SPREADSHEET_ID || null,
-            worksheetName: process.env.GOOGLE_SHEETS_TAB_NAME || "Orders",
-            spreadsheetRowId: parts.length > 0 ? "APPENDED" : "NO_PART_ROWS",
-            status: "SYNCED",
-          },
+        if (productionLines.length > 0) {
+          await appendQuantityLedgerRows({
+            orderNumber: createdOrder.orderNumber,
+            poNumber,
+            customerName,
+            reason: "ORDER_SENT_TO_FACTORY",
+            source: "website-create",
+            parts: productionLines.map((line) => ({
+              partNumber: line.partNumber,
+              frameNeeded: line.frameNeeded,
+              qtyChange: line.quantity,
+            })),
+          });
+        }
+
+        await prisma.sheetSyncLog.createMany({
+          data: [
+            {
+              orderId: createdOrder.id,
+              spreadsheetId: process.env.GOOGLE_SHEETS_SPREADSHEET_ID || null,
+              worksheetName: process.env.GOOGLE_SHEETS_TAB_NAME || "Orders",
+              spreadsheetRowId: parts.length > 0 ? "APPENDED" : "NO_PART_ROWS",
+              status: "SYNCED",
+            },
+            {
+              orderId: createdOrder.id,
+              spreadsheetId: process.env.GOOGLE_SHEETS_SPREADSHEET_ID || null,
+              worksheetName:
+                process.env.GOOGLE_SHEETS_QUANTITY_LEDGER_TAB_NAME ||
+                "Quantity Ledger",
+              spreadsheetRowId:
+                productionLines.length > 0 ? "APPENDED" : "NO_LEDGER_ROWS",
+              status: "SYNCED",
+            },
+          ],
         });
       } catch (error) {
         console.error("ORDER SHEETS ERROR:", error);
@@ -405,7 +591,7 @@ await sendOrderNotification({
           data: {
             orderId: createdOrder.id,
             spreadsheetId: process.env.GOOGLE_SHEETS_SPREADSHEET_ID || null,
-            worksheetName: process.env.GOOGLE_SHEETS_TAB_NAME || "Orders",
+            worksheetName: "Orders / Quantity Ledger",
             spreadsheetRowId: "APPEND_FAILED",
             status: "FAILED",
             errorMessage:

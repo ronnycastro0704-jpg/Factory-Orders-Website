@@ -13,5 +13,5 @@ export default async function AdminPage() {
     redirect("/my/orders");
   }
 
-  redirect("/admin/products");
+  redirect("/admin/production");
 }

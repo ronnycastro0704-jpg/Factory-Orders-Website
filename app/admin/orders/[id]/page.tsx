@@ -3,6 +3,7 @@ import { formatCurrency } from "../../../../lib/utils";
 import { notFound } from "next/navigation";
 import EditOrderForm from "./edit-order-form";
 import FactoryActions from "./factory-actions";
+import ProductionLineEditor from "./production-line-editor";
 
 type PageProps = {
   params: Promise<{
@@ -53,6 +54,60 @@ type SheetSyncLogItem = {
   createdAt: Date;
 };
 
+type ProductionLineItem = {
+  id: string;
+  partNumber: string;
+  frameNeeded: string;
+  quantity: number;
+  bodyLeather: string | null;
+  dueDate: Date | null;
+  priority: string;
+  currentStatus: string;
+  lineNotes: string | null;
+
+  millFirstStatus: string;
+  leatherOrderedStatus: string;
+  millStatus: string;
+  frameAssemblyStatus: string;
+  leatherArrivedStatus: string;
+  leaCutStatus: string;
+  sewnStatus: string;
+  upholsteryStatus: string;
+  upholsteredStatus: string;
+  finalAssemblyStatus: string;
+  qcStatus: string;
+
+  upholsteryAssignedTo: string | null;
+  upholsteredAssignedTo: string | null;
+  finalAssemblyAssignedTo: string | null;
+  qcAssignedTo: string | null;
+
+  pickedUp: boolean;
+  pickedUpAt: Date | null;
+  updatedAt: Date;
+};
+
+function formatStatusBadge(status: string) {
+  switch (status) {
+    case "BLOCKED":
+      return "bg-red-50 text-red-700 border-red-200";
+    case "READY":
+      return "bg-emerald-50 text-emerald-700 border-emerald-200";
+    case "PICKED_UP":
+      return "bg-purple-50 text-purple-700 border-purple-200";
+    case "CUTTING":
+    case "SEWING":
+    case "UPHOLSTERY":
+    case "FINAL_ASSEMBLY":
+    case "QC":
+      return "bg-blue-50 text-blue-700 border-blue-200";
+    case "WAITING_ON_LEATHER":
+      return "bg-yellow-50 text-yellow-700 border-yellow-200";
+    default:
+      return "bg-slate-100 text-slate-700 border-slate-200";
+  }
+}
+
 export default async function AdminOrderDetailPage({ params }: PageProps) {
   const { id } = await params;
 
@@ -73,6 +128,9 @@ export default async function AdminOrderDetailPage({ params }: PageProps) {
       sheetSyncLogs: {
         orderBy: { createdAt: "desc" },
       },
+      productionLines: {
+        orderBy: [{ partNumber: "asc" }, { frameNeeded: "asc" }],
+      },
     },
   });
 
@@ -84,27 +142,79 @@ export default async function AdminOrderDetailPage({ params }: PageProps) {
   const typedRevisions = order.revisions as OrderRevisionItem[];
   const typedEmailLogs = order.emailLogs as EmailLogItem[];
   const typedSheetSyncLogs = order.sheetSyncLogs as SheetSyncLogItem[];
+  const typedProductionLines = order.productionLines as ProductionLineItem[];
 
   return (
     <main className="min-h-screen bg-slate-50 p-8 text-slate-900">
-      <div className="mx-auto max-w-6xl space-y-8">
+      <div className="mx-auto max-w-7xl space-y-8">
         <div className="rounded-2xl border bg-white p-6 shadow-sm">
           <p className="text-sm text-slate-500">Order</p>
-          <h1 className="mt-2 text-3xl font-bold">{order.orderNumber}</h1>
-          <p className="mt-2 text-slate-600">
-            {order.customerName} • {order.customerEmail}
-          </p>
-          {order.customerPhone ? (
-            <p className="mt-1 text-slate-600">{order.customerPhone}</p>
-          ) : null}
-          {order.notes ? (
-            <p className="mt-4 text-slate-600">Notes: {order.notes}</p>
-          ) : null}
+          <div className="mt-2 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <h1 className="text-3xl font-bold">{order.orderNumber}</h1>
+              <p className="mt-2 text-slate-600">
+                {order.customerName} • {order.customerEmail}
+              </p>
+              {order.customerPhone ? (
+                <p className="mt-1 text-slate-600">{order.customerPhone}</p>
+              ) : null}
+              {order.poNumber ? (
+                <p className="mt-2 text-sm font-medium text-slate-700">
+                  PO #: {order.poNumber}
+                </p>
+              ) : null}
+              {order.notes ? (
+                <p className="mt-4 text-slate-600">Notes: {order.notes}</p>
+              ) : null}
+            </div>
 
-          <div className="mt-4 flex flex-wrap gap-6 text-sm text-slate-500">
-            <span>Status: {order.status}</span>
-            <span>Created: {new Date(order.createdAt).toLocaleString()}</span>
-            <span>Total: {formatCurrency(Number(order.total))}</span>
+            <div className="flex flex-wrap gap-2">
+              <span className="inline-flex rounded-full border px-3 py-1 text-xs font-semibold bg-slate-100 text-slate-700 border-slate-200">
+                {order.status.replaceAll("_", " ")}
+              </span>
+              <span
+                className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${formatStatusBadge(
+                  order.overallProductionStatus
+                )}`}
+              >
+                {order.overallProductionStatus.replaceAll("_", " ")}
+              </span>
+              <span className="inline-flex rounded-full border px-3 py-1 text-xs font-semibold bg-slate-100 text-slate-700 border-slate-200">
+                Priority: {order.priority}
+              </span>
+              {order.pickedUp ? (
+                <span className="inline-flex rounded-full border px-3 py-1 text-xs font-semibold bg-emerald-50 text-emerald-700 border-emerald-200">
+                  Picked Up
+                </span>
+              ) : null}
+            </div>
+          </div>
+
+          <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-5 text-sm text-slate-500">
+            <div>
+              <p className="text-xs uppercase tracking-[0.14em]">Created</p>
+              <p className="mt-1 text-slate-700">
+                {new Date(order.createdAt).toLocaleString()}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs uppercase tracking-[0.14em]">Total</p>
+              <p className="mt-1 text-slate-700">{formatCurrency(Number(order.total))}</p>
+            </div>
+            <div>
+              <p className="text-xs uppercase tracking-[0.14em]">Quantity</p>
+              <p className="mt-1 text-slate-700">{order.quantity}</p>
+            </div>
+            <div>
+              <p className="text-xs uppercase tracking-[0.14em]">Due Date</p>
+              <p className="mt-1 text-slate-700">
+                {order.dueDate ? new Date(order.dueDate).toLocaleDateString() : "—"}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs uppercase tracking-[0.14em]">Production Lines</p>
+              <p className="mt-1 text-slate-700">{typedProductionLines.length}</p>
+            </div>
           </div>
         </div>
 
@@ -133,6 +243,44 @@ export default async function AdminOrderDetailPage({ params }: PageProps) {
           </div>
 
           <div className="space-y-8">
+            <div className="rounded-2xl border bg-white p-6 shadow-sm">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                  <h2 className="text-2xl font-semibold">Production Lines</h2>
+                  <p className="mt-2 text-sm text-slate-500">
+                    Track each part / frame combination through the factory.
+                  </p>
+                </div>
+
+                <span className="inline-flex rounded-full border px-3 py-1 text-xs font-semibold bg-slate-100 text-slate-700 border-slate-200">
+                  {typedProductionLines.length} line
+                  {typedProductionLines.length === 1 ? "" : "s"}
+                </span>
+              </div>
+
+              {typedProductionLines.length === 0 ? (
+                <div className="mt-6 rounded-xl border border-dashed bg-slate-50 p-6 text-sm text-slate-500">
+                  No production lines yet. They will appear once the order is sent
+                  to factory and includes valid Part # / Frame Needed combinations.
+                </div>
+              ) : (
+                <div className="mt-6 space-y-6">
+                  {typedProductionLines.map((line) => (
+                    <ProductionLineEditor
+                      key={line.id}
+                      line={{
+                        ...line,
+                        dueDate: line.dueDate ? line.dueDate.toISOString() : null,
+                        pickedUpAt: line.pickedUpAt
+                          ? line.pickedUpAt.toISOString()
+                          : null,
+                      }}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+
             <div className="rounded-2xl border bg-white p-6 shadow-sm">
               <h2 className="text-2xl font-semibold">Order Items</h2>
 
