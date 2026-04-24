@@ -39,8 +39,6 @@ const STAGE_STATUS_VALUES = new Set<ProductionStageStatus>([
   "NA",
 ]);
 
-const PRIORITY_VALUES = new Set<OrderPriority>(["NORMAL", "RUSH", "HOLD"]);
-
 function normalizeStageStatus(
   value: unknown,
   fallback: ProductionStageStatus = "NOT_STARTED"
@@ -56,11 +54,17 @@ function normalizePriority(
   value: unknown,
   fallback: OrderPriority = "NORMAL"
 ): OrderPriority {
-  const raw = String(value || "")
-    .trim()
-    .toUpperCase() as OrderPriority;
+  const raw = String(value || "").trim().toUpperCase();
 
-  return PRIORITY_VALUES.has(raw) ? raw : fallback;
+  if (raw === "HOT") {
+    return "HOLD";
+  }
+
+  if (raw === "NORMAL" || raw === "RUSH" || raw === "HOLD") {
+    return raw;
+  }
+
+  return fallback;
 }
 
 function normalizeOptionalText(value: unknown) {
@@ -257,6 +261,7 @@ export async function PUT(request: Request, context: RouteContext) {
     }
 
     const dueDateInput = parseOptionalDate(body.dueDate);
+    const pickedUpAtInput = parseOptionalDate(body.pickedUpAt);
 
     if (!dueDateInput.isValid) {
       return NextResponse.json(
@@ -265,7 +270,15 @@ export async function PUT(request: Request, context: RouteContext) {
       );
     }
 
-    const pickedUp = Boolean(body.pickedUp);
+    if (!pickedUpAtInput.isValid) {
+      return NextResponse.json(
+        { error: "Picked up date is invalid." },
+        { status: 400 }
+      );
+    }
+
+    const pickedUpAt = pickedUpAtInput.date;
+    const pickedUp = Boolean(pickedUpAt);
 
     const millFirstStatus = normalizeStageStatus(
       body.millFirstStatus,
@@ -332,10 +345,7 @@ export async function PUT(request: Request, context: RouteContext) {
       data: {
         bodyLeather: normalizeOptionalText(body.bodyLeather),
         dueDate: dueDateInput.date,
-        priority: normalizePriority(
-          body.priority,
-          existingLine.priority as OrderPriority
-        ),
+        priority: normalizePriority(body.priority, existingLine.priority as OrderPriority),
         lineNotes: normalizeOptionalText(body.lineNotes),
 
         millFirstStatus,
@@ -358,7 +368,7 @@ export async function PUT(request: Request, context: RouteContext) {
         qcAssignedTo: normalizeOptionalText(body.qcAssignedTo),
 
         pickedUp,
-        pickedUpAt: pickedUp ? existingLine.pickedUpAt ?? new Date() : null,
+        pickedUpAt,
         currentStatus,
       },
     });
@@ -382,7 +392,7 @@ export async function PUT(request: Request, context: RouteContext) {
         overallProductionStatus: orderStatus,
         pickedUp: allPickedUp,
         pickedUpAt: allPickedUp
-          ? existingLine.order.pickedUpAt ?? new Date()
+          ? updatedLine.pickedUpAt ?? existingLine.order.pickedUpAt ?? new Date()
           : null,
       },
     });

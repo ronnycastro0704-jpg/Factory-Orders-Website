@@ -51,6 +51,9 @@ export default async function AdminProductsPage() {
               <Link href="/admin" className="button-secondary">
                 ← Dashboard
               </Link>
+              <Link href="/admin/production" className="button-secondary">
+                Production
+              </Link>
               <Link href="/admin/orders" className="button-secondary">
                 Orders
               </Link>
@@ -105,9 +108,7 @@ export default async function AdminProductsPage() {
                 <h2 className="mt-2 text-3xl font-bold">Existing Products</h2>
               </div>
 
-              <span className="status-pill">
-                {products.length} total
-              </span>
+              <span className="status-pill">{products.length} total</span>
             </div>
 
             {products.length === 0 ? (

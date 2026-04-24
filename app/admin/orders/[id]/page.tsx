@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { prisma } from "../../../../lib/prisma";
 import { formatCurrency } from "../../../../lib/utils";
 import { notFound } from "next/navigation";
@@ -87,6 +88,10 @@ type ProductionLineItem = {
   updatedAt: Date;
 };
 
+function formatPriorityLabel(priority: string) {
+  return priority === "HOLD" ? "HOT" : priority;
+}
+
 function formatStatusBadge(status: string) {
   switch (status) {
     case "BLOCKED":
@@ -147,6 +152,18 @@ export default async function AdminOrderDetailPage({ params }: PageProps) {
   return (
     <main className="min-h-screen bg-slate-50 p-8 text-slate-900">
       <div className="mx-auto max-w-7xl space-y-8">
+        <div className="flex flex-wrap gap-3">
+          <Link href="/admin/production" className="button-secondary">
+            Production
+          </Link>
+          <Link href="/admin/orders" className="button-secondary">
+            Orders
+          </Link>
+          <Link href="/admin/products" className="button-secondary">
+            Products
+          </Link>
+        </div>
+
         <div className="rounded-2xl border bg-white p-6 shadow-sm">
           <p className="text-sm text-slate-500">Order</p>
           <div className="mt-2 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -180,17 +197,17 @@ export default async function AdminOrderDetailPage({ params }: PageProps) {
                 {order.overallProductionStatus.replaceAll("_", " ")}
               </span>
               <span className="inline-flex rounded-full border px-3 py-1 text-xs font-semibold bg-slate-100 text-slate-700 border-slate-200">
-                Priority: {order.priority}
+                Priority: {formatPriorityLabel(order.priority)}
               </span>
-              {order.pickedUp ? (
+              {order.pickedUpAt ? (
                 <span className="inline-flex rounded-full border px-3 py-1 text-xs font-semibold bg-emerald-50 text-emerald-700 border-emerald-200">
-                  Picked Up
+                  Picked Up {new Date(order.pickedUpAt).toLocaleDateString()}
                 </span>
               ) : null}
             </div>
           </div>
 
-          <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-5 text-sm text-slate-500">
+          <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-6 text-sm text-slate-500">
             <div>
               <p className="text-xs uppercase tracking-[0.14em]">Created</p>
               <p className="mt-1 text-slate-700">
@@ -199,7 +216,9 @@ export default async function AdminOrderDetailPage({ params }: PageProps) {
             </div>
             <div>
               <p className="text-xs uppercase tracking-[0.14em]">Total</p>
-              <p className="mt-1 text-slate-700">{formatCurrency(Number(order.total))}</p>
+              <p className="mt-1 text-slate-700">
+                {formatCurrency(Number(order.total))}
+              </p>
             </div>
             <div>
               <p className="text-xs uppercase tracking-[0.14em]">Quantity</p>
@@ -209,6 +228,12 @@ export default async function AdminOrderDetailPage({ params }: PageProps) {
               <p className="text-xs uppercase tracking-[0.14em]">Due Date</p>
               <p className="mt-1 text-slate-700">
                 {order.dueDate ? new Date(order.dueDate).toLocaleDateString() : "—"}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs uppercase tracking-[0.14em]">Picked Up</p>
+              <p className="mt-1 text-slate-700">
+                {order.pickedUpAt ? new Date(order.pickedUpAt).toLocaleDateString() : "—"}
               </p>
             </div>
             <div>

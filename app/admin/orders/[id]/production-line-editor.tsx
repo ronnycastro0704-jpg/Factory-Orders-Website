@@ -45,7 +45,7 @@ const stageOptions = [
   "NA",
 ];
 
-const priorityOptions = ["NORMAL", "RUSH", "HOLD"];
+const priorityOptions = ["NORMAL", "RUSH", "HOT"];
 
 function formatBadge(status: string) {
   switch (status) {
@@ -73,13 +73,18 @@ function toDateInputValue(value: string | null) {
   return value.slice(0, 10);
 }
 
+function toUiPriority(value: string) {
+  return value === "HOLD" ? "HOT" : value || "NORMAL";
+}
+
 export default function ProductionLineEditor({ line }: Props) {
   const router = useRouter();
 
   const [bodyLeather, setBodyLeather] = useState(line.bodyLeather || "");
   const [dueDate, setDueDate] = useState(toDateInputValue(line.dueDate));
-  const [priority, setPriority] = useState(line.priority || "NORMAL");
+  const [priority, setPriority] = useState(toUiPriority(line.priority));
   const [lineNotes, setLineNotes] = useState(line.lineNotes || "");
+  const [pickedUpAt, setPickedUpAt] = useState(toDateInputValue(line.pickedUpAt));
 
   const [millFirstStatus, setMillFirstStatus] = useState(line.millFirstStatus);
   const [leatherOrderedStatus, setLeatherOrderedStatus] = useState(
@@ -114,8 +119,6 @@ export default function ProductionLineEditor({ line }: Props) {
   );
   const [qcAssignedTo, setQcAssignedTo] = useState(line.qcAssignedTo || "");
 
-  const [pickedUp, setPickedUp] = useState(line.pickedUp);
-
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -136,6 +139,7 @@ export default function ProductionLineEditor({ line }: Props) {
           dueDate,
           priority,
           lineNotes,
+          pickedUpAt,
 
           millFirstStatus,
           leatherOrderedStatus,
@@ -153,8 +157,6 @@ export default function ProductionLineEditor({ line }: Props) {
           upholsteredAssignedTo,
           finalAssemblyAssignedTo,
           qcAssignedTo,
-
-          pickedUp,
         }),
       });
 
@@ -234,7 +236,9 @@ export default function ProductionLineEditor({ line }: Props) {
 
           <p className="mt-2 text-sm text-slate-500">
             Qty {line.quantity}
-            {line.pickedUpAt ? ` · Picked up ${new Date(line.pickedUpAt).toLocaleString()}` : ""}
+            {line.pickedUpAt
+              ? ` · Picked up ${new Date(line.pickedUpAt).toLocaleDateString()}`
+              : ""}
           </p>
         </div>
 
@@ -280,15 +284,22 @@ export default function ProductionLineEditor({ line }: Props) {
         </div>
 
         <div className="rounded-xl border bg-slate-50 p-4">
-          <label className="mb-2 block text-sm font-medium">Picked Up</label>
-          <label className="flex items-center gap-2 rounded-lg border bg-white px-3 py-2">
+          <label className="mb-2 block text-sm font-medium">Picked Up Date</label>
+          <div className="flex gap-2">
             <input
-              type="checkbox"
-              checked={pickedUp}
-              onChange={(e) => setPickedUp(e.target.checked)}
+              type="date"
+              className="w-full rounded-lg border bg-white px-3 py-2"
+              value={pickedUpAt}
+              onChange={(e) => setPickedUpAt(e.target.value)}
             />
-            <span>{pickedUp ? "Yes" : "No"}</span>
-          </label>
+            <button
+              type="button"
+              onClick={() => setPickedUpAt("")}
+              className="rounded-lg border px-3 py-2 hover:bg-slate-100"
+            >
+              Clear
+            </button>
+          </div>
         </div>
       </div>
 

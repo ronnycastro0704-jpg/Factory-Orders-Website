@@ -14,6 +14,7 @@ type OrderRow = {
   priority: string;
   dueDate: Date | null;
   pickedUp: boolean;
+  pickedUpAt: Date | null;
   quantity: number;
   total: unknown;
   notes: string | null;
@@ -62,6 +63,10 @@ function formatDateOnly(date: Date | null) {
   return new Intl.DateTimeFormat("en-US", {
     dateStyle: "medium",
   }).format(date);
+}
+
+function formatPriorityLabel(priority: string) {
+  return priority === "HOLD" ? "HOT" : priority;
 }
 
 function getStatusClasses(status: string) {
@@ -185,6 +190,9 @@ export default async function AdminOrdersPage() {
               <Link href="/admin" className="button-secondary">
                 ← Dashboard
               </Link>
+              <Link href="/admin/production" className="button-secondary">
+                Production
+              </Link>
               <Link href="/admin/products" className="button-secondary">
                 Products
               </Link>
@@ -241,9 +249,7 @@ export default async function AdminOrdersPage() {
               <h2 className="mt-2 text-3xl font-bold">Latest 50 Orders</h2>
             </div>
 
-            <span className="status-pill">
-              Sorted newest to oldest
-            </span>
+            <span className="status-pill">Sorted newest to oldest</span>
           </div>
 
           {typedOrders.length === 0 ? (
@@ -299,7 +305,7 @@ export default async function AdminOrdersPage() {
                                 order.priority
                               )}`}
                             >
-                              {order.priority}
+                              {formatPriorityLabel(order.priority)}
                             </span>
                           </div>
 
@@ -381,7 +387,8 @@ export default async function AdminOrdersPage() {
                             {firstProductionLine.partNumber} / {firstProductionLine.frameNeeded}
                           </p>
                           <p className="mt-1 text-sm text-slate-500">
-                            Qty {firstProductionLine.quantity} · {firstProductionLine.currentStatus.replaceAll("_", " ")}
+                            Qty {firstProductionLine.quantity} ·{" "}
+                            {firstProductionLine.currentStatus.replaceAll("_", " ")}
                           </p>
                         </div>
                       ) : null}
@@ -432,9 +439,9 @@ export default async function AdminOrdersPage() {
                         </div>
                       ) : null}
 
-                      {order.pickedUp ? (
+                      {order.pickedUpAt ? (
                         <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm font-medium text-emerald-700">
-                          Picked up
+                          Picked up on {formatDate(order.pickedUpAt)}
                         </div>
                       ) : null}
                     </div>

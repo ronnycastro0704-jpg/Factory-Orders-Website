@@ -46,7 +46,12 @@ type ProductionLineSeed = {
 };
 
 const SELECTION_META_SEPARATOR = "|||";
-const ORDER_PRIORITIES = new Set<OrderPriority>(["NORMAL", "RUSH", "HOLD"]);
+
+function addDays(date: Date, days: number) {
+  const next = new Date(date);
+  next.setDate(next.getDate() + days);
+  return next;
+}
 
 function normalizeEmail(value: string) {
   return value.trim().toLowerCase();
@@ -77,30 +82,17 @@ function sanitizeQuantity(value: number | null | undefined) {
 }
 
 function normalizePriority(value: unknown): OrderPriority {
-  const raw = String(value || "")
-    .trim()
-    .toUpperCase();
+  const raw = String(value || "").trim().toUpperCase();
 
-  if (ORDER_PRIORITIES.has(raw as OrderPriority)) {
-    return raw as OrderPriority;
+  if (raw === "HOT") {
+    return "HOLD";
+  }
+
+  if (raw === "NORMAL" || raw === "RUSH" || raw === "HOLD") {
+    return raw;
   }
 
   return "NORMAL";
-}
-
-function parseOptionalDate(value: unknown) {
-  const raw = String(value || "").trim();
-
-  if (!raw) {
-    return { raw, date: null as Date | null };
-  }
-
-  const date = new Date(raw);
-
-  return {
-    raw,
-    date: Number.isNaN(date.getTime()) ? null : date,
-  };
 }
 
 function buildSelectionRows(selections: IncomingSelection[]) {
@@ -286,8 +278,8 @@ export async function POST(request: Request) {
       Number(body.quantity ?? body.orderQuantity ?? body.selections?.[0]?.quantity ?? 1)
     );
     const priority = normalizePriority(body.priority);
-    const dueDateInput = parseOptionalDate(body.dueDate);
-    const dueDate = dueDateInput.date;
+    const createdAt = new Date();
+    const dueDate = addDays(createdAt, 56);
 
     const selections = Array.isArray(body.selections)
       ? (body.selections as IncomingSelection[])
@@ -314,13 +306,6 @@ export async function POST(request: Request) {
     if (!customerEmail || !isValidEmail(customerEmail)) {
       return NextResponse.json(
         { error: "A valid customer email is required." },
-        { status: 400 }
-      );
-    }
-
-    if (dueDateInput.raw && !dueDate) {
-      return NextResponse.json(
-        { error: "Due date is invalid." },
         { status: 400 }
       );
     }
@@ -378,11 +363,12 @@ export async function POST(request: Request) {
         status: nextStatus,
         subtotal: total,
         total,
-        sentToFactoryAt: submitToFactory ? new Date() : null,
+        createdAt,
+        sentToFactoryAt: submitToFactory ? createdAt : null,
         quantity,
         dueDate,
         priority,
-        overallProductionStatus: submitToFactory ? "NEW" : "NEW",
+        overallProductionStatus: "NEW",
         ...(submittingUser?.id ? { userId: submittingUser.id } : {}),
         items: {
           create: [
@@ -542,7 +528,7 @@ export async function POST(request: Request) {
             customerName,
             quantity,
             bodyLeather,
-            dateSold: new Date(),
+            dateSold: createdAt,
             dueDate,
             parts,
           });

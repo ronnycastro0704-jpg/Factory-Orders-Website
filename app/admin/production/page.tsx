@@ -76,11 +76,8 @@ const statusOptions: readonly ["ALL", ...ProductionOverallStatus[]] = [
   ...productionStatusOptions,
 ];
 
-const priorityValueOptions: readonly OrderPriority[] = ["NORMAL", "RUSH", "HOLD"];
-const priorityOptions: readonly ["ALL", ...OrderPriority[]] = [
-  "ALL",
-  ...priorityValueOptions,
-];
+const priorityUiOptions = ["ALL", "NORMAL", "RUSH", "HOT"] as const;
+type PriorityUiFilter = (typeof priorityUiOptions)[number];
 
 type PickedUpFilter = "ALL" | "yes" | "no";
 type OverdueFilter = "yes" | "no";
@@ -107,16 +104,14 @@ function normalizeStatusFilter(value: string): "ALL" | ProductionOverallStatus {
     : "ALL";
 }
 
-function normalizePriorityFilter(value: string): "ALL" | OrderPriority {
+function normalizePriorityFilter(value: string): PriorityUiFilter {
   const normalized = value.trim().toUpperCase();
 
-  if (normalized === "ALL") {
-    return "ALL";
+  if (priorityUiOptions.includes(normalized as PriorityUiFilter)) {
+    return normalized as PriorityUiFilter;
   }
 
-  return priorityValueOptions.includes(normalized as OrderPriority)
-    ? (normalized as OrderPriority)
-    : "ALL";
+  return "ALL";
 }
 
 function normalizePickedUpFilter(value: string): PickedUpFilter {
@@ -150,6 +145,10 @@ function formatDateTime(date: Date | null) {
   }).format(date);
 }
 
+function formatPriorityLabel(priority: OrderPriority) {
+  return priority === "HOLD" ? "HOT" : priority;
+}
+
 function getStatusClasses(status: ProductionOverallStatus) {
   switch (status) {
     case "BLOCKED":
@@ -176,7 +175,7 @@ function getPriorityClasses(priority: OrderPriority) {
     case "RUSH":
       return "bg-red-50 text-red-700 border-red-200";
     case "HOLD":
-      return "bg-amber-50 text-amber-700 border-amber-200";
+      return "bg-orange-50 text-orange-700 border-orange-200";
     default:
       return "bg-slate-100 text-slate-700 border-slate-200";
   }
@@ -222,7 +221,8 @@ export default async function AdminProductionPage({
 
   const q = normalizeQueryValue(params.q).trim();
   const status = normalizeStatusFilter(normalizeQueryValue(params.status));
-  const priority = normalizePriorityFilter(normalizeQueryValue(params.priority));
+  const priorityUi = normalizePriorityFilter(normalizeQueryValue(params.priority));
+  const priority = priorityUi === "HOT" ? "HOLD" : priorityUi;
   const pickedUp = normalizePickedUpFilter(normalizeQueryValue(params.pickedUp));
   const overdue = normalizeOverdueFilter(normalizeQueryValue(params.overdue));
   const now = new Date();
@@ -420,10 +420,10 @@ export default async function AdminProductionPage({
               <label className="mb-1 block text-sm font-medium">Priority</label>
               <select
                 name="priority"
-                defaultValue={priority}
+                defaultValue={priorityUi}
                 className="w-full rounded-lg border px-3 py-2"
               >
-                {priorityOptions.map((option) => (
+                {priorityUiOptions.map((option) => (
                   <option key={option} value={option}>
                     {option}
                   </option>
@@ -529,11 +529,11 @@ export default async function AdminProductionPage({
                                 line.priority
                               )}`}
                             >
-                              {line.priority}
+                              {formatPriorityLabel(line.priority)}
                             </span>
-                            {line.pickedUp ? (
+                            {line.pickedUpAt ? (
                               <span className="inline-flex rounded-full border px-3 py-1 text-xs font-semibold bg-purple-50 text-purple-700 border-purple-200">
-                                Picked Up
+                                Picked Up {formatDateOnly(line.pickedUpAt)}
                               </span>
                             ) : null}
                             {isOverdue ? (

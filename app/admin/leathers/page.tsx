@@ -52,6 +52,9 @@ export default async function AdminLeathersPage() {
               <Link href="/admin" className="button-secondary">
                 ← Dashboard
               </Link>
+              <Link href="/admin/production" className="button-secondary">
+                Production
+              </Link>
               <Link href="/admin/orders" className="button-secondary">
                 Orders
               </Link>
