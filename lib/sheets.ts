@@ -15,25 +15,14 @@ type SheetRowInput = {
   parts: SheetPartInput[];
 };
 
-type QuantityLedgerPartInput = {
-  partNumber: string;
-  frameNeeded: string;
-  qtyChange: number;
-};
-
-type QuantityLedgerRowInput = {
-  orderNumber: string;
-  poNumber?: string | null;
-  customerName: string;
-  reason: string;
-  source?: string | null;
-  parts: QuantityLedgerPartInput[];
-};
-
 type ProductionStageStatus =
   | "NOT_STARTED"
+  | "HOT"
   | "IN_PROGRESS"
+  | "FRAME_DONE"
+  | "THIS_WEEK"
   | "DONE"
+  | "MISSING_LEATHER"
   | "BLOCKED"
   | "NA";
 
@@ -58,9 +47,8 @@ type ProductionTrackingRowInput = {
   finalAssemblyStatus: ProductionStageStatus;
   qcStatus: ProductionStageStatus;
 
-  upholsteryAssignedTo?: string | null;
+  leaCutAssignedTo?: string | null;
   upholsteredAssignedTo?: string | null;
-  finalAssemblyAssignedTo?: string | null;
   qcAssignedTo?: string | null;
 
   pickedUp: boolean;
@@ -111,16 +99,6 @@ function formatDateSold(value?: string | Date | null) {
   return `${fallback.getMonth() + 1}/${fallback.getDate()}/${fallback.getFullYear()}`;
 }
 
-function formatTimestamp(value?: string | Date | null) {
-  const date = value ? new Date(value) : new Date();
-
-  if (Number.isNaN(date.getTime())) {
-    return new Date().toISOString();
-  }
-
-  return date.toISOString();
-}
-
 function sanitizeQuantity(value: number | null | undefined) {
   const parsed = Number(value ?? 1);
 
@@ -149,10 +127,18 @@ function formatStageStatus(value: ProductionStageStatus) {
   switch (value) {
     case "NOT_STARTED":
       return "Not Started";
+    case "HOT":
+      return "Hot";
     case "IN_PROGRESS":
       return "In Progress";
+    case "FRAME_DONE":
+      return "Frame Done";
+    case "THIS_WEEK":
+      return "This Week";
     case "DONE":
       return "Done";
+    case "MISSING_LEATHER":
+      return "Missing Leather";
     case "BLOCKED":
       return "Blocked";
     case "NA":
@@ -209,48 +195,8 @@ export async function appendOrderRow(input: SheetRowInput) {
     quantity,
     dateSold,
     dueDate,
-    "", // MILL FIRST
+    "",
     input.bodyLeather || "",
-  ]);
-
-  await sheets.spreadsheets.values.append({
-    spreadsheetId,
-    range: `${tabName}!A:I`,
-    valueInputOption: "USER_ENTERED",
-    requestBody: {
-      values: rows,
-    },
-  });
-}
-
-export async function appendQuantityLedgerRows(input: QuantityLedgerRowInput) {
-  const spreadsheetId = process.env.GOOGLE_SHEETS_SPREADSHEET_ID;
-  const tabName =
-    process.env.GOOGLE_SHEETS_QUANTITY_LEDGER_TAB_NAME || "Quantity Ledger";
-
-  if (!spreadsheetId) {
-    throw new Error("Missing GOOGLE_SHEETS_SPREADSHEET_ID.");
-  }
-
-  if (!input.parts || input.parts.length === 0) {
-    throw new Error("No quantity ledger rows were provided for Google Sheets.");
-  }
-
-  const auth = getGoogleAuth();
-  const sheets = google.sheets({ version: "v4", auth });
-
-  const timestamp = formatTimestamp();
-
-  const rows = input.parts.map((part) => [
-    timestamp,
-    input.orderNumber,
-    input.poNumber || "",
-    input.customerName,
-    part.partNumber || "",
-    part.frameNeeded || "",
-    Number(part.qtyChange || 0),
-    input.reason,
-    input.source || "website",
   ]);
 
   await sheets.spreadsheets.values.append({
@@ -363,20 +309,17 @@ export async function updateProductionTrackingRow(
   currentRow[10] = formatStageStatus(input.millStatus);
   currentRow[11] = formatStageStatus(input.frameAssemblyStatus);
   currentRow[12] = formatStageStatus(input.leatherArrivedStatus);
-  currentRow[13] = formatStageStatus(input.leaCutStatus);
-  currentRow[14] = formatStageStatus(input.sewnStatus);
-  currentRow[15] = formatAssignedOrStatus(
-    input.upholsteryAssignedTo,
-    input.upholsteryStatus
+  currentRow[13] = formatAssignedOrStatus(
+    input.leaCutAssignedTo,
+    input.leaCutStatus
   );
+  currentRow[14] = formatStageStatus(input.sewnStatus);
+  currentRow[15] = formatStageStatus(input.upholsteryStatus);
   currentRow[16] = formatAssignedOrStatus(
     input.upholsteredAssignedTo,
     input.upholsteredStatus
   );
-  currentRow[17] = formatAssignedOrStatus(
-    input.finalAssemblyAssignedTo,
-    input.finalAssemblyStatus
-  );
+  currentRow[17] = formatStageStatus(input.finalAssemblyStatus);
   currentRow[18] = formatAssignedOrStatus(input.qcAssignedTo, input.qcStatus);
   currentRow[19] = formatPickedUpValue(input.pickedUp, input.pickedUpAt);
 

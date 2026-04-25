@@ -3,10 +3,7 @@ import { Prisma } from "@prisma/client";
 import { auth } from "../../../auth";
 import { prisma } from "../../../lib/prisma";
 import { sendOrderNotification } from "../../../lib/email";
-import {
-  appendOrderRow,
-  appendQuantityLedgerRows,
-} from "../../../lib/sheets";
+import { appendOrderRow } from "../../../lib/sheets";
 
 type IncomingSelection = {
   groupName: string;
@@ -534,41 +531,14 @@ export async function POST(request: Request) {
           });
         }
 
-        if (productionLines.length > 0) {
-          await appendQuantityLedgerRows({
-            orderNumber: createdOrder.orderNumber,
-            poNumber,
-            customerName,
-            reason: "ORDER_SENT_TO_FACTORY",
-            source: "website-create",
-            parts: productionLines.map((line) => ({
-              partNumber: line.partNumber,
-              frameNeeded: line.frameNeeded,
-              qtyChange: line.quantity,
-            })),
-          });
-        }
-
-        await prisma.sheetSyncLog.createMany({
-          data: [
-            {
-              orderId: createdOrder.id,
-              spreadsheetId: process.env.GOOGLE_SHEETS_SPREADSHEET_ID || null,
-              worksheetName: process.env.GOOGLE_SHEETS_TAB_NAME || "Orders",
-              spreadsheetRowId: parts.length > 0 ? "APPENDED" : "NO_PART_ROWS",
-              status: "SYNCED",
-            },
-            {
-              orderId: createdOrder.id,
-              spreadsheetId: process.env.GOOGLE_SHEETS_SPREADSHEET_ID || null,
-              worksheetName:
-                process.env.GOOGLE_SHEETS_QUANTITY_LEDGER_TAB_NAME ||
-                "Quantity Ledger",
-              spreadsheetRowId:
-                productionLines.length > 0 ? "APPENDED" : "NO_LEDGER_ROWS",
-              status: "SYNCED",
-            },
-          ],
+        await prisma.sheetSyncLog.create({
+          data: {
+            orderId: createdOrder.id,
+            spreadsheetId: process.env.GOOGLE_SHEETS_SPREADSHEET_ID || null,
+            worksheetName: process.env.GOOGLE_SHEETS_TAB_NAME || "Orders",
+            spreadsheetRowId: parts.length > 0 ? "APPENDED" : "NO_PART_ROWS",
+            status: "SYNCED",
+          },
         });
       } catch (error) {
         console.error("ORDER SHEETS ERROR:", error);
@@ -577,7 +547,7 @@ export async function POST(request: Request) {
           data: {
             orderId: createdOrder.id,
             spreadsheetId: process.env.GOOGLE_SHEETS_SPREADSHEET_ID || null,
-            worksheetName: "Orders / Quantity Ledger",
+            worksheetName: process.env.GOOGLE_SHEETS_TAB_NAME || "Orders",
             spreadsheetRowId: "APPEND_FAILED",
             status: "FAILED",
             errorMessage:

@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { ChangeEvent, useState } from "react";
 
 type Props = {
   line: {
@@ -14,6 +14,7 @@ type Props = {
     priority: string;
     currentStatus: string;
     lineNotes: string | null;
+    completedPhotoUrl: string | null;
 
     millFirstStatus: string;
     leatherOrderedStatus: string;
@@ -27,6 +28,7 @@ type Props = {
     finalAssemblyStatus: string;
     qcStatus: string;
 
+    leaCutAssignedTo: string | null;
     upholsteryAssignedTo: string | null;
     upholsteredAssignedTo: string | null;
     finalAssemblyAssignedTo: string | null;
@@ -37,15 +39,37 @@ type Props = {
   };
 };
 
-const stageOptions = [
-  "NOT_STARTED",
-  "IN_PROGRESS",
-  "DONE",
-  "BLOCKED",
-  "NA",
+type StageOption = {
+  value: string;
+  label: string;
+};
+
+const MILL_FIRST_OPTIONS: StageOption[] = [
+  { value: "NOT_STARTED", label: "Not Started" },
+  { value: "HOT", label: "Hot" },
+  { value: "IN_PROGRESS", label: "In Progress" },
+  { value: "FRAME_DONE", label: "Frame Done" },
+  { value: "THIS_WEEK", label: "This Week" },
+  { value: "DONE", label: "Done" },
+  { value: "NA", label: "N/A" },
 ];
 
-const priorityOptions = ["NORMAL", "RUSH", "HOT"];
+const GENERIC_STAGE_OPTIONS: StageOption[] = [
+  { value: "NOT_STARTED", label: "Not Started" },
+  { value: "IN_PROGRESS", label: "In Progress" },
+  { value: "DONE", label: "Done" },
+  { value: "NA", label: "N/A" },
+];
+
+const LEA_CUT_OPTIONS: StageOption[] = [
+  { value: "NOT_STARTED", label: "Not Started" },
+  { value: "IN_PROGRESS", label: "In Progress" },
+  { value: "DONE", label: "Done" },
+  { value: "MISSING_LEATHER", label: "Missing Leather" },
+  { value: "NA", label: "N/A" },
+];
+
+const PRIORITY_OPTIONS = ["NORMAL", "RUSH", "HOT"];
 
 function formatBadge(status: string) {
   switch (status) {
@@ -77,6 +101,70 @@ function toUiPriority(value: string) {
   return value === "HOLD" ? "HOT" : value || "NORMAL";
 }
 
+function formatStageLabel(value: string) {
+  switch (value) {
+    case "NOT_STARTED":
+      return "Not Started";
+    case "HOT":
+      return "Hot";
+    case "IN_PROGRESS":
+      return "In Progress";
+    case "FRAME_DONE":
+      return "Frame Done";
+    case "THIS_WEEK":
+      return "This Week";
+    case "DONE":
+      return "Done";
+    case "MISSING_LEATHER":
+      return "Missing Leather";
+    case "BLOCKED":
+      return "Blocked";
+    case "NA":
+      return "N/A";
+    default:
+      return value.replaceAll("_", " ");
+  }
+}
+
+function getStageToneClasses(value: string) {
+  switch (value) {
+    case "NOT_STARTED":
+      return "border-red-200 bg-red-50 text-red-700";
+    case "HOT":
+      return "border-orange-200 bg-orange-50 text-orange-700";
+    case "IN_PROGRESS":
+      return "border-lime-200 bg-lime-50 text-lime-800";
+    case "FRAME_DONE":
+      return "border-sky-200 bg-sky-50 text-sky-700";
+    case "THIS_WEEK":
+      return "border-amber-200 bg-amber-50 text-amber-700";
+    case "DONE":
+      return "border-emerald-300 bg-emerald-100 text-emerald-800";
+    case "MISSING_LEATHER":
+      return "border-rose-200 bg-rose-50 text-rose-700";
+    case "BLOCKED":
+      return "border-red-300 bg-red-100 text-red-800";
+    case "NA":
+      return "border-slate-200 bg-slate-100 text-slate-600";
+    default:
+      return "border-slate-200 bg-white text-slate-700";
+  }
+}
+
+function getResolvedOptions(options: StageOption[], value: string) {
+  if (options.some((option) => option.value === value)) {
+    return options;
+  }
+
+  return [
+    ...options,
+    {
+      value,
+      label: formatStageLabel(value),
+    },
+  ];
+}
+
 export default function ProductionLineEditor({ line }: Props) {
   const router = useRouter();
 
@@ -85,6 +173,10 @@ export default function ProductionLineEditor({ line }: Props) {
   const [priority, setPriority] = useState(toUiPriority(line.priority));
   const [lineNotes, setLineNotes] = useState(line.lineNotes || "");
   const [pickedUpAt, setPickedUpAt] = useState(toDateInputValue(line.pickedUpAt));
+  const [completedPhotoUrl, setCompletedPhotoUrl] = useState(
+    line.completedPhotoUrl || ""
+  );
+  const [completedPhotoFile, setCompletedPhotoFile] = useState<File | null>(null);
 
   const [millFirstStatus, setMillFirstStatus] = useState(line.millFirstStatus);
   const [leatherOrderedStatus, setLeatherOrderedStatus] = useState(
@@ -108,20 +200,43 @@ export default function ProductionLineEditor({ line }: Props) {
   );
   const [qcStatus, setQcStatus] = useState(line.qcStatus);
 
-  const [upholsteryAssignedTo, setUpholsteryAssignedTo] = useState(
-    line.upholsteryAssignedTo || ""
+  const [leaCutAssignedTo, setLeaCutAssignedTo] = useState(
+    line.leaCutAssignedTo || ""
   );
   const [upholsteredAssignedTo, setUpholsteredAssignedTo] = useState(
     line.upholsteredAssignedTo || ""
   );
-  const [finalAssemblyAssignedTo, setFinalAssemblyAssignedTo] = useState(
-    line.finalAssemblyAssignedTo || ""
-  );
   const [qcAssignedTo, setQcAssignedTo] = useState(line.qcAssignedTo || "");
 
   const [loading, setLoading] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+
+  async function uploadCompletedPhotoIfNeeded() {
+    if (!completedPhotoFile) {
+      return completedPhotoUrl;
+    }
+
+    setUploading(true);
+
+    const formData = new FormData();
+    formData.append("file", completedPhotoFile);
+
+    const response = await fetch("/api/uploads", {
+      method: "POST",
+      body: formData,
+    });
+
+    const data = await response.json();
+    setUploading(false);
+
+    if (!response.ok) {
+      throw new Error(data.error || "Failed to upload completed photo.");
+    }
+
+    return String(data.url || "");
+  }
 
   async function handleSave() {
     setLoading(true);
@@ -129,6 +244,8 @@ export default function ProductionLineEditor({ line }: Props) {
     setSuccess("");
 
     try {
+      const finalCompletedPhotoUrl = await uploadCompletedPhotoIfNeeded();
+
       const response = await fetch(`/api/admin/production-lines/${line.id}`, {
         method: "PUT",
         headers: {
@@ -140,6 +257,7 @@ export default function ProductionLineEditor({ line }: Props) {
           priority,
           lineNotes,
           pickedUpAt,
+          completedPhotoUrl: finalCompletedPhotoUrl,
 
           millFirstStatus,
           leatherOrderedStatus,
@@ -153,9 +271,8 @@ export default function ProductionLineEditor({ line }: Props) {
           finalAssemblyStatus,
           qcStatus,
 
-          upholsteryAssignedTo,
+          leaCutAssignedTo,
           upholsteredAssignedTo,
-          finalAssemblyAssignedTo,
           qcAssignedTo,
         }),
       });
@@ -168,48 +285,75 @@ export default function ProductionLineEditor({ line }: Props) {
         return;
       }
 
+      setCompletedPhotoUrl(finalCompletedPhotoUrl);
+      setCompletedPhotoFile(null);
       setSuccess("Production line updated.");
       router.refresh();
-    } catch (error) {
-      console.error(error);
-      setError("Failed to update production line.");
+    } catch (saveError) {
+      console.error(saveError);
+      setError(
+        saveError instanceof Error
+          ? saveError.message
+          : "Failed to update production line."
+      );
     } finally {
       setLoading(false);
+      setUploading(false);
     }
   }
 
-  function renderStageField(
-    label: string,
-    value: string,
-    onChange: (value: string) => void,
-    assignedTo?: string,
-    onAssignedToChange?: (value: string) => void
-  ) {
+  function handleCompletedPhotoFileChange(event: ChangeEvent<HTMLInputElement>) {
+    setCompletedPhotoFile(event.target.files?.[0] || null);
+  }
+
+  function renderStageField(args: {
+    label: string;
+    value: string;
+    onChange: (value: string) => void;
+    options: StageOption[];
+    assignedTo?: string;
+    onAssignedToChange?: (value: string) => void;
+    assignedToPlaceholder?: string;
+  }) {
+    const resolvedOptions = getResolvedOptions(args.options, args.value);
+
     return (
       <div className="rounded-xl border bg-slate-50 p-4">
-        <label className="mb-2 block text-sm font-medium">{label}</label>
+        <div className="mb-2 flex items-center justify-between gap-3">
+          <label className="block text-sm font-medium">{args.label}</label>
+          <span
+            className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${getStageToneClasses(
+              args.value
+            )}`}
+          >
+            {formatStageLabel(args.value)}
+          </span>
+        </div>
+
         <select
-          className="w-full rounded-lg border bg-white px-3 py-2"
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
+          className={`w-full rounded-lg border px-3 py-2 font-medium ${getStageToneClasses(
+            args.value
+          )}`}
+          value={args.value}
+          onChange={(event) => args.onChange(event.target.value)}
         >
-          {stageOptions.map((option) => (
-            <option key={option} value={option}>
-              {option.replaceAll("_", " ")}
+          {resolvedOptions.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
             </option>
           ))}
         </select>
 
-        {onAssignedToChange ? (
+        {args.onAssignedToChange ? (
           <div className="mt-3">
             <label className="mb-1 block text-xs font-medium uppercase tracking-[0.14em] text-slate-500">
               Assigned To
             </label>
             <input
               className="w-full rounded-lg border bg-white px-3 py-2"
-              value={assignedTo || ""}
-              onChange={(e) => onAssignedToChange(e.target.value)}
-              placeholder="Employee name"
+              value={args.assignedTo || ""}
+              onChange={(event) => args.onAssignedToChange?.(event.target.value)}
+              placeholder={args.assignedToPlaceholder || "Employee name"}
             />
           </div>
         ) : null}
@@ -253,7 +397,7 @@ export default function ProductionLineEditor({ line }: Props) {
           <input
             className="w-full rounded-lg border bg-white px-3 py-2"
             value={bodyLeather}
-            onChange={(e) => setBodyLeather(e.target.value)}
+            onChange={(event) => setBodyLeather(event.target.value)}
             placeholder="Body leather"
           />
         </div>
@@ -264,18 +408,24 @@ export default function ProductionLineEditor({ line }: Props) {
             type="date"
             className="w-full rounded-lg border bg-white px-3 py-2"
             value={dueDate}
-            onChange={(e) => setDueDate(e.target.value)}
+            onChange={(event) => setDueDate(event.target.value)}
           />
         </div>
 
         <div className="rounded-xl border bg-slate-50 p-4">
           <label className="mb-2 block text-sm font-medium">Priority</label>
           <select
-            className="w-full rounded-lg border bg-white px-3 py-2"
+            className={`w-full rounded-lg border px-3 py-2 font-medium ${
+              priority === "HOT"
+                ? "border-orange-200 bg-orange-50 text-orange-700"
+                : priority === "RUSH"
+                ? "border-red-200 bg-red-50 text-red-700"
+                : "border-slate-200 bg-slate-50 text-slate-700"
+            }`}
             value={priority}
-            onChange={(e) => setPriority(e.target.value)}
+            onChange={(event) => setPriority(event.target.value)}
           >
-            {priorityOptions.map((option) => (
+            {PRIORITY_OPTIONS.map((option) => (
               <option key={option} value={option}>
                 {option}
               </option>
@@ -290,7 +440,7 @@ export default function ProductionLineEditor({ line }: Props) {
               type="date"
               className="w-full rounded-lg border bg-white px-3 py-2"
               value={pickedUpAt}
-              onChange={(e) => setPickedUpAt(e.target.value)}
+              onChange={(event) => setPickedUpAt(event.target.value)}
             />
             <button
               type="button"
@@ -309,65 +459,167 @@ export default function ProductionLineEditor({ line }: Props) {
           className="w-full rounded-lg border bg-white px-3 py-2"
           rows={3}
           value={lineNotes}
-          onChange={(e) => setLineNotes(e.target.value)}
+          onChange={(event) => setLineNotes(event.target.value)}
           placeholder="Internal notes for this production line"
         />
+      </div>
+
+      <div className="mt-4 rounded-xl border bg-slate-50 p-4">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
+          <div className="lg:w-64">
+            <label className="mb-2 block text-sm font-medium">
+              Completed Furniture Photo
+            </label>
+
+            {completedPhotoUrl ? (
+              <img
+                src={completedPhotoUrl}
+                alt={`${line.partNumber} completed`}
+                className="h-48 w-full rounded-xl border object-cover"
+              />
+            ) : (
+              <div className="flex h-48 w-full items-center justify-center rounded-xl border border-dashed bg-white text-sm text-slate-400">
+                No photo uploaded
+              </div>
+            )}
+          </div>
+
+          <div className="flex-1 space-y-4">
+            <div>
+              <label className="mb-1 block text-sm font-medium">
+                Upload Photo
+              </label>
+              <input
+                type="file"
+                accept="image/*"
+                className="w-full rounded-lg border bg-white px-3 py-2"
+                onChange={handleCompletedPhotoFileChange}
+              />
+              {completedPhotoFile ? (
+                <p className="mt-2 text-xs text-slate-500">
+                  Selected file: {completedPhotoFile.name}
+                </p>
+              ) : null}
+            </div>
+
+            <div>
+              <label className="mb-1 block text-sm font-medium">
+                Or Paste Photo URL
+              </label>
+              <input
+                className="w-full rounded-lg border bg-white px-3 py-2"
+                value={completedPhotoUrl}
+                onChange={(event) => setCompletedPhotoUrl(event.target.value)}
+                placeholder="https://..."
+              />
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                setCompletedPhotoUrl("");
+                setCompletedPhotoFile(null);
+              }}
+              className="rounded-lg border px-3 py-2 hover:bg-slate-100"
+            >
+              Clear Photo
+            </button>
+          </div>
+        </div>
       </div>
 
       <div className="mt-6">
         <h4 className="text-lg font-semibold">Production Stages</h4>
 
         <div className="mt-4 grid gap-4 md:grid-cols-2">
-          {renderStageField("Mill First", millFirstStatus, setMillFirstStatus)}
-          {renderStageField(
-            "Leather Ordered",
-            leatherOrderedStatus,
-            setLeatherOrderedStatus
-          )}
-          {renderStageField("Mill", millStatus, setMillStatus)}
-          {renderStageField(
-            "Frame Assembly",
-            frameAssemblyStatus,
-            setFrameAssemblyStatus
-          )}
-          {renderStageField(
-            "Leather Arrived",
-            leatherArrivedStatus,
-            setLeatherArrivedStatus
-          )}
-          {renderStageField("LEA CUT", leaCutStatus, setLeaCutStatus)}
-          {renderStageField("Sewn", sewnStatus, setSewnStatus)}
-          {renderStageField(
-            "Upholstery",
-            upholsteryStatus,
-            setUpholsteryStatus,
-            upholsteryAssignedTo,
-            setUpholsteryAssignedTo
-          )}
-          {renderStageField(
-            "Upholstered",
-            upholsteredStatus,
-            setUpholsteredStatus,
-            upholsteredAssignedTo,
-            setUpholsteredAssignedTo
-          )}
-          {renderStageField(
-            "Final Assembly",
-            finalAssemblyStatus,
-            setFinalAssemblyStatus,
-            finalAssemblyAssignedTo,
-            setFinalAssemblyAssignedTo
-          )}
-          {renderStageField(
-            "QC",
-            qcStatus,
-            setQcStatus,
-            qcAssignedTo,
-            setQcAssignedTo
-          )}
+          {renderStageField({
+            label: "MILL FIRST",
+            value: millFirstStatus,
+            onChange: setMillFirstStatus,
+            options: MILL_FIRST_OPTIONS,
+          })}
+
+          {renderStageField({
+            label: "Leather Ordered",
+            value: leatherOrderedStatus,
+            onChange: setLeatherOrderedStatus,
+            options: GENERIC_STAGE_OPTIONS,
+          })}
+
+          {renderStageField({
+            label: "MILL",
+            value: millStatus,
+            onChange: setMillStatus,
+            options: GENERIC_STAGE_OPTIONS,
+          })}
+
+          {renderStageField({
+            label: "Frame Assembly",
+            value: frameAssemblyStatus,
+            onChange: setFrameAssemblyStatus,
+            options: GENERIC_STAGE_OPTIONS,
+          })}
+
+          {renderStageField({
+            label: "Leather Arrived",
+            value: leatherArrivedStatus,
+            onChange: setLeatherArrivedStatus,
+            options: GENERIC_STAGE_OPTIONS,
+          })}
+
+          {renderStageField({
+            label: "LEA CUT",
+            value: leaCutStatus,
+            onChange: setLeaCutStatus,
+            options: LEA_CUT_OPTIONS,
+            assignedTo: leaCutAssignedTo,
+            onAssignedToChange: setLeaCutAssignedTo,
+          })}
+
+          {renderStageField({
+            label: "Sewn",
+            value: sewnStatus,
+            onChange: setSewnStatus,
+            options: GENERIC_STAGE_OPTIONS,
+          })}
+
+          {renderStageField({
+            label: "Upholstery",
+            value: upholsteryStatus,
+            onChange: setUpholsteryStatus,
+            options: GENERIC_STAGE_OPTIONS,
+          })}
+
+          {renderStageField({
+            label: "Upholstered",
+            value: upholsteredStatus,
+            onChange: setUpholsteredStatus,
+            options: GENERIC_STAGE_OPTIONS,
+            assignedTo: upholsteredAssignedTo,
+            onAssignedToChange: setUpholsteredAssignedTo,
+          })}
+
+          {renderStageField({
+            label: "Final Assembly",
+            value: finalAssemblyStatus,
+            onChange: setFinalAssemblyStatus,
+            options: GENERIC_STAGE_OPTIONS,
+          })}
+
+          {renderStageField({
+            label: "QC'ED",
+            value: qcStatus,
+            onChange: setQcStatus,
+            options: GENERIC_STAGE_OPTIONS,
+            assignedTo: qcAssignedTo,
+            onAssignedToChange: setQcAssignedTo,
+          })}
         </div>
       </div>
 
+      {uploading ? (
+        <p className="mt-4 text-sm text-slate-500">Uploading photo...</p>
+      ) : null}
       {error ? <p className="mt-4 text-sm text-red-600">{error}</p> : null}
       {success ? <p className="mt-4 text-sm text-green-600">{success}</p> : null}
 
@@ -375,7 +627,7 @@ export default function ProductionLineEditor({ line }: Props) {
         <button
           type="button"
           onClick={handleSave}
-          disabled={loading}
+          disabled={loading || uploading}
           className="rounded-lg bg-slate-900 px-4 py-2 text-white hover:bg-slate-800 disabled:opacity-50"
         >
           {loading ? "Saving..." : "Save Production Line"}

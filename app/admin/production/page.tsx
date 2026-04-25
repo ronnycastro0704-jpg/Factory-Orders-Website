@@ -26,6 +26,7 @@ type ProductionLineRow = {
   priority: OrderPriority;
   currentStatus: ProductionOverallStatus;
   lineNotes: string | null;
+  completedPhotoUrl: string | null;
 
   millFirstStatus: string;
   leatherOrderedStatus: string;
@@ -39,6 +40,7 @@ type ProductionLineRow = {
   finalAssemblyStatus: string;
   qcStatus: string;
 
+  leaCutAssignedTo: string | null;
   upholsteryAssignedTo: string | null;
   upholsteredAssignedTo: string | null;
   finalAssemblyAssignedTo: string | null;
@@ -149,6 +151,31 @@ function formatPriorityLabel(priority: OrderPriority) {
   return priority === "HOLD" ? "HOT" : priority;
 }
 
+function formatStageLabel(value: string) {
+  switch (value) {
+    case "NOT_STARTED":
+      return "Not Started";
+    case "HOT":
+      return "Hot";
+    case "IN_PROGRESS":
+      return "In Progress";
+    case "FRAME_DONE":
+      return "Frame Done";
+    case "THIS_WEEK":
+      return "This Week";
+    case "DONE":
+      return "Done";
+    case "MISSING_LEATHER":
+      return "Missing Leather";
+    case "BLOCKED":
+      return "Blocked";
+    case "NA":
+      return "N/A";
+    default:
+      return value.replaceAll("_", " ");
+  }
+}
+
 function getStatusClasses(status: ProductionOverallStatus) {
   switch (status) {
     case "BLOCKED":
@@ -181,21 +208,45 @@ function getPriorityClasses(priority: OrderPriority) {
   }
 }
 
+function getStageValueClasses(value: string) {
+  switch (value) {
+    case "NOT_STARTED":
+      return "bg-red-50 text-red-700 border-red-200";
+    case "HOT":
+      return "bg-orange-50 text-orange-700 border-orange-200";
+    case "IN_PROGRESS":
+      return "bg-lime-50 text-lime-800 border-lime-200";
+    case "FRAME_DONE":
+      return "bg-sky-50 text-sky-700 border-sky-200";
+    case "THIS_WEEK":
+      return "bg-amber-50 text-amber-700 border-amber-200";
+    case "DONE":
+      return "bg-emerald-100 text-emerald-800 border-emerald-300";
+    case "MISSING_LEATHER":
+      return "bg-rose-50 text-rose-700 border-rose-200";
+    case "BLOCKED":
+      return "bg-red-100 text-red-800 border-red-300";
+    case "NA":
+      return "bg-slate-100 text-slate-600 border-slate-200";
+    default:
+      return "bg-slate-100 text-slate-700 border-slate-200";
+  }
+}
+
 function getCurrentAssignee(line: ProductionLineRow) {
   return (
     line.qcAssignedTo ||
-    line.finalAssemblyAssignedTo ||
     line.upholsteredAssignedTo ||
-    line.upholsteryAssignedTo ||
+    line.leaCutAssignedTo ||
     ""
   );
 }
 
 function getStageSummary(line: ProductionLineRow) {
   const stages = [
-    { label: "Mill First", value: line.millFirstStatus },
+    { label: "MILL FIRST", value: line.millFirstStatus },
     { label: "Leather Ordered", value: line.leatherOrderedStatus },
-    { label: "Mill", value: line.millStatus },
+    { label: "MILL", value: line.millStatus },
     { label: "Frame Assembly", value: line.frameAssemblyStatus },
     { label: "Leather Arrived", value: line.leatherArrivedStatus },
     { label: "LEA CUT", value: line.leaCutStatus },
@@ -203,15 +254,19 @@ function getStageSummary(line: ProductionLineRow) {
     { label: "Upholstery", value: line.upholsteryStatus },
     { label: "Upholstered", value: line.upholsteredStatus },
     { label: "Final Assembly", value: line.finalAssemblyStatus },
-    { label: "QC", value: line.qcStatus },
+    { label: "QC'ED", value: line.qcStatus },
   ];
 
   const activeStage =
-    stages.find((stage) => stage.value === "IN_PROGRESS") ||
+    stages.find((stage) =>
+      ["HOT", "IN_PROGRESS", "FRAME_DONE", "THIS_WEEK", "MISSING_LEATHER"].includes(
+        stage.value
+      )
+    ) ||
     [...stages].reverse().find((stage) => stage.value === "DONE") ||
     stages[0];
 
-  return `${activeStage.label}: ${activeStage.value.replaceAll("_", " ")}`;
+  return activeStage;
 }
 
 export default async function AdminProductionPage({
@@ -503,6 +558,7 @@ export default async function AdminProductionPage({
                   !line.pickedUp &&
                   !["READY", "PICKED_UP"].includes(line.currentStatus) &&
                   (line.dueDate?.getTime() ?? 0) < nowTime;
+                const stageSummary = getStageSummary(line);
 
                 return (
                   <Link
@@ -562,6 +618,16 @@ export default async function AdminProductionPage({
                         </div>
                       </div>
 
+                      {line.completedPhotoUrl ? (
+                        <div className="overflow-hidden rounded-xl border bg-white">
+                          <img
+                            src={line.completedPhotoUrl}
+                            alt={`${line.partNumber} completed`}
+                            className="h-52 w-full object-cover"
+                          />
+                        </div>
+                      ) : null}
+
                       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                         <div className="soft-panel">
                           <p className="text-xs uppercase tracking-[0.16em] text-slate-500">
@@ -601,11 +667,20 @@ export default async function AdminProductionPage({
                       </div>
 
                       <div className="rounded-xl border bg-white/80 p-3">
-                        <p className="text-xs uppercase tracking-[0.16em] text-slate-500">
-                          Stage Summary
-                        </p>
+                        <div className="flex items-center justify-between gap-3">
+                          <p className="text-xs uppercase tracking-[0.16em] text-slate-500">
+                            Stage Summary
+                          </p>
+                          <span
+                            className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${getStageValueClasses(
+                              stageSummary.value
+                            )}`}
+                          >
+                            {formatStageLabel(stageSummary.value)}
+                          </span>
+                        </div>
                         <p className="mt-2 text-sm text-slate-700">
-                          {getStageSummary(line)}
+                          {stageSummary.label}
                         </p>
                       </div>
 

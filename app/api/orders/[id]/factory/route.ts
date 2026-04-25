@@ -1,10 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "../../../../../lib/prisma";
 import { sendOrderNotification } from "../../../../../lib/email";
-import {
-  appendOrderRow,
-  appendQuantityLedgerRows,
-} from "../../../../../lib/sheets";
+import { appendOrderRow } from "../../../../../lib/sheets";
 
 type RouteContext = {
   params: Promise<{
@@ -359,10 +356,7 @@ function buildSelectionsFromItem(
       groupName,
       choiceLabel,
       choiceValue: revisionMatch?.choiceValue || null,
-      partNumber:
-        revisionMatch?.partNumber ||
-        revisionMatch?.choiceValue ||
-        null,
+      partNumber: revisionMatch?.partNumber || revisionMatch?.choiceValue || null,
       leatherName,
       leatherGrade,
       baseAmount:
@@ -373,9 +367,7 @@ function buildSelectionsFromItem(
       leatherImageUrl: revisionMatch?.leatherImageUrl || null,
       laseredBrand: Boolean(parsedLaseredBrand || revisionMatch?.laseredBrand),
       laseredBrandImageUrl:
-        parsedLaseredBrandImage ||
-        revisionMatch?.laseredBrandImageUrl ||
-        null,
+        parsedLaseredBrandImage || revisionMatch?.laseredBrandImageUrl || null,
       quantity: orderQuantity,
       frameNeededCode: revisionMatch?.frameNeededCode || null,
       isBodyLeather: Boolean(revisionMatch?.isBodyLeather),
@@ -722,41 +714,14 @@ export async function POST(request: Request, context: RouteContext) {
           });
         }
 
-        if (productionLines.length > 0) {
-          await appendQuantityLedgerRows({
-            orderNumber: order.orderNumber,
-            poNumber: order.poNumber || null,
-            customerName: order.customerName,
-            reason: "ORDER_SENT_TO_FACTORY",
-            source: "admin-factory-action",
-            parts: productionLines.map((line) => ({
-              partNumber: line.partNumber,
-              frameNeeded: line.frameNeeded,
-              qtyChange: line.quantity,
-            })),
-          });
-        }
-
-        await prisma.sheetSyncLog.createMany({
-          data: [
-            {
-              orderId: id,
-              spreadsheetId: process.env.GOOGLE_SHEETS_SPREADSHEET_ID || null,
-              worksheetName: process.env.GOOGLE_SHEETS_TAB_NAME || "Orders",
-              spreadsheetRowId: parts.length > 0 ? "APPENDED" : "NO_PART_ROWS",
-              status: "SYNCED",
-            },
-            {
-              orderId: id,
-              spreadsheetId: process.env.GOOGLE_SHEETS_SPREADSHEET_ID || null,
-              worksheetName:
-                process.env.GOOGLE_SHEETS_QUANTITY_LEDGER_TAB_NAME ||
-                "Quantity Ledger",
-              spreadsheetRowId:
-                productionLines.length > 0 ? "APPENDED" : "NO_LEDGER_ROWS",
-              status: "SYNCED",
-            },
-          ],
+        await prisma.sheetSyncLog.create({
+          data: {
+            orderId: id,
+            spreadsheetId: process.env.GOOGLE_SHEETS_SPREADSHEET_ID || null,
+            worksheetName: process.env.GOOGLE_SHEETS_TAB_NAME || "Orders",
+            spreadsheetRowId: parts.length > 0 ? "APPENDED" : "NO_PART_ROWS",
+            status: "SYNCED",
+          },
         });
       } catch (error) {
         console.error("FACTORY SHEETS ERROR:", error);
@@ -765,7 +730,7 @@ export async function POST(request: Request, context: RouteContext) {
           data: {
             orderId: id,
             spreadsheetId: process.env.GOOGLE_SHEETS_SPREADSHEET_ID || null,
-            worksheetName: "Orders / Quantity Ledger",
+            worksheetName: process.env.GOOGLE_SHEETS_TAB_NAME || "Orders",
             spreadsheetRowId: "APPEND_FAILED",
             status: "FAILED",
             errorMessage:

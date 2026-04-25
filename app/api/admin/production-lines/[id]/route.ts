@@ -12,8 +12,12 @@ type RouteContext = {
 
 type ProductionStageStatus =
   | "NOT_STARTED"
+  | "HOT"
   | "IN_PROGRESS"
+  | "FRAME_DONE"
+  | "THIS_WEEK"
   | "DONE"
+  | "MISSING_LEATHER"
   | "BLOCKED"
   | "NA";
 
@@ -31,23 +35,48 @@ type ProductionOverallStatus =
 
 type OrderPriority = "NORMAL" | "RUSH" | "HOLD";
 
-const STAGE_STATUS_VALUES = new Set<ProductionStageStatus>([
+const MILL_FIRST_VALUES = new Set<ProductionStageStatus>([
+  "NOT_STARTED",
+  "HOT",
+  "IN_PROGRESS",
+  "FRAME_DONE",
+  "THIS_WEEK",
+  "DONE",
+  "NA",
+  "BLOCKED",
+]);
+
+const GENERIC_STAGE_VALUES = new Set<ProductionStageStatus>([
   "NOT_STARTED",
   "IN_PROGRESS",
   "DONE",
-  "BLOCKED",
   "NA",
+  "BLOCKED",
+]);
+
+const LEA_CUT_VALUES = new Set<ProductionStageStatus>([
+  "NOT_STARTED",
+  "IN_PROGRESS",
+  "DONE",
+  "MISSING_LEATHER",
+  "NA",
+  "BLOCKED",
 ]);
 
 function normalizeStageStatus(
   value: unknown,
-  fallback: ProductionStageStatus = "NOT_STARTED"
+  fallback: ProductionStageStatus,
+  allowedValues: Set<ProductionStageStatus>
 ): ProductionStageStatus {
-  const raw = String(value || "")
+  const raw = String(value ?? "")
     .trim()
     .toUpperCase() as ProductionStageStatus;
 
-  return STAGE_STATUS_VALUES.has(raw) ? raw : fallback;
+  if (!raw) {
+    return fallback;
+  }
+
+  return allowedValues.has(raw) ? raw : fallback;
 }
 
 function normalizePriority(
@@ -88,8 +117,8 @@ function parseOptionalDate(value: unknown) {
   };
 }
 
-function hasProgress(status: ProductionStageStatus) {
-  return status === "IN_PROGRESS" || status === "DONE";
+function isStarted(status: ProductionStageStatus) {
+  return !["NOT_STARTED", "NA"].includes(status);
 }
 
 function deriveLineCurrentStatus(input: {
@@ -128,35 +157,31 @@ function deriveLineCurrentStatus(input: {
     return "BLOCKED";
   }
 
-  if (input.qcStatus === "IN_PROGRESS") {
-    return "QC";
+  if (input.leaCutStatus === "MISSING_LEATHER") {
+    return "WAITING_ON_LEATHER";
   }
 
   if (input.qcStatus === "DONE") {
     return "READY";
   }
 
-  if (
-    input.finalAssemblyStatus === "IN_PROGRESS" ||
-    input.finalAssemblyStatus === "DONE"
-  ) {
+  if (isStarted(input.qcStatus)) {
+    return "QC";
+  }
+
+  if (isStarted(input.finalAssemblyStatus)) {
     return "FINAL_ASSEMBLY";
   }
 
-  if (
-    input.upholsteryStatus === "IN_PROGRESS" ||
-    input.upholsteryStatus === "DONE" ||
-    input.upholsteredStatus === "IN_PROGRESS" ||
-    input.upholsteredStatus === "DONE"
-  ) {
+  if (isStarted(input.upholsteryStatus) || isStarted(input.upholsteredStatus)) {
     return "UPHOLSTERY";
   }
 
-  if (input.sewnStatus === "IN_PROGRESS" || input.sewnStatus === "DONE") {
+  if (isStarted(input.sewnStatus)) {
     return "SEWING";
   }
 
-  if (input.leaCutStatus === "IN_PROGRESS" || input.leaCutStatus === "DONE") {
+  if (isStarted(input.leaCutStatus)) {
     return "CUTTING";
   }
 
@@ -168,7 +193,7 @@ function deriveLineCurrentStatus(input: {
     input.leatherArrivedStatus,
   ];
 
-  if (preProduction.some((status) => hasProgress(status))) {
+  if (preProduction.some((status) => isStarted(status))) {
     return "WAITING_ON_LEATHER";
   }
 
@@ -282,47 +307,58 @@ export async function PUT(request: Request, context: RouteContext) {
 
     const millFirstStatus = normalizeStageStatus(
       body.millFirstStatus,
-      existingLine.millFirstStatus as ProductionStageStatus
+      existingLine.millFirstStatus as ProductionStageStatus,
+      MILL_FIRST_VALUES
     );
     const leatherOrderedStatus = normalizeStageStatus(
       body.leatherOrderedStatus,
-      existingLine.leatherOrderedStatus as ProductionStageStatus
+      existingLine.leatherOrderedStatus as ProductionStageStatus,
+      GENERIC_STAGE_VALUES
     );
     const millStatus = normalizeStageStatus(
       body.millStatus,
-      existingLine.millStatus as ProductionStageStatus
+      existingLine.millStatus as ProductionStageStatus,
+      GENERIC_STAGE_VALUES
     );
     const frameAssemblyStatus = normalizeStageStatus(
       body.frameAssemblyStatus,
-      existingLine.frameAssemblyStatus as ProductionStageStatus
+      existingLine.frameAssemblyStatus as ProductionStageStatus,
+      GENERIC_STAGE_VALUES
     );
     const leatherArrivedStatus = normalizeStageStatus(
       body.leatherArrivedStatus,
-      existingLine.leatherArrivedStatus as ProductionStageStatus
+      existingLine.leatherArrivedStatus as ProductionStageStatus,
+      GENERIC_STAGE_VALUES
     );
     const leaCutStatus = normalizeStageStatus(
       body.leaCutStatus,
-      existingLine.leaCutStatus as ProductionStageStatus
+      existingLine.leaCutStatus as ProductionStageStatus,
+      LEA_CUT_VALUES
     );
     const sewnStatus = normalizeStageStatus(
       body.sewnStatus,
-      existingLine.sewnStatus as ProductionStageStatus
+      existingLine.sewnStatus as ProductionStageStatus,
+      GENERIC_STAGE_VALUES
     );
     const upholsteryStatus = normalizeStageStatus(
       body.upholsteryStatus,
-      existingLine.upholsteryStatus as ProductionStageStatus
+      existingLine.upholsteryStatus as ProductionStageStatus,
+      GENERIC_STAGE_VALUES
     );
     const upholsteredStatus = normalizeStageStatus(
       body.upholsteredStatus,
-      existingLine.upholsteredStatus as ProductionStageStatus
+      existingLine.upholsteredStatus as ProductionStageStatus,
+      GENERIC_STAGE_VALUES
     );
     const finalAssemblyStatus = normalizeStageStatus(
       body.finalAssemblyStatus,
-      existingLine.finalAssemblyStatus as ProductionStageStatus
+      existingLine.finalAssemblyStatus as ProductionStageStatus,
+      GENERIC_STAGE_VALUES
     );
     const qcStatus = normalizeStageStatus(
       body.qcStatus,
-      existingLine.qcStatus as ProductionStageStatus
+      existingLine.qcStatus as ProductionStageStatus,
+      GENERIC_STAGE_VALUES
     );
 
     const currentStatus = deriveLineCurrentStatus({
@@ -345,8 +381,12 @@ export async function PUT(request: Request, context: RouteContext) {
       data: {
         bodyLeather: normalizeOptionalText(body.bodyLeather),
         dueDate: dueDateInput.date,
-        priority: normalizePriority(body.priority, existingLine.priority as OrderPriority),
+        priority: normalizePriority(
+          body.priority,
+          existingLine.priority as OrderPriority
+        ),
         lineNotes: normalizeOptionalText(body.lineNotes),
+        completedPhotoUrl: normalizeOptionalText(body.completedPhotoUrl),
 
         millFirstStatus,
         leatherOrderedStatus,
@@ -360,12 +400,12 @@ export async function PUT(request: Request, context: RouteContext) {
         finalAssemblyStatus,
         qcStatus,
 
-        upholsteryAssignedTo: normalizeOptionalText(body.upholsteryAssignedTo),
+        leaCutAssignedTo: normalizeOptionalText(body.leaCutAssignedTo),
         upholsteredAssignedTo: normalizeOptionalText(body.upholsteredAssignedTo),
-        finalAssemblyAssignedTo: normalizeOptionalText(
-          body.finalAssemblyAssignedTo
-        ),
         qcAssignedTo: normalizeOptionalText(body.qcAssignedTo),
+
+        upholsteryAssignedTo: null,
+        finalAssemblyAssignedTo: null,
 
         pickedUp,
         pickedUpAt,
@@ -392,7 +432,9 @@ export async function PUT(request: Request, context: RouteContext) {
         overallProductionStatus: orderStatus,
         pickedUp: allPickedUp,
         pickedUpAt: allPickedUp
-          ? updatedLine.pickedUpAt ?? existingLine.order.pickedUpAt ?? new Date()
+          ? updatedLine.pickedUpAt ??
+            existingLine.order.pickedUpAt ??
+            new Date()
           : null,
       },
     });
@@ -424,9 +466,8 @@ export async function PUT(request: Request, context: RouteContext) {
           updatedLine.finalAssemblyStatus as ProductionStageStatus,
         qcStatus: updatedLine.qcStatus as ProductionStageStatus,
 
-        upholsteryAssignedTo: updatedLine.upholsteryAssignedTo,
+        leaCutAssignedTo: updatedLine.leaCutAssignedTo,
         upholsteredAssignedTo: updatedLine.upholsteredAssignedTo,
-        finalAssemblyAssignedTo: updatedLine.finalAssemblyAssignedTo,
         qcAssignedTo: updatedLine.qcAssignedTo,
 
         pickedUp: updatedLine.pickedUp,

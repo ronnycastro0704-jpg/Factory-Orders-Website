@@ -84,25 +84,25 @@ model OptionChoice {
 }
 
 model Order {
-  id                      String                   @id @default(cuid())
-  orderNumber             String                   @unique
+  id                      String                  @id @default(cuid())
+  orderNumber             String                  @unique
   customerName            String
   customerEmail           String
   customerPhone           String?
   poNumber                String?
-  status                  OrderStatus              @default(DRAFT)
-  subtotal                Decimal                  @default(0) @db.Decimal(10, 2)
-  total                   Decimal                  @default(0) @db.Decimal(10, 2)
+  status                  OrderStatus             @default(DRAFT)
+  subtotal                Decimal                 @default(0) @db.Decimal(10, 2)
+  total                   Decimal                 @default(0) @db.Decimal(10, 2)
   notes                   String?
   sentToFactoryAt         DateTime?
   dueDate                 DateTime?
-  priority                OrderPriority            @default(NORMAL)
-  pickedUp                Boolean                  @default(false)
+  priority                OrderPriority           @default(NORMAL)
+  pickedUp                Boolean                 @default(false)
   pickedUpAt              DateTime?
-  overallProductionStatus ProductionOverallStatus  @default(NEW)
-  createdAt               DateTime                 @default(now())
-  updatedAt               DateTime                 @updatedAt
-  quantity                Int                      @default(1)
+  overallProductionStatus ProductionOverallStatus @default(NEW)
+  createdAt               DateTime                @default(now())
+  updatedAt               DateTime                @updatedAt
+  quantity                Int                     @default(1)
 
   userId String?
   user   User? @relation(fields: [userId], references: [id], onDelete: SetNull)
@@ -199,43 +199,45 @@ model Employee {
 }
 
 model ProductionLine {
-  id                        String                  @id @default(cuid())
-  orderId                   String
-  order                     Order                   @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  productNameSnapshot       String
-  optionGroupNameSnapshot   String?
-  optionChoiceNameSnapshot  String?
-  partNumber                String
-  frameNeeded               String
-  quantity                  Int                     @default(1)
-  bodyLeather               String?
-  dueDate                   DateTime?
-  priority                  OrderPriority           @default(NORMAL)
-  currentStatus             ProductionOverallStatus @default(NEW)
-  lineNotes                 String?
+  id                       String                  @id @default(cuid())
+  orderId                  String
+  order                    Order                   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productNameSnapshot      String
+  optionGroupNameSnapshot  String?
+  optionChoiceNameSnapshot String?
+  partNumber               String
+  frameNeeded              String
+  quantity                 Int                     @default(1)
+  bodyLeather              String?
+  dueDate                  DateTime?
+  priority                 OrderPriority           @default(NORMAL)
+  currentStatus            ProductionOverallStatus @default(NEW)
+  lineNotes                String?
+  completedPhotoUrl        String?
 
-  millFirstStatus           ProductionStageStatus   @default(NOT_STARTED)
-  leatherOrderedStatus      ProductionStageStatus   @default(NOT_STARTED)
-  millStatus                ProductionStageStatus   @default(NOT_STARTED)
-  frameAssemblyStatus       ProductionStageStatus   @default(NOT_STARTED)
-  leatherArrivedStatus      ProductionStageStatus   @default(NOT_STARTED)
-  leaCutStatus              ProductionStageStatus   @default(NOT_STARTED)
-  sewnStatus                ProductionStageStatus   @default(NOT_STARTED)
-  upholsteryStatus          ProductionStageStatus   @default(NOT_STARTED)
-  upholsteredStatus         ProductionStageStatus   @default(NOT_STARTED)
-  finalAssemblyStatus       ProductionStageStatus   @default(NOT_STARTED)
-  qcStatus                  ProductionStageStatus   @default(NOT_STARTED)
+  millFirstStatus          ProductionStageStatus   @default(NOT_STARTED)
+  leatherOrderedStatus     ProductionStageStatus   @default(NOT_STARTED)
+  millStatus               ProductionStageStatus   @default(NOT_STARTED)
+  frameAssemblyStatus      ProductionStageStatus   @default(NOT_STARTED)
+  leatherArrivedStatus     ProductionStageStatus   @default(NOT_STARTED)
+  leaCutStatus             ProductionStageStatus   @default(NOT_STARTED)
+  sewnStatus               ProductionStageStatus   @default(NOT_STARTED)
+  upholsteryStatus         ProductionStageStatus   @default(NOT_STARTED)
+  upholsteredStatus        ProductionStageStatus   @default(NOT_STARTED)
+  finalAssemblyStatus      ProductionStageStatus   @default(NOT_STARTED)
+  qcStatus                 ProductionStageStatus   @default(NOT_STARTED)
 
-  upholsteryAssignedTo      String?
-  upholsteredAssignedTo     String?
-  finalAssemblyAssignedTo   String?
-  qcAssignedTo              String?
+  leaCutAssignedTo         String?
+  upholsteryAssignedTo     String?
+  upholsteredAssignedTo    String?
+  finalAssemblyAssignedTo  String?
+  qcAssignedTo             String?
 
-  pickedUp                  Boolean                 @default(false)
-  pickedUpAt                DateTime?
+  pickedUp                 Boolean                 @default(false)
+  pickedUpAt               DateTime?
 
-  createdAt                 DateTime                @default(now())
-  updatedAt                 DateTime                @updatedAt
+  createdAt                DateTime                @default(now())
+  updatedAt                DateTime                @updatedAt
 
   @@index([orderId])
   @@index([currentStatus])
@@ -244,9 +246,9 @@ model ProductionLine {
 }
 
 model QuantityLedger {
-  id          String               @id @default(cuid())
+  id           String               @id @default(cuid())
   orderId      String
-  order        Order               @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  order        Order                @relation(fields: [orderId], references: [id], onDelete: Cascade)
   orderNumber  String
   poNumber     String?
   customerName String
@@ -320,8 +322,12 @@ enum ProductionOverallStatus {
 
 enum ProductionStageStatus {
   NOT_STARTED
+  HOT
   IN_PROGRESS
+  FRAME_DONE
+  THIS_WEEK
   DONE
+  MISSING_LEATHER
   BLOCKED
   NA
 }

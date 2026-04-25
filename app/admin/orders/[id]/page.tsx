@@ -65,6 +65,7 @@ type ProductionLineItem = {
   priority: string;
   currentStatus: string;
   lineNotes: string | null;
+  completedPhotoUrl: string | null;
 
   millFirstStatus: string;
   leatherOrderedStatus: string;
@@ -78,6 +79,7 @@ type ProductionLineItem = {
   finalAssemblyStatus: string;
   qcStatus: string;
 
+  leaCutAssignedTo: string | null;
   upholsteryAssignedTo: string | null;
   upholsteredAssignedTo: string | null;
   finalAssemblyAssignedTo: string | null;
@@ -227,17 +229,23 @@ export default async function AdminOrderDetailPage({ params }: PageProps) {
             <div>
               <p className="text-xs uppercase tracking-[0.14em]">Due Date</p>
               <p className="mt-1 text-slate-700">
-                {order.dueDate ? new Date(order.dueDate).toLocaleDateString() : "—"}
+                {order.dueDate
+                  ? new Date(order.dueDate).toLocaleDateString()
+                  : "—"}
               </p>
             </div>
             <div>
               <p className="text-xs uppercase tracking-[0.14em]">Picked Up</p>
               <p className="mt-1 text-slate-700">
-                {order.pickedUpAt ? new Date(order.pickedUpAt).toLocaleDateString() : "—"}
+                {order.pickedUpAt
+                  ? new Date(order.pickedUpAt).toLocaleDateString()
+                  : "—"}
               </p>
             </div>
             <div>
-              <p className="text-xs uppercase tracking-[0.14em]">Production Lines</p>
+              <p className="text-xs uppercase tracking-[0.14em]">
+                Production Lines
+              </p>
               <p className="mt-1 text-slate-700">{typedProductionLines.length}</p>
             </div>
           </div>
@@ -302,6 +310,49 @@ export default async function AdminOrderDetailPage({ params }: PageProps) {
                       }}
                     />
                   ))}
+                </div>
+              )}
+            </div>
+
+            <div className="rounded-2xl border bg-white p-6 shadow-sm">
+              <div className="mb-4 flex items-end justify-between gap-4">
+                <div>
+                  <h2 className="text-2xl font-semibold">
+                    Completed Furniture Photos
+                  </h2>
+                  <p className="mt-2 text-sm text-slate-500">
+                    Quick visual inventory of finished production lines.
+                  </p>
+                </div>
+              </div>
+
+              {typedProductionLines.filter((line) => line.completedPhotoUrl).length ===
+              0 ? (
+                <p className="text-sm text-slate-500">
+                  No completed furniture photos uploaded yet.
+                </p>
+              ) : (
+                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                  {typedProductionLines
+                    .filter((line) => line.completedPhotoUrl)
+                    .map((line) => (
+                      <div
+                        key={`${line.id}-photo`}
+                        className="rounded-2xl border bg-slate-50 p-4"
+                      >
+                        <img
+                          src={line.completedPhotoUrl || ""}
+                          alt={`${line.partNumber} completed`}
+                          className="h-52 w-full rounded-xl object-cover"
+                        />
+                        <p className="mt-3 font-semibold">
+                          {line.partNumber} / {line.frameNeeded}
+                        </p>
+                        <p className="mt-1 text-sm text-slate-500">
+                          Qty {line.quantity}
+                        </p>
+                      </div>
+                    ))}
                 </div>
               )}
             </div>

@@ -3,8 +3,6 @@ import { Prisma } from "@prisma/client";
 import { auth } from "../../../../auth";
 import { prisma } from "../../../../lib/prisma";
 import { sendOrderNotification } from "../../../../lib/email";
-import { appendQuantityLedgerRows } from "../../../../lib/sheets";
-
 
 type RouteContext = {
   params: Promise<{
@@ -81,10 +79,11 @@ function sanitizeQuantity(value: number | null | undefined) {
   return Math.max(1, Math.round(parsed));
 }
 
-function normalizePriority(value: unknown, fallback: OrderPriority): OrderPriority {
-  const raw = String(value || "")
-    .trim()
-    .toUpperCase();
+function normalizePriority(
+  value: unknown,
+  fallback: OrderPriority
+): OrderPriority {
+  const raw = String(value || "").trim().toUpperCase();
 
   if (ORDER_PRIORITIES.has(raw as OrderPriority)) {
     return raw as OrderPriority;
@@ -377,14 +376,17 @@ export async function PUT(request: Request, context: RouteContext) {
     }
 
     const quantity = sanitizeQuantity(
-      Number(body.quantity ?? body.orderQuantity ?? body.selections?.[0]?.quantity ?? order.quantity ?? 1)
+      Number(
+        body.quantity ??
+          body.orderQuantity ??
+          body.selections?.[0]?.quantity ??
+          order.quantity ??
+          1
+      )
     );
     const priority = normalizePriority(body.priority, order.priority as OrderPriority);
     const dueDateInput = parseOptionalDate(body.dueDate);
-    const dueDate =
-      dueDateInput.raw === ""
-        ? order.dueDate
-        : dueDateInput.date;
+    const dueDate = dueDateInput.raw === "" ? order.dueDate : dueDateInput.date;
 
     if (dueDateInput.raw && !dueDateInput.date) {
       return NextResponse.json(
@@ -503,7 +505,7 @@ export async function PUT(request: Request, context: RouteContext) {
         qtyChange: number;
       }> = [];
 
-    const tx: Prisma.PrismaPromise<unknown>[] = [];
+      const tx: Prisma.PrismaPromise<unknown>[] = [];
 
       for (const previousLine of order.productionLines) {
         const key = `${previousLine.partNumber}|||${previousLine.frameNeeded}`;
@@ -592,47 +594,6 @@ export async function PUT(request: Request, context: RouteContext) {
 
       if (tx.length > 0) {
         await prisma.$transaction(tx);
-      }
-
-      if (ledgerChanges.length > 0) {
-        try {
-          await appendQuantityLedgerRows({
-            orderNumber: updatedOrder.orderNumber,
-            poNumber,
-            customerName,
-            reason: "ORDER_EDITED",
-            source: "website-edit",
-            parts: ledgerChanges,
-          });
-
-          await prisma.sheetSyncLog.create({
-            data: {
-              orderId: id,
-              spreadsheetId: process.env.GOOGLE_SHEETS_SPREADSHEET_ID || null,
-              worksheetName:
-                process.env.GOOGLE_SHEETS_QUANTITY_LEDGER_TAB_NAME ||
-                "Quantity Ledger",
-              spreadsheetRowId: "APPENDED",
-              status: "SYNCED",
-            },
-          });
-        } catch (error) {
-          console.error("UPDATE QUANTITY LEDGER SHEETS ERROR:", error);
-
-          await prisma.sheetSyncLog.create({
-            data: {
-              orderId: id,
-              spreadsheetId: process.env.GOOGLE_SHEETS_SPREADSHEET_ID || null,
-              worksheetName:
-                process.env.GOOGLE_SHEETS_QUANTITY_LEDGER_TAB_NAME ||
-                "Quantity Ledger",
-              spreadsheetRowId: "APPEND_FAILED",
-              status: "FAILED",
-              errorMessage:
-                error instanceof Error ? error.message : "Unknown sheets error",
-            },
-          });
-        }
       }
     }
 
