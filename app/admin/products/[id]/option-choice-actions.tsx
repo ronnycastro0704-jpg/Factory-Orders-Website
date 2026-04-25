@@ -8,15 +8,16 @@ type Choice = {
   label: string;
   value: string | null;
   description: string | null;
+  frameNeededCode: string | null;
+  isBodyLeather: boolean;
   imageUrl: string | null;
   priceDelta: number;
+  leatherInventoryUsage: number | null;
   usesLeatherGrades: boolean;
   appliesLeatherSurcharge: boolean;
   allowsLaseredBrand: boolean;
   isBinaryOption: boolean;
   isQuickPick: boolean;
-  isBodyLeather: boolean;
-  frameNeededCode: string | null;
   gradeAUpcharge: number | null;
   gradeBUpcharge: number | null;
   gradeEMBUpcharge: number | null;
@@ -61,6 +62,11 @@ export default function OptionChoiceActions({ groupId, choice }: Props) {
   const [isBinaryOption, setIsBinaryOption] = useState(choice.isBinaryOption);
   const [isQuickPick, setIsQuickPick] = useState(choice.isQuickPick);
   const [isBodyLeather, setIsBodyLeather] = useState(choice.isBodyLeather);
+  const [leatherInventoryUsage, setLeatherInventoryUsage] = useState(
+    choice.leatherInventoryUsage === null
+      ? ""
+      : String(choice.leatherInventoryUsage)
+  );
   const [active, setActive] = useState(choice.active);
 
   const [gradeAUpcharge, setGradeAUpcharge] = useState(
@@ -142,6 +148,7 @@ export default function OptionChoiceActions({ groupId, choice }: Props) {
             isBinaryOption,
             isQuickPick,
             isBodyLeather,
+            leatherInventoryUsage,
             active,
             gradeAUpcharge: usesLeatherGrades ? gradeAUpcharge : "",
             gradeBUpcharge: usesLeatherGrades ? gradeBUpcharge : "",
@@ -259,7 +266,6 @@ export default function OptionChoiceActions({ groupId, choice }: Props) {
           className="w-full rounded-lg border px-3 py-2"
           value={frameNeededCode}
           onChange={(e) => setFrameNeededCode(e.target.value)}
-          placeholder="100002"
         />
       </div>
 
@@ -330,6 +336,7 @@ export default function OptionChoiceActions({ groupId, choice }: Props) {
 
             if (!checked) {
               setIsBodyLeather(false);
+              setLeatherInventoryUsage("");
             }
           }}
         />
@@ -355,6 +362,20 @@ export default function OptionChoiceActions({ groupId, choice }: Props) {
             />
             Body Leather
           </label>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium">
+              Leather Usage Units
+            </label>
+            <input
+              type="number"
+              step="0.01"
+              className="w-full rounded-lg border px-3 py-2"
+              value={leatherInventoryUsage}
+              onChange={(e) => setLeatherInventoryUsage(e.target.value)}
+              placeholder="Example: 1.5"
+            />
+          </div>
         </>
       ) : null}
 
@@ -491,6 +512,11 @@ export default function OptionChoiceActions({ groupId, choice }: Props) {
             setIsBinaryOption(choice.isBinaryOption);
             setIsQuickPick(choice.isQuickPick);
             setIsBodyLeather(choice.isBodyLeather);
+            setLeatherInventoryUsage(
+              choice.leatherInventoryUsage === null
+                ? ""
+                : String(choice.leatherInventoryUsage)
+            );
             setActive(choice.active);
             setGradeAUpcharge(
               choice.gradeAUpcharge === null ? "" : String(choice.gradeAUpcharge)

@@ -11,7 +11,6 @@ type RouteContext = {
 export async function PUT(request: Request, context: RouteContext) {
   try {
     const { groupId, choiceId } = await context.params;
-    const body = await request.json();
 
     const existingChoice = await prisma.optionChoice.findUnique({
       where: { id: choiceId },
@@ -27,6 +26,8 @@ export async function PUT(request: Request, context: RouteContext) {
         { status: 404 }
       );
     }
+
+    const body = await request.json();
 
     const label = String(body.label || "").trim();
     const value = String(body.value || "").trim();
@@ -46,6 +47,13 @@ export async function PUT(request: Request, context: RouteContext) {
     const isQuickPick = Boolean(body.isQuickPick);
     const isBodyLeather = Boolean(body.isBodyLeather);
     const active = typeof body.active === "boolean" ? body.active : true;
+
+    const leatherInventoryUsage =
+      body.leatherInventoryUsage === "" ||
+      body.leatherInventoryUsage === null ||
+      body.leatherInventoryUsage === undefined
+        ? null
+        : Number(body.leatherInventoryUsage);
 
     const gradeAUpcharge =
       body.gradeAUpcharge === "" ||
@@ -103,6 +111,23 @@ export async function PUT(request: Request, context: RouteContext) {
       );
     }
 
+    if (!Number.isFinite(priceDelta)) {
+      return NextResponse.json(
+        { error: "Base price delta must be a valid number." },
+        { status: 400 }
+      );
+    }
+
+    if (
+      leatherInventoryUsage !== null &&
+      (!Number.isFinite(leatherInventoryUsage) || leatherInventoryUsage < 0)
+    ) {
+      return NextResponse.json(
+        { error: "Leather usage must be 0 or greater." },
+        { status: 400 }
+      );
+    }
+
     const updatedChoice = await prisma.optionChoice.update({
       where: { id: choiceId },
       data: {
@@ -119,6 +144,10 @@ export async function PUT(request: Request, context: RouteContext) {
         isBinaryOption,
         isQuickPick,
         isBodyLeather: usesLeatherGrades ? isBodyLeather : false,
+        leatherInventoryUsage:
+          usesLeatherGrades && leatherInventoryUsage !== null
+            ? leatherInventoryUsage
+            : null,
         active,
         gradeAUpcharge: usesLeatherGrades ? gradeAUpcharge : null,
         gradeBUpcharge: usesLeatherGrades ? gradeBUpcharge : null,

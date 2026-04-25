@@ -25,6 +25,7 @@ type OptionChoiceItem = {
   isQuickPick: boolean;
   isBodyLeather: boolean;
   frameNeededCode: string | null;
+  leatherInventoryUsage: unknown | null;
   gradeAUpcharge: unknown | null;
   gradeBUpcharge: unknown | null;
   gradeEMBUpcharge: unknown | null;
@@ -266,6 +267,13 @@ export default async function AdminProductDetailPage({ params }: PageProps) {
                                         Body Leather:{" "}
                                         {choice.isBodyLeather ? "Yes" : "No"}
                                       </p>
+
+                                      <p className="mt-1 text-sm font-medium text-slate-700">
+                                        Leather Usage Units:{" "}
+                                        {choice.leatherInventoryUsage === null
+                                          ? "0.00"
+                                          : money(choice.leatherInventoryUsage)}
+                                      </p>
                                     </>
                                   ) : null}
 
@@ -295,6 +303,10 @@ export default async function AdminProductDetailPage({ params }: PageProps) {
                                       isQuickPick: choice.isQuickPick,
                                       isBodyLeather: choice.isBodyLeather,
                                       frameNeededCode: choice.frameNeededCode,
+                                      leatherInventoryUsage:
+                                        choice.leatherInventoryUsage === null
+                                          ? null
+                                          : Number(choice.leatherInventoryUsage),
                                       gradeAUpcharge:
                                         choice.gradeAUpcharge === null
                                           ? null

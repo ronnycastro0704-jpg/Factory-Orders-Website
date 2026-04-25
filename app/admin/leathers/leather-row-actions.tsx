@@ -9,6 +9,7 @@ type Props = {
     name: string;
     grade: string;
     imageUrl: string | null;
+    inventoryUnits: number;
     active?: boolean;
   };
 };
@@ -30,6 +31,9 @@ export default function LeatherRowActions({ leather }: Props) {
   const [name, setName] = useState(leather.name);
   const [grade, setGrade] = useState(leather.grade);
   const [imageUrl, setImageUrl] = useState(leather.imageUrl || "");
+  const [inventoryUnits, setInventoryUnits] = useState(
+    String(leather.inventoryUnits)
+  );
   const [active, setActive] = useState(leather.active ?? true);
 
   const [loading, setLoading] = useState(false);
@@ -49,6 +53,7 @@ export default function LeatherRowActions({ leather }: Props) {
           name,
           grade,
           imageUrl,
+          inventoryUnits: Number(inventoryUnits),
           active,
         }),
       });
@@ -161,6 +166,17 @@ export default function LeatherRowActions({ leather }: Props) {
         />
       </div>
 
+      <div>
+        <label className="mb-1 block text-sm font-medium">Inventory Units</label>
+        <input
+          type="number"
+          step="0.01"
+          className="w-full rounded-lg border px-3 py-2"
+          value={inventoryUnits}
+          onChange={(e) => setInventoryUnits(e.target.value)}
+        />
+      </div>
+
       <label className="flex items-center gap-2 text-sm">
         <input
           type="checkbox"
@@ -189,6 +205,7 @@ export default function LeatherRowActions({ leather }: Props) {
             setName(leather.name);
             setGrade(leather.grade);
             setImageUrl(leather.imageUrl || "");
+            setInventoryUnits(String(leather.inventoryUnits));
             setActive(leather.active ?? true);
           }}
           className="rounded-lg border px-3 py-2 text-sm hover:bg-slate-100"

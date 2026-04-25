@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { prisma } from "../../../../../lib/prisma";
 import { sendOrderNotification } from "../../../../../lib/email";
 import { appendOrderRow } from "../../../../../lib/sheets";
@@ -13,9 +14,11 @@ type SelectionSnapshot = {
   optionGroupNameSnapshot: string;
   optionChoiceNameSnapshot: string;
   priceDeltaSnapshot: unknown;
+  leatherInventoryUsageSnapshot: unknown;
 };
 
 type ItemWithSelections = {
+  productId: string;
   productNameSnapshot: string;
   selections: SelectionSnapshot[];
 };
@@ -46,6 +49,7 @@ type RevisionSelection = {
   quantity?: number | null;
   frameNeededCode?: string | null;
   isBodyLeather?: boolean;
+  leatherInventoryUsage?: number | null;
 };
 
 type EnrichedSelection = {
@@ -64,6 +68,7 @@ type EnrichedSelection = {
   quantity: number;
   frameNeededCode?: string | null;
   isBodyLeather?: boolean;
+  leatherInventoryUsage: number;
 };
 
 type OrderPriority = "NORMAL" | "RUSH" | "HOLD";
@@ -78,6 +83,11 @@ type ProductionLineSeed = {
   bodyLeather: string | null;
   dueDate: Date | null;
   priority: OrderPriority;
+};
+
+type LeatherInventoryDelta = {
+  leatherName: string;
+  units: number;
 };
 
 const SELECTION_META_SEPARATOR = "|||";
@@ -106,6 +116,112 @@ function sanitizeQuantity(value: number | null | undefined) {
   }
 
   return Math.max(1, Math.round(parsed));
+}
+
+function roundToTwo(value: number) {
+  return Math.round((value + Number.EPSILON) * 100) / 100;
+}
+
+async function resolveLeatherUsageForSelections(
+  productId: string,
+  selections: EnrichedSelection[]
+) {
+  const groups = await prisma.optionGroup.findMany({
+    where: { productId },
+    select: {
+      name: true,
+      choices: {
+        select: {
+          label: true,
+          leatherInventoryUsage: true,
+        },
+      },
+    },
+  });
+
+  const usageMap = new Map<string, number>();
+
+  for (const group of groups) {
+    for (const choice of group.choices) {
+      usageMap.set(
+        `${group.name}|||${choice.label}`,
+        Number(choice.leatherInventoryUsage || 0)
+      );
+    }
+  }
+
+  return selections.map((selection) => ({
+    ...selection,
+    leatherInventoryUsage:
+      selection.leatherInventoryUsage > 0
+        ? selection.leatherInventoryUsage
+        : Number(
+            usageMap.get(`${selection.groupName}|||${selection.choiceLabel}`) || 0
+          ),
+  }));
+}
+
+function buildLeatherInventoryDeltas(
+  selections: EnrichedSelection[],
+  orderQuantity: number
+): LeatherInventoryDelta[] {
+  const grouped = new Map<string, number>();
+
+  for (const selection of selections) {
+    const leatherName = String(selection.leatherName || "").trim();
+    const usage = Number(selection.leatherInventoryUsage || 0);
+
+    if (!leatherName || usage <= 0) {
+      continue;
+    }
+
+    grouped.set(
+      leatherName,
+      roundToTwo((grouped.get(leatherName) || 0) + usage * orderQuantity)
+    );
+  }
+
+  return Array.from(grouped.entries()).map(([leatherName, units]) => ({
+    leatherName,
+    units,
+  }));
+}
+
+async function applyLeatherInventoryDeltas(
+  tx: Prisma.TransactionClient,
+  deltas: LeatherInventoryDelta[]
+) {
+  if (deltas.length === 0) {
+    return;
+  }
+
+  const leathers = await tx.leather.findMany({
+    select: {
+      id: true,
+      name: true,
+    },
+  });
+
+  const leatherMap = new Map(
+    leathers.map((leather) => [leather.name.trim().toLowerCase(), leather])
+  );
+
+  for (const delta of deltas) {
+    const leather = leatherMap.get(delta.leatherName.trim().toLowerCase());
+
+    if (!leather || !delta.units) {
+      continue;
+    }
+
+    await tx.leather.update({
+      where: { id: leather.id },
+      data: {
+        inventoryUnits: {
+          decrement: delta.units,
+        },
+      },
+    });
+  }
 }
 
 function extractRevisionData(revisions: RevisionRecord[]) {
@@ -180,6 +296,7 @@ function extractRevisionData(revisions: RevisionRecord[]) {
           quantity?: unknown;
           frameNeededCode?: unknown;
           isBodyLeather?: unknown;
+          leatherInventoryUsage?: unknown;
         };
 
         if (
@@ -231,6 +348,7 @@ function extractRevisionData(revisions: RevisionRecord[]) {
               ? selection.frameNeededCode
               : null,
           isBodyLeather: Boolean(selection.isBodyLeather),
+          leatherInventoryUsage: Number(selection.leatherInventoryUsage || 0),
         } satisfies RevisionSelection;
       })
       .filter(Boolean) as RevisionSelection[];
@@ -371,6 +489,11 @@ function buildSelectionsFromItem(
       quantity: orderQuantity,
       frameNeededCode: revisionMatch?.frameNeededCode || null,
       isBodyLeather: Boolean(revisionMatch?.isBodyLeather),
+      leatherInventoryUsage: Number(
+        revisionMatch?.leatherInventoryUsage ||
+          baseSelection.leatherInventoryUsageSnapshot ||
+          0
+      ),
     };
   });
 }
@@ -498,14 +621,13 @@ export async function POST(request: Request, context: RouteContext) {
     const { quantity, selections: revisionSelections, lineItems } =
       extractRevisionData(order.revisions as RevisionRecord[]);
 
-    const selections = buildSelectionsFromItem(
-      item,
-      revisionSelections,
-      quantity
+    let enrichedSelections = await resolveLeatherUsageForSelections(
+      item.productId,
+      buildSelectionsFromItem(item, revisionSelections, quantity)
     );
 
-    const enrichedSelections: EnrichedSelection[] = await Promise.all(
-      selections.map(async (selection: EnrichedSelection) => {
+    enrichedSelections = await Promise.all(
+      enrichedSelections.map(async (selection: EnrichedSelection) => {
         let leatherImageUrl = selection.leatherImageUrl || null;
 
         if (selection.leatherName && !leatherImageUrl) {
@@ -584,31 +706,39 @@ export async function POST(request: Request, context: RouteContext) {
       order.dueDate,
       order.priority as OrderPriority
     );
+    const leatherInventoryDeltas = buildLeatherInventoryDeltas(
+      enrichedSelections,
+      quantity
+    );
 
     if (action === "sent_to_factory" && order.status !== "SENT_TO_FACTORY") {
-      if (productionLines.length > 0) {
-        await prisma.productionLine.createMany({
-          data: productionLines.map((line) => ({
-            orderId: id,
-            ...line,
-          })),
-          skipDuplicates: true,
-        });
+      await prisma.$transaction(async (tx) => {
+        if (productionLines.length > 0) {
+          await tx.productionLine.createMany({
+            data: productionLines.map((line) => ({
+              orderId: id,
+              ...line,
+            })),
+            skipDuplicates: true,
+          });
 
-        await prisma.quantityLedger.createMany({
-          data: productionLines.map((line) => ({
-            orderId: id,
-            orderNumber: order.orderNumber,
-            poNumber: order.poNumber || null,
-            customerName: order.customerName,
-            partNumber: line.partNumber,
-            frameNeeded: line.frameNeeded,
-            qtyChange: line.quantity,
-            reason: "ORDER_SENT_TO_FACTORY",
-            source: "admin-factory-action",
-          })),
-        });
-      }
+          await tx.quantityLedger.createMany({
+            data: productionLines.map((line) => ({
+              orderId: id,
+              orderNumber: order.orderNumber,
+              poNumber: order.poNumber || null,
+              customerName: order.customerName,
+              partNumber: line.partNumber,
+              frameNeeded: line.frameNeeded,
+              qtyChange: line.quantity,
+              reason: "ORDER_SENT_TO_FACTORY",
+              source: "admin-factory-action",
+            })),
+          });
+        }
+
+        await applyLeatherInventoryDeltas(tx, leatherInventoryDeltas);
+      });
     }
 
     if (action === "completed") {

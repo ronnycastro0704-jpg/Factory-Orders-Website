@@ -30,6 +30,13 @@ export async function POST(request: Request, context: RouteContext) {
     const isQuickPick = Boolean(body.isQuickPick);
     const isBodyLeather = Boolean(body.isBodyLeather);
 
+    const leatherInventoryUsage =
+      body.leatherInventoryUsage === "" ||
+      body.leatherInventoryUsage === null ||
+      body.leatherInventoryUsage === undefined
+        ? null
+        : Number(body.leatherInventoryUsage);
+
     const gradeAUpcharge =
       body.gradeAUpcharge === "" ||
       body.gradeAUpcharge === null ||
@@ -86,6 +93,23 @@ export async function POST(request: Request, context: RouteContext) {
       );
     }
 
+    if (!Number.isFinite(priceDelta)) {
+      return NextResponse.json(
+        { error: "Base price delta must be a valid number." },
+        { status: 400 }
+      );
+    }
+
+    if (
+      leatherInventoryUsage !== null &&
+      (!Number.isFinite(leatherInventoryUsage) || leatherInventoryUsage < 0)
+    ) {
+      return NextResponse.json(
+        { error: "Leather usage must be 0 or greater." },
+        { status: 400 }
+      );
+    }
+
     const choice = await prisma.optionChoice.create({
       data: {
         optionGroupId: groupId,
@@ -102,6 +126,10 @@ export async function POST(request: Request, context: RouteContext) {
         isBinaryOption,
         isQuickPick,
         isBodyLeather: usesLeatherGrades ? isBodyLeather : false,
+        leatherInventoryUsage:
+          usesLeatherGrades && leatherInventoryUsage !== null
+            ? leatherInventoryUsage
+            : null,
         gradeAUpcharge: usesLeatherGrades ? gradeAUpcharge : null,
         gradeBUpcharge: usesLeatherGrades ? gradeBUpcharge : null,
         gradeEMBUpcharge: usesLeatherGrades ? gradeEMBUpcharge : null,

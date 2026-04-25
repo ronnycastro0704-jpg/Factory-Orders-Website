@@ -61,6 +61,7 @@ model OptionChoice {
   isBodyLeather           Boolean     @default(false)
   imageUrl                String?
   priceDelta              Decimal     @default(0) @db.Decimal(10, 2)
+  leatherInventoryUsage   Decimal?    @db.Decimal(10, 2)
 
   usesLeatherGrades       Boolean     @default(false)
   isQuickPick             Boolean     @default(false)
@@ -135,13 +136,14 @@ model OrderItem {
 }
 
 model OrderItemSelection {
-  id                       String    @id @default(cuid())
-  orderItemId              String
-  orderItem                OrderItem @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
-  optionGroupNameSnapshot  String
-  optionChoiceNameSnapshot String
-  priceDeltaSnapshot       Decimal   @default(0) @db.Decimal(10, 2)
-  createdAt                DateTime  @default(now())
+  id                            String    @id @default(cuid())
+  orderItemId                   String
+  orderItem                     OrderItem @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+  optionGroupNameSnapshot       String
+  optionChoiceNameSnapshot      String
+  priceDeltaSnapshot            Decimal   @default(0) @db.Decimal(10, 2)
+  leatherInventoryUsageSnapshot Decimal?  @db.Decimal(10, 2)
+  createdAt                     DateTime  @default(now())
 
   @@index([orderItemId])
 }
@@ -265,14 +267,15 @@ model QuantityLedger {
 }
 
 model Leather {
-  id        String   @id @default(cuid())
-  name      String
-  slug      String   @unique
-  grade     String
-  imageUrl  String?
-  active    Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id             String   @id @default(cuid())
+  name           String
+  slug           String   @unique
+  grade          String
+  imageUrl       String?
+  inventoryUnits Decimal  @default(0) @db.Decimal(10, 2)
+  active         Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 }
 
 enum UserRole {

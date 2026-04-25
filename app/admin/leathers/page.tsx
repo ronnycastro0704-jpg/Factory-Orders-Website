@@ -9,8 +9,13 @@ type LeatherRow = {
   slug: string;
   grade: string;
   imageUrl: string | null;
+  inventoryUnits: unknown;
   active: boolean;
 };
+
+function formatInventoryUnits(value: number) {
+  return `${value.toFixed(2)} units`;
+}
 
 export default async function AdminLeathersPage() {
   const leathers = (await prisma.leather.findMany({
@@ -19,6 +24,10 @@ export default async function AdminLeathersPage() {
 
   const activeCount = leathers.filter((leather) => leather.active).length;
   const inactiveCount = leathers.length - activeCount;
+  const totalInventoryUnits = leathers.reduce(
+    (sum, leather) => sum + Number(leather.inventoryUnits || 0),
+    0
+  );
 
   const gradeCounts = leathers.reduce<Record<string, number>>((acc, leather) => {
     acc[leather.grade] = (acc[leather.grade] || 0) + 1;
@@ -43,8 +52,8 @@ export default async function AdminLeathersPage() {
                 Manage your leather library
               </h1>
               <p className="mt-4 max-w-2xl text-base sm:text-lg text-slate-600">
-                Keep leather names, grades, and reference images clean so customers
-                and factory workers can identify materials more easily.
+                Keep leather names, grades, images, and live inventory in one place
+                so your client can see what is available before production.
               </p>
             </div>
 
@@ -65,7 +74,7 @@ export default async function AdminLeathersPage() {
           </div>
         </section>
 
-        <section className="grid gap-6 md:grid-cols-3">
+        <section className="grid gap-6 md:grid-cols-4">
           <div className="section-card-strong">
             <p className="text-xs uppercase tracking-[0.16em] text-slate-500">
               Total Leathers
@@ -86,13 +95,22 @@ export default async function AdminLeathersPage() {
             </p>
             <p className="mt-3 text-4xl font-bold">{inactiveCount}</p>
           </div>
+
+          <div className="section-card-strong">
+            <p className="text-xs uppercase tracking-[0.16em] text-slate-500">
+              Total Inventory
+            </p>
+            <p className="mt-3 text-4xl font-bold">
+              {totalInventoryUnits.toFixed(2)}
+            </p>
+          </div>
         </section>
 
         <div className="mt-8 grid gap-8 lg:grid-cols-[420px_1fr]">
           <section className="section-card-strong">
             <h2 className="text-2xl font-semibold">Add Leather</h2>
             <p className="mt-2 text-sm text-slate-500">
-              Create leather entries with a grade and an image for visual clarity.
+              Create leather entries with a grade, image, and starting inventory.
             </p>
 
             <div className="mt-6">
@@ -125,59 +143,91 @@ export default async function AdminLeathersPage() {
               </div>
             ) : (
               <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
-                {leathers.map((leather: LeatherRow) => (
-                  <div key={leather.id} className="premium-grid-card">
-                    <div className="image-frame">
-                      {leather.imageUrl ? (
-                        <div className="flex h-56 items-center justify-center overflow-hidden rounded-xl bg-white p-3">
-                          <img
-                            src={leather.imageUrl}
-                            alt={leather.name}
-                            className="h-full w-full object-contain"
-                          />
-                        </div>
-                      ) : (
-                        <div className="flex h-56 items-center justify-center rounded-xl bg-slate-100 text-sm text-slate-400">
-                          No Image
-                        </div>
-                      )}
-                    </div>
+                {leathers.map((leather: LeatherRow) => {
+                  const inventoryUnits = Number(leather.inventoryUnits || 0);
 
-                    <div className="mt-5">
-                      <div className="flex flex-wrap items-start justify-between gap-3">
-                        <div>
-                          <h3 className="text-xl font-semibold">{leather.name}</h3>
-                          <p className="mt-1 text-sm text-slate-500">
-                            Slug: {leather.slug}
-                          </p>
-                        </div>
-
-                        <span className="status-pill">
-                          {leather.active ? "Active" : "Inactive"}
-                        </span>
+                  return (
+                    <div key={leather.id} className="premium-grid-card">
+                      <div className="image-frame">
+                        {leather.imageUrl ? (
+                          <div className="flex h-56 items-center justify-center overflow-hidden rounded-xl bg-white p-3">
+                            <img
+                              src={leather.imageUrl}
+                              alt={leather.name}
+                              className="h-full w-full object-contain"
+                            />
+                          </div>
+                        ) : (
+                          <div className="flex h-56 items-center justify-center rounded-xl bg-slate-100 text-sm text-slate-400">
+                            No Image
+                          </div>
+                        )}
                       </div>
 
-                      <div className="mt-4 soft-panel">
-                        <p className="text-xs uppercase tracking-[0.16em] text-slate-500">
-                          Grade
-                        </p>
-                        <p className="mt-2 text-lg font-bold text-slate-900">
-                          {leather.grade}
-                        </p>
-                      </div>
+                      <div className="mt-5">
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div>
+                            <h3 className="text-xl font-semibold">{leather.name}</h3>
+                            <p className="mt-1 text-sm text-slate-500">
+                              Slug: {leather.slug}
+                            </p>
+                          </div>
 
-                      <LeatherRowActions
-                        leather={{
-                          id: leather.id,
-                          name: leather.name,
-                          grade: leather.grade,
-                          imageUrl: leather.imageUrl,
-                          active: leather.active,
-                        }}
-                      />
+                          <span className="status-pill">
+                            {leather.active ? "Active" : "Inactive"}
+                          </span>
+                        </div>
+
+                        <div className="mt-4 grid gap-3">
+                          <div className="soft-panel">
+                            <p className="text-xs uppercase tracking-[0.16em] text-slate-500">
+                              Grade
+                            </p>
+                            <p className="mt-2 text-lg font-bold text-slate-900">
+                              {leather.grade}
+                            </p>
+                          </div>
+
+                          <div
+                            className={`soft-panel ${
+                              inventoryUnits < 0
+                                ? "border-red-200 bg-red-50"
+                                : inventoryUnits === 0
+                                ? "border-amber-200 bg-amber-50"
+                                : ""
+                            }`}
+                          >
+                            <p className="text-xs uppercase tracking-[0.16em] text-slate-500">
+                              Inventory
+                            </p>
+                            <p
+                              className={`mt-2 text-lg font-bold ${
+                                inventoryUnits < 0
+                                  ? "text-red-700"
+                                  : inventoryUnits === 0
+                                  ? "text-amber-700"
+                                  : "text-slate-900"
+                              }`}
+                            >
+                              {formatInventoryUnits(inventoryUnits)}
+                            </p>
+                          </div>
+                        </div>
+
+                        <LeatherRowActions
+                          leather={{
+                            id: leather.id,
+                            name: leather.name,
+                            grade: leather.grade,
+                            imageUrl: leather.imageUrl,
+                            inventoryUnits,
+                            active: leather.active,
+                          }}
+                        />
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </section>

@@ -25,6 +25,7 @@ export default function CreateOptionChoiceForm({ groupId }: Props) {
   const [isBinaryOption, setIsBinaryOption] = useState(false);
   const [isQuickPick, setIsQuickPick] = useState(false);
   const [isBodyLeather, setIsBodyLeather] = useState(false);
+  const [leatherInventoryUsage, setLeatherInventoryUsage] = useState("");
 
   const [gradeAUpcharge, setGradeAUpcharge] = useState("");
   const [gradeBUpcharge, setGradeBUpcharge] = useState("");
@@ -90,6 +91,7 @@ export default function CreateOptionChoiceForm({ groupId }: Props) {
           isBinaryOption,
           isQuickPick,
           isBodyLeather,
+          leatherInventoryUsage,
           gradeAUpcharge,
           gradeBUpcharge,
           gradeEMBUpcharge,
@@ -123,6 +125,7 @@ export default function CreateOptionChoiceForm({ groupId }: Props) {
       setIsBinaryOption(false);
       setIsQuickPick(false);
       setIsBodyLeather(false);
+      setLeatherInventoryUsage("");
       setGradeAUpcharge("");
       setGradeBUpcharge("");
       setGradeEMBUpcharge("");
@@ -239,6 +242,7 @@ export default function CreateOptionChoiceForm({ groupId }: Props) {
 
             if (!checked) {
               setIsBodyLeather(false);
+              setLeatherInventoryUsage("");
             }
           }}
         />
@@ -264,6 +268,24 @@ export default function CreateOptionChoiceForm({ groupId }: Props) {
             />
             Body Leather
           </label>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium">
+              Leather Usage Units
+            </label>
+            <input
+              type="number"
+              step="0.01"
+              className="w-full rounded-lg border px-3 py-2"
+              value={leatherInventoryUsage}
+              onChange={(e) => setLeatherInventoryUsage(e.target.value)}
+              placeholder="Example: 1.5"
+            />
+            <p className="mt-1 text-xs text-slate-500">
+              This amount will be deducted from the selected leather inventory
+              when the order is sent to factory.
+            </p>
+          </div>
         </>
       ) : null}
 

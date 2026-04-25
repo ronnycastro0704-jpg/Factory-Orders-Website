@@ -11,7 +11,10 @@ export async function GET() {
     return NextResponse.json(leathers);
   } catch (error) {
     console.error("GET LEATHERS ERROR:", error);
-    return NextResponse.json({ error: "Failed to load leathers." }, { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to load leathers." },
+      { status: 500 }
+    );
   }
 }
 
@@ -22,13 +25,27 @@ export async function POST(request: Request) {
     const name = String(body.name || "").trim();
     const grade = String(body.grade || "").trim();
     const imageUrl = String(body.imageUrl || "").trim();
+    const inventoryUnits = Number(body.inventoryUnits ?? 0);
 
     if (!name) {
-      return NextResponse.json({ error: "Leather name is required." }, { status: 400 });
+      return NextResponse.json(
+        { error: "Leather name is required." },
+        { status: 400 }
+      );
     }
 
     if (!grade) {
-      return NextResponse.json({ error: "Leather grade is required." }, { status: 400 });
+      return NextResponse.json(
+        { error: "Leather grade is required." },
+        { status: 400 }
+      );
+    }
+
+    if (!Number.isFinite(inventoryUnits)) {
+      return NextResponse.json(
+        { error: "Leather inventory must be a valid number." },
+        { status: 400 }
+      );
     }
 
     const leather = await prisma.leather.create({
@@ -37,6 +54,7 @@ export async function POST(request: Request) {
         slug: slugify(name),
         grade,
         imageUrl: imageUrl || null,
+        inventoryUnits,
         active: true,
       },
     });
@@ -44,6 +62,9 @@ export async function POST(request: Request) {
     return NextResponse.json(leather, { status: 201 });
   } catch (error) {
     console.error("CREATE LEATHER ERROR:", error);
-    return NextResponse.json({ error: "Failed to create leather." }, { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to create leather." },
+      { status: 500 }
+    );
   }
 }

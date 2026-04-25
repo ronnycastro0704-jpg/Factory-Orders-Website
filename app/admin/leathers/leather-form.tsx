@@ -19,6 +19,7 @@ export default function CreateLeatherForm() {
   const [name, setName] = useState("");
   const [grade, setGrade] = useState("Grade A");
   const [imageUrl, setImageUrl] = useState("");
+  const [inventoryUnits, setInventoryUnits] = useState("0");
   const [imageFile, setImageFile] = useState<File | null>(null);
 
   const [loading, setLoading] = useState(false);
@@ -67,6 +68,7 @@ export default function CreateLeatherForm() {
           name,
           grade,
           imageUrl: finalImageUrl,
+          inventoryUnits: Number(inventoryUnits),
         }),
       });
 
@@ -82,11 +84,14 @@ export default function CreateLeatherForm() {
       setName("");
       setGrade("Grade A");
       setImageUrl("");
+      setInventoryUnits("0");
       setImageFile(null);
       router.refresh();
     } catch (error) {
       console.error(error);
-      setError(error instanceof Error ? error.message : "Failed to create leather.");
+      setError(
+        error instanceof Error ? error.message : "Failed to create leather."
+      );
     } finally {
       setLoading(false);
       setUploading(false);
@@ -122,6 +127,20 @@ export default function CreateLeatherForm() {
       </div>
 
       <div>
+        <label className="mb-1 block text-sm font-medium">
+          Inventory Units
+        </label>
+        <input
+          type="number"
+          step="0.01"
+          className="w-full rounded-lg border px-3 py-2"
+          value={inventoryUnits}
+          onChange={(e) => setInventoryUnits(e.target.value)}
+          placeholder="0"
+        />
+      </div>
+
+      <div>
         <label className="mb-1 block text-sm font-medium">Upload Image</label>
         <input
           type="file"
@@ -141,9 +160,13 @@ export default function CreateLeatherForm() {
         />
       </div>
 
-      {uploading ? <p className="text-sm text-slate-500">Uploading image...</p> : null}
+      {uploading ? (
+        <p className="text-sm text-slate-500">Uploading image...</p>
+      ) : null}
       {error ? <p className="text-sm font-medium text-red-600">{error}</p> : null}
-      {success ? <p className="text-sm font-medium text-green-600">{success}</p> : null}
+      {success ? (
+        <p className="text-sm font-medium text-green-600">{success}</p>
+      ) : null}
 
       <button
         type="submit"

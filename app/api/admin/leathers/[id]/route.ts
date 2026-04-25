@@ -24,8 +24,8 @@ export async function PUT(request: Request, context: RouteContext) {
     const name = String(body.name || "").trim();
     const grade = String(body.grade || "").trim();
     const imageUrl = String(body.imageUrl || "").trim();
-    const active =
-      typeof body.active === "boolean" ? body.active : true;
+    const inventoryUnits = Number(body.inventoryUnits ?? 0);
+    const active = typeof body.active === "boolean" ? body.active : true;
 
     if (!name) {
       return NextResponse.json(
@@ -41,6 +41,13 @@ export async function PUT(request: Request, context: RouteContext) {
       );
     }
 
+    if (!Number.isFinite(inventoryUnits)) {
+      return NextResponse.json(
+        { error: "Leather inventory must be a valid number." },
+        { status: 400 }
+      );
+    }
+
     const leather = await prisma.leather.update({
       where: { id },
       data: {
@@ -48,6 +55,7 @@ export async function PUT(request: Request, context: RouteContext) {
         slug: slugify(name),
         grade,
         imageUrl: imageUrl || null,
+        inventoryUnits,
         active,
       },
     });
