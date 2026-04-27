@@ -65,20 +65,21 @@ export default async function SiteHeader() {
               <LogoutButton />
             </>
           ) : (
-            <>
-              <Link
-                href="/login"
-                className="rounded-lg border px-3 py-2 text-sm hover:bg-slate-100"
-              >
-                Log in
-              </Link>
-              <Link
-                href="/signup"
-                className="rounded-lg bg-slate-900 px-3 py-2 text-sm text-white hover:bg-slate-800"
-              >
-                Sign up
-              </Link>
-            </>
+<>
+  <Link
+    href="/signup"
+    className="rounded-lg border px-3 py-2 text-sm hover:bg-slate-100"
+  >
+    Create account
+  </Link>
+
+  <Link
+    href="/login"
+    className="rounded-lg bg-slate-900 px-3 py-2 text-sm text-white hover:bg-slate-800"
+  >
+    Sign in
+  </Link>
+</>
           )}
         </div>
       </div>
