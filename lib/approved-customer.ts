@@ -1,3 +1,5 @@
+import { prisma } from "./prisma";
+
 export type ApprovedCustomer = {
   email: string;
   name: string;
@@ -7,38 +9,44 @@ function normalizeEmail(value: string) {
   return value.trim().toLowerCase();
 }
 
-export const APPROVED_CUSTOMERS: ApprovedCustomer[] = [
-  {
-    email: "ianmejiascastro@gmail.com",
-    name: "Ian",
-  },
-
-  // Add more here:
-  // { email: "ronny@example.com", name: "Ronny" },
-  // { email: "client@example.com", name: "Client Name" },
-];
-
-const approvedCustomerMap = new Map(
-  APPROVED_CUSTOMERS.map((customer) => [
-    normalizeEmail(customer.email),
-    {
-      email: normalizeEmail(customer.email),
-      name: customer.name.trim(),
-    },
-  ])
-);
-
-export function getApprovedCustomerProfile(email?: string | null) {
+export async function getApprovedCustomerProfile(email?: string | null) {
   if (!email) return null;
-  return approvedCustomerMap.get(normalizeEmail(email)) || null;
+
+  const customer = await prisma.approvedCustomer.findFirst({
+    where: {
+      email: normalizeEmail(email),
+      active: true,
+    },
+    select: {
+      email: true,
+      name: true,
+    },
+  });
+
+  if (!customer) return null;
+
+  return {
+    email: normalizeEmail(customer.email),
+    name: customer.name.trim(),
+  };
 }
 
-export function isApprovedCustomerEmail(email?: string | null) {
-  return Boolean(getApprovedCustomerProfile(email));
+export async function isApprovedCustomerEmail(email?: string | null) {
+  return Boolean(await getApprovedCustomerProfile(email));
 }
 
-export function getApprovedCustomerEmails() {
-  return APPROVED_CUSTOMERS.map((customer) =>
-    normalizeEmail(customer.email)
-  );
+export async function getApprovedCustomerEmails() {
+  const customers = await prisma.approvedCustomer.findMany({
+    where: {
+      active: true,
+    },
+    select: {
+      email: true,
+    },
+    orderBy: {
+      email: "asc",
+    },
+  });
+
+  return customers.map((customer) => normalizeEmail(customer.email));
 }

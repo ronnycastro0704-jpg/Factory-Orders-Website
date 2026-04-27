@@ -619,7 +619,7 @@ export async function PUT(request: Request, context: RouteContext) {
       );
     }
 
-    const approvedCustomer = getApprovedCustomerProfile(viewerEmail);
+    const approvedCustomer = await getApprovedCustomerProfile(viewerEmail);
 
     if (isCustomer && !approvedCustomer) {
       return NextResponse.json(

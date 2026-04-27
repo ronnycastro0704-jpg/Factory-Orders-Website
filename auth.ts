@@ -23,9 +23,9 @@ function isAdminEmail(email?: string | null) {
   return getAdminEmails().includes(normalizeEmail(email));
 }
 
-function isEmailAllowed(email?: string | null) {
+async function isEmailAllowed(email?: string | null) {
   if (!email) return false;
-  return isApprovedCustomerEmail(email) || isAdminEmail(email);
+  return (await isApprovedCustomerEmail(email)) || isAdminEmail(email);
 }
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
@@ -58,7 +58,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           return null;
         }
 
-        if (!isEmailAllowed(email)) {
+        if (!(await isEmailAllowed(email))) {
           return null;
         }
 
@@ -87,10 +87,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           return null;
         }
 
-        const approvedCustomer = getApprovedCustomerProfile(email);
+        const approvedCustomer = await getApprovedCustomerProfile(email);
 
-        const userId =
-          typeof rawUser.id === "string" ? rawUser.id : email;
+        const userId = typeof rawUser.id === "string" ? rawUser.id : email;
 
         const userEmail = approvedCustomer?.email
           ? approvedCustomer.email
@@ -114,7 +113,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   ],
   callbacks: {
     async signIn({ user }) {
-      return isEmailAllowed(user.email);
+      return await isEmailAllowed(user.email);
     },
     async jwt({ token, user }) {
       if (user?.email) {

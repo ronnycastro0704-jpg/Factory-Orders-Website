@@ -22,9 +22,9 @@ function isAdminEmail(email?: string | null) {
   return getAdminEmails().includes(normalizeEmail(email));
 }
 
-function isAllowedSignupEmail(email?: string | null) {
+async function isAllowedSignupEmail(email?: string | null) {
   if (!email) return false;
-  return isApprovedCustomerEmail(email) || isAdminEmail(email);
+  return (await isApprovedCustomerEmail(email)) || isAdminEmail(email);
 }
 
 export async function POST(request: Request) {
@@ -39,7 +39,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Email is required." }, { status: 400 });
     }
 
-    if (!isAllowedSignupEmail(email)) {
+    if (!(await isAllowedSignupEmail(email))) {
       return NextResponse.json(
         { error: "This email is not approved to create an account." },
         { status: 403 }
@@ -53,7 +53,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const approvedCustomer = getApprovedCustomerProfile(email);
+    const approvedCustomer = await getApprovedCustomerProfile(email);
     const finalName = approvedCustomer?.name || submittedName;
 
     if (!finalName) {

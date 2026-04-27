@@ -395,7 +395,7 @@ export async function POST(request: Request) {
     const body = await request.json();
 
     const signedInEmail = normalizeEmail(session.user.email);
-    const approvedCustomer = getApprovedCustomerProfile(signedInEmail);
+    const approvedCustomer = await getApprovedCustomerProfile(signedInEmail);
 
     if (!approvedCustomer) {
       return NextResponse.json(

@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { getApprovedCustomerProfile } from "../../../lib/approved-customer";
 import { formatCurrency } from "../../../lib/utils";
 
 type Choice = {
@@ -191,30 +190,46 @@ export default function ProductBuilder({ product, leathers }: Props) {
   const [customerPhone, setCustomerPhone] = useState("");
   const [notes, setNotes] = useState("");
 
-  useEffect(() => {
-    let cancelled = false;
+useEffect(() => {
+  let cancelled = false;
 
-    async function loadApprovedCustomer() {
-      try {
-        const response = await fetch("/api/auth/session");
-        const session = await response.json();
-        const profile = getApprovedCustomerProfile(session?.user?.email);
+  async function loadCurrentCustomer() {
+    try {
+      const response = await fetch("/api/auth/session");
 
-        if (!cancelled && profile) {
-          setCustomerName(profile.name);
-          setCustomerEmail(profile.email);
-        }
-      } catch (error) {
-        console.error("Failed to load approved customer profile:", error);
+      if (!response.ok) {
+        return;
       }
+
+      const session = await response.json();
+
+      const email =
+        typeof session?.user?.email === "string"
+          ? session.user.email
+          : "";
+
+      const name =
+        typeof session?.user?.name === "string"
+          ? session.user.name
+          : email
+          ? email.split("@")[0]
+          : "";
+
+      if (!cancelled) {
+        setCustomerName(name);
+        setCustomerEmail(email);
+      }
+    } catch (error) {
+      console.error("Failed to load current customer:", error);
     }
+  }
 
-    loadApprovedCustomer();
+  loadCurrentCustomer();
 
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  return () => {
+    cancelled = true;
+  };
+}, []);
 
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState("");
