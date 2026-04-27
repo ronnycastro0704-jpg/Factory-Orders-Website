@@ -19,6 +19,7 @@ type OrderRow = {
 
 function formatDate(date: Date) {
   return new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Chicago",
     dateStyle: "medium",
     timeStyle: "short",
   }).format(date);
