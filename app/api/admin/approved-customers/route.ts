@@ -11,35 +11,26 @@ function isValidEmail(value: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
 
-async function requireAdmin() {
+async function getAdminErrorResponse() {
   const session = await auth();
 
   if (!session?.user?.email) {
-    return {
-      allowed: false,
-      response: NextResponse.json({ error: "Unauthorized." }, { status: 401 }),
-    };
+    return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
   }
 
   if (!isAdminEmail(session.user.email)) {
-    return {
-      allowed: false,
-      response: NextResponse.json({ error: "Forbidden." }, { status: 403 }),
-    };
+    return NextResponse.json({ error: "Forbidden." }, { status: 403 });
   }
 
-  return {
-    allowed: true,
-    response: null,
-  };
+  return undefined;
 }
 
 export async function POST(request: Request) {
   try {
-    const adminCheck = await requireAdmin();
+    const adminErrorResponse = await getAdminErrorResponse();
 
-    if (!adminCheck.allowed) {
-      return adminCheck.response;
+    if (adminErrorResponse) {
+      return adminErrorResponse;
     }
 
     const body = await request.json();
