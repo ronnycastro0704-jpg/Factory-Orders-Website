@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { getApprovedCustomerProfile } from "../../../lib/approved-customer";
 import { formatCurrency } from "../../../lib/utils";
 
 type Choice = {
@@ -189,6 +190,31 @@ export default function ProductBuilder({ product, leathers }: Props) {
   const [customerEmail, setCustomerEmail] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
   const [notes, setNotes] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadApprovedCustomer() {
+      try {
+        const response = await fetch("/api/auth/session");
+        const session = await response.json();
+        const profile = getApprovedCustomerProfile(session?.user?.email);
+
+        if (!cancelled && profile) {
+          setCustomerName(profile.name);
+          setCustomerEmail(profile.email);
+        }
+      } catch (error) {
+        console.error("Failed to load approved customer profile:", error);
+      }
+    }
+
+    loadApprovedCustomer();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState("");
@@ -1067,20 +1093,22 @@ export default function ProductBuilder({ product, leathers }: Props) {
             <div>
               <label className="mb-1 block text-sm font-medium">Name</label>
               <input
-                className="w-full rounded-lg border px-3 py-2"
+                className="w-full rounded-lg border bg-gray-100 px-3 py-2 text-gray-700"
                 value={customerName}
-                onChange={(e) => setCustomerName(e.target.value)}
-                placeholder="Customer name"
+                readOnly
+                disabled
+                placeholder="Approved customer name"
               />
             </div>
 
             <div>
               <label className="mb-1 block text-sm font-medium">Email</label>
               <input
-                className="w-full rounded-lg border px-3 py-2"
+                className="w-full rounded-lg border bg-gray-100 px-3 py-2 text-gray-700"
                 value={customerEmail}
-                onChange={(e) => setCustomerEmail(e.target.value)}
-                placeholder="customer@email.com"
+                readOnly
+                disabled
+                placeholder="Approved customer email"
               />
             </div>
 

@@ -2,28 +2,30 @@ import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { compare } from "bcryptjs";
 import { prisma } from "./lib/prisma";
+import {
+  getApprovedCustomerProfile,
+  isApprovedCustomerEmail,
+} from "./lib/approved-customer";
 
 function normalizeEmail(value: string) {
   return value.trim().toLowerCase();
 }
 
-function getAllowedSignInEmails() {
-  return (process.env.ALLOWED_SIGNUP_EMAILS || "")
+function getAdminEmails() {
+  return (process.env.ADMIN_EMAILS || "")
     .split(",")
     .map((value) => normalizeEmail(value))
     .filter(Boolean);
 }
 
+function isAdminEmail(email?: string | null) {
+  if (!email) return false;
+  return getAdminEmails().includes(normalizeEmail(email));
+}
+
 function isEmailAllowed(email?: string | null) {
   if (!email) return false;
-
-  const allowedEmails = getAllowedSignInEmails();
-
-  if (allowedEmails.length === 0) {
-    return true;
-  }
-
-  return allowedEmails.includes(normalizeEmail(email));
+  return isApprovedCustomerEmail(email) || isAdminEmail(email);
 }
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
@@ -85,16 +87,22 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           return null;
         }
 
+        const approvedCustomer = getApprovedCustomerProfile(email);
+
         const userId =
           typeof rawUser.id === "string" ? rawUser.id : email;
 
-        const userEmail =
-          typeof rawUser.email === "string" ? rawUser.email : email;
+        const userEmail = approvedCustomer?.email
+          ? approvedCustomer.email
+          : typeof rawUser.email === "string"
+          ? normalizeEmail(rawUser.email)
+          : email;
 
-        const userName =
-          typeof rawUser.name === "string" && rawUser.name.trim().length > 0
-            ? rawUser.name
-            : userEmail.split("@")[0];
+        const userName = approvedCustomer?.name
+          ? approvedCustomer.name
+          : typeof rawUser.name === "string" && rawUser.name.trim().length > 0
+          ? rawUser.name
+          : userEmail.split("@")[0];
 
         return {
           id: userId,

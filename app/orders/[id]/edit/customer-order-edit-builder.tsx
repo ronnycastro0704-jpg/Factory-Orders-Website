@@ -214,8 +214,8 @@ export default function CustomerOrderEditBuilder({
 
   const [poNumber, setPoNumber] = useState(initialPoNumber);
   const [quantity, setQuantity] = useState(sanitizeQuantity(initialQuantity));
-  const [customerName, setCustomerName] = useState(initialCustomerName);
-  const [customerEmail, setCustomerEmail] = useState(initialCustomerEmail);
+  const [customerName] = useState(initialCustomerName);
+  const [customerEmail] = useState(initialCustomerEmail);
   const [customerPhone, setCustomerPhone] = useState(initialCustomerPhone);
   const [notes, setNotes] = useState(initialNotes);
   const [changeReason, setChangeReason] = useState("");
@@ -518,8 +518,6 @@ export default function CustomerOrderEditBuilder({
         body: JSON.stringify({
           poNumber,
           quantity: sanitizeQuantity(quantity),
-          customerName,
-          customerEmail,
           customerPhone,
           notes,
           changeReason,
@@ -1094,18 +1092,20 @@ export default function CustomerOrderEditBuilder({
             <div>
               <label className="mb-1 block text-sm font-medium">Name</label>
               <input
-                className="w-full rounded-lg border px-3 py-2"
+                className="w-full rounded-lg border bg-gray-100 px-3 py-2 text-gray-700"
                 value={customerName}
-                onChange={(e) => setCustomerName(e.target.value)}
+                readOnly
+                disabled
               />
             </div>
 
             <div>
               <label className="mb-1 block text-sm font-medium">Email</label>
               <input
-                className="w-full rounded-lg border px-3 py-2"
+                className="w-full rounded-lg border bg-gray-100 px-3 py-2 text-gray-700"
                 value={customerEmail}
-                onChange={(e) => setCustomerEmail(e.target.value)}
+                readOnly
+                disabled
               />
             </div>
 

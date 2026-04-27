@@ -3,6 +3,7 @@ import { Prisma } from "@prisma/client";
 import { auth } from "../../../../auth";
 import { prisma } from "../../../../lib/prisma";
 import { sendOrderNotification } from "../../../../lib/email";
+import { getApprovedCustomerProfile } from "../../../../lib/approved-customer";
 
 type RouteContext = {
   params: Promise<{
@@ -69,9 +70,6 @@ function normalizeEmail(value: string) {
   return value.trim().toLowerCase();
 }
 
-function isValidEmail(email: string) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-}
 
 function isAdminEmail(email?: string | null) {
   if (!email) return false;
@@ -562,9 +560,6 @@ export async function PUT(request: Request, context: RouteContext) {
     const body = await request.json();
 
     const poNumber = String(body.poNumber || "").trim() || null;
-    const customerName = String(body.customerName || "").trim();
-    const customerEmailRaw = String(body.customerEmail || "").trim();
-    const customerEmail = normalizeEmail(customerEmailRaw);
     const customerPhone = String(body.customerPhone || "").trim() || null;
     const notes = String(body.notes || "").trim() || null;
     const changeReason = String(body.changeReason || "").trim() || "Order updated";
@@ -580,19 +575,6 @@ export async function PUT(request: Request, context: RouteContext) {
       ? (body.lineItems as IncomingLineItem[])
       : [];
 
-    if (!customerName) {
-      return NextResponse.json(
-        { error: "Customer name is required." },
-        { status: 400 }
-      );
-    }
-
-    if (!customerEmail || !isValidEmail(customerEmail)) {
-      return NextResponse.json(
-        { error: "A valid customer email is required." },
-        { status: 400 }
-      );
-    }
 
     if (rawSelections.length === 0) {
       return NextResponse.json(
@@ -636,6 +618,18 @@ export async function PUT(request: Request, context: RouteContext) {
         { status: 403 }
       );
     }
+
+    const approvedCustomer = getApprovedCustomerProfile(viewerEmail);
+
+    if (isCustomer && !approvedCustomer) {
+      return NextResponse.json(
+        { error: "This email is not approved to edit customer orders." },
+        { status: 403 }
+      );
+    }
+
+    const customerName = order.customerName;
+    const customerEmail = normalizeEmail(order.customerEmail);
 
     const item = order.items[0];
 

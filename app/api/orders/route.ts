@@ -4,6 +4,7 @@ import { auth } from "../../../auth";
 import { prisma } from "../../../lib/prisma";
 import { sendOrderNotification } from "../../../lib/email";
 import { appendOrderRow } from "../../../lib/sheets";
+import { getApprovedCustomerProfile } from "../../../lib/approved-customer";
 
 type IncomingSelection = {
   groupName: string;
@@ -64,9 +65,6 @@ function normalizeEmail(value: string) {
   return value.trim().toLowerCase();
 }
 
-function isValidEmail(email: string) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-}
 
 function generateOrderNumber() {
   const now = new Date();
@@ -397,14 +395,19 @@ export async function POST(request: Request) {
     const body = await request.json();
 
     const signedInEmail = normalizeEmail(session.user.email);
-    const signedInName =
-      session.user.name?.trim() || signedInEmail.split("@")[0] || "Customer";
+    const approvedCustomer = getApprovedCustomerProfile(signedInEmail);
+
+    if (!approvedCustomer) {
+      return NextResponse.json(
+        { error: "This email is not approved to place customer orders." },
+        { status: 403 }
+      );
+    }
 
     const productId = String(body.productId || "").trim();
     const poNumber = String(body.poNumber || "").trim() || null;
-    const customerName = String(body.customerName || "").trim() || signedInName;
-    const customerEmailRaw = String(body.customerEmail || "").trim();
-    const customerEmail = normalizeEmail(customerEmailRaw || signedInEmail);
+    const customerName = approvedCustomer.name;
+    const customerEmail = approvedCustomer.email;
     const customerPhone = String(body.customerPhone || "").trim() || null;
     const notes = String(body.notes || "").trim() || null;
     const productName = String(body.productName || "").trim();
@@ -433,19 +436,6 @@ export async function POST(request: Request) {
       );
     }
 
-    if (!customerName) {
-      return NextResponse.json(
-        { error: "Customer name is required." },
-        { status: 400 }
-      );
-    }
-
-    if (!customerEmail || !isValidEmail(customerEmail)) {
-      return NextResponse.json(
-        { error: "A valid customer email is required." },
-        { status: 400 }
-      );
-    }
 
     if (rawSelections.length === 0) {
       return NextResponse.json(
