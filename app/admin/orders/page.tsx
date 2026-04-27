@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { prisma } from "../../../lib/prisma";
 import { formatCurrency } from "../../../lib/utils";
+import { formatCentralDate, formatCentralDateTime } from "../../../lib/central-time";
 
 type OrderRow = {
   id: string;
@@ -51,18 +52,11 @@ type OrderRow = {
 };
 
 function formatDate(date: Date) {
-  return new Intl.DateTimeFormat("en-US", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(date);
+  return formatCentralDateTime(date);
 }
 
 function formatDateOnly(date: Date | null) {
-  if (!date) return "—";
-
-  return new Intl.DateTimeFormat("en-US", {
-    dateStyle: "medium",
-  }).format(date);
+  return formatCentralDate(date);
 }
 
 function formatPriorityLabel(priority: string) {

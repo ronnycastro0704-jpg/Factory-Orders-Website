@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { prisma } from "../../../../lib/prisma";
+import { formatCentralDate, formatCentralDateTime } from "../../../../lib/central-time";
 import { formatCurrency } from "../../../../lib/utils";
 import { notFound } from "next/navigation";
 import EditOrderForm from "./edit-order-form";
@@ -203,7 +204,7 @@ export default async function AdminOrderDetailPage({ params }: PageProps) {
               </span>
               {order.pickedUpAt ? (
                 <span className="inline-flex rounded-full border px-3 py-1 text-xs font-semibold bg-emerald-50 text-emerald-700 border-emerald-200">
-                  Picked Up {new Date(order.pickedUpAt).toLocaleDateString()}
+                  Picked Up {formatCentralDate(order.pickedUpAt)}
                 </span>
               ) : null}
             </div>
@@ -213,7 +214,7 @@ export default async function AdminOrderDetailPage({ params }: PageProps) {
             <div>
               <p className="text-xs uppercase tracking-[0.14em]">Created</p>
               <p className="mt-1 text-slate-700">
-                {new Date(order.createdAt).toLocaleString()}
+                {formatCentralDateTime(order.createdAt)}
               </p>
             </div>
             <div>
@@ -230,7 +231,7 @@ export default async function AdminOrderDetailPage({ params }: PageProps) {
               <p className="text-xs uppercase tracking-[0.14em]">Due Date</p>
               <p className="mt-1 text-slate-700">
                 {order.dueDate
-                  ? new Date(order.dueDate).toLocaleDateString()
+                  ? formatCentralDate(order.dueDate)
                   : "—"}
               </p>
             </div>
@@ -238,7 +239,7 @@ export default async function AdminOrderDetailPage({ params }: PageProps) {
               <p className="text-xs uppercase tracking-[0.14em]">Picked Up</p>
               <p className="mt-1 text-slate-700">
                 {order.pickedUpAt
-                  ? new Date(order.pickedUpAt).toLocaleDateString()
+                  ? formatCentralDate(order.pickedUpAt)
                   : "—"}
               </p>
             </div>
@@ -431,7 +432,7 @@ export default async function AdminOrderDetailPage({ params }: PageProps) {
                         Changed by: {revision.changedBy || "Unknown"}
                       </p>
                       <p className="mt-1 text-sm text-slate-500">
-                        {new Date(revision.createdAt).toLocaleString()}
+                        {formatCentralDateTime(revision.createdAt)}
                       </p>
                     </div>
                   ))
@@ -466,7 +467,7 @@ export default async function AdminOrderDetailPage({ params }: PageProps) {
                         </p>
                       ) : null}
                       <p className="mt-1 text-sm text-slate-500">
-                        {new Date(log.createdAt).toLocaleString()}
+                        {formatCentralDateTime(log.createdAt)}
                       </p>
                     </div>
                   ))
@@ -502,7 +503,7 @@ export default async function AdminOrderDetailPage({ params }: PageProps) {
                         </p>
                       ) : null}
                       <p className="mt-1 text-sm text-slate-500">
-                        {new Date(log.createdAt).toLocaleString()}
+                        {formatCentralDateTime(log.createdAt)}
                       </p>
                     </div>
                   ))

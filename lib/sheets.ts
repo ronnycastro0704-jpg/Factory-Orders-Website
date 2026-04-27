@@ -1,4 +1,5 @@
 import { google } from "googleapis";
+import { formatCentralSheetDate } from "./central-time";
 
 type SheetPartInput = {
   partNumber: string;
@@ -77,15 +78,7 @@ function getGoogleAuth() {
 }
 
 function formatDate(value?: string | Date | null) {
-  if (!value) return "";
-
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return "";
-  }
-
-  return `${date.getMonth() + 1}/${date.getDate()}/${date.getFullYear()}`;
+  return formatCentralSheetDate(value);
 }
 
 function formatDateSold(value?: string | Date | null) {
@@ -95,8 +88,7 @@ function formatDateSold(value?: string | Date | null) {
     return formatted;
   }
 
-  const fallback = new Date();
-  return `${fallback.getMonth() + 1}/${fallback.getDate()}/${fallback.getFullYear()}`;
+  return formatCentralSheetDate(new Date());
 }
 
 function sanitizeQuantity(value: number | null | undefined) {
