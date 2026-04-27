@@ -1,3 +1,4 @@
+import Link from "next/link";
 import LoginForm from "./login-form";
 
 type PageProps = {
@@ -21,6 +22,13 @@ export default async function LoginPage({ searchParams }: PageProps) {
 
         <div className="mt-6">
           <LoginForm callbackUrl={callbackUrl} />
+        </div>
+
+        <div className="mt-6 border-t pt-4 text-center text-sm text-slate-600">
+          Don&apos;t have an account?{" "}
+          <Link href="/signup" className="font-medium text-slate-900 underline">
+            Create account
+          </Link>
         </div>
       </div>
     </main>
