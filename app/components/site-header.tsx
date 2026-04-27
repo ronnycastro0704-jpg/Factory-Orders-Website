@@ -27,22 +27,25 @@ export default async function SiteHeader() {
                   My Orders
                 </Link>
 
-                {(role === "ADMIN" || role === "STAFF") ? (
-                  <>
-                    <Link href="/admin" className="hover:text-slate-900">
-                      Admin Dashboard
-                    </Link>
-                    <Link href="/admin/products" className="hover:text-slate-900">
-                      Products
-                    </Link>
-                    <Link href="/admin/leathers" className="hover:text-slate-900">
-                      Leathers
-                    </Link>
-                    <Link href="/admin/orders" className="hover:text-slate-900">
-                      Orders
-                    </Link>
-                  </>
-                ) : null}
+  {(role === "ADMIN" || role === "STAFF") ? (
+  <>
+    <Link href="/admin" className="hover:text-slate-900">
+      Admin Dashboard
+    </Link>
+    <Link href="/admin/products" className="hover:text-slate-900">
+      Products
+    </Link>
+    <Link href="/admin/leathers" className="hover:text-slate-900">
+      Leathers
+    </Link>
+    <Link href="/admin/approved-customers" className="hover:text-slate-900">
+      Approved Customers
+    </Link>
+    <Link href="/admin/orders" className="hover:text-slate-900">
+      Orders
+    </Link>
+  </>
+) : null}
               </>
             ) : null}
           </nav>
