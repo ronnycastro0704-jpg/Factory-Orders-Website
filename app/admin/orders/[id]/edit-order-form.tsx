@@ -18,6 +18,7 @@ const statusOptions = [
   "CHANGED",
   "SENT_TO_FACTORY",
   "COMPLETED",
+  "PAID",
   "CANCELLED",
 ];
 
@@ -121,7 +122,7 @@ export default function EditOrderForm({
         >
           {statusOptions.map((option) => (
             <option key={option} value={option}>
-              {option}
+              {option.replaceAll("_", " ")}
             </option>
           ))}
         </select>
@@ -145,7 +146,7 @@ export default function EditOrderForm({
           className="w-full rounded-lg border px-3 py-2"
           value={changeReason}
           onChange={(e) => setChangeReason(e.target.value)}
-          placeholder="Example: corrected customer email"
+          placeholder="Example: marked invoice as paid"
         />
       </div>
 
