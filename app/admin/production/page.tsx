@@ -73,9 +73,12 @@ const productionStatusOptions: readonly ProductionOverallStatus[] = [
   "BLOCKED",
 ];
 
-const statusOptions: readonly ["ALL", ...ProductionOverallStatus[]] = [
+type StatusFilter = "ALL" | "PAID" | ProductionOverallStatus;
+
+const statusOptions: readonly StatusFilter[] = [
   "ALL",
   ...productionStatusOptions,
+  "PAID",
 ];
 
 const priorityUiOptions = ["ALL", "NORMAL", "RUSH", "HOT"] as const;
@@ -94,11 +97,11 @@ function normalizeQueryValue(value: string | string[] | undefined) {
   return value || "";
 }
 
-function normalizeStatusFilter(value: string): "ALL" | ProductionOverallStatus {
+function normalizeStatusFilter(value: string): StatusFilter {
   const normalized = value.trim().toUpperCase();
 
-  if (normalized === "ALL") {
-    return "ALL";
+  if (normalized === "ALL" || normalized === "PAID") {
+    return normalized;
   }
 
   return productionStatusOptions.includes(normalized as ProductionOverallStatus)
@@ -296,9 +299,25 @@ export default async function AdminProductionPage({
     );
   }
 
+if (status === "PAID") {
+  andFilters.push({
+    order: {
+      status: "PAID",
+    },
+  });
+} else {
+  andFilters.push({
+    order: {
+      status: {
+        not: "PAID",
+      },
+    },
+  });
+
   if (status !== "ALL") {
     andFilters.push({ currentStatus: status });
   }
+}
 
   if (priority !== "ALL") {
     andFilters.push({ priority });
@@ -330,15 +349,15 @@ export default async function AdminProductionPage({
   const [totalLines, overdueLines, blockedLines, readyLines, pickedUpLines, lines] =
     await Promise.all([
       prisma.productionLine.count(),
-      prisma.productionLine.count({
-        where: {
-          dueDate: { lt: now },
-          pickedUp: false,
-          currentStatus: {
-            notIn: ["READY", "PICKED_UP"],
-          },
-        },
-      }),
+prisma.productionLine.count({
+  where: {
+    order: {
+      status: {
+        not: "PAID",
+      },
+    },
+  },
+}),
       prisma.productionLine.count({
         where: { currentStatus: "BLOCKED" },
       }),
