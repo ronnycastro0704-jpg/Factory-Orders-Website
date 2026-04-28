@@ -1,7 +1,14 @@
 import Link from "next/link";
+import { Prisma } from "@prisma/client";
 import { prisma } from "../../../lib/prisma";
 import { formatCurrency } from "../../../lib/utils";
-import { formatCentralDate, formatCentralDateTime } from "../../../lib/central-time";
+import { formatCentralDateTime } from "../../../lib/central-time";
+
+type PageProps = {
+  searchParams: Promise<{
+    q?: string;
+  }>;
+};
 
 type OrderRow = {
   id: string;
@@ -13,55 +20,18 @@ type OrderRow = {
   status: string;
   overallProductionStatus: string;
   priority: string;
-  dueDate: Date | null;
-  pickedUp: boolean;
-  pickedUpAt: Date | null;
   quantity: number;
   total: unknown;
-  notes: string | null;
   createdAt: Date;
+  updatedAt: Date;
   items: {
     id: string;
     productNameSnapshot: string;
-    lineTotal: unknown;
-    selections: {
-      id: string;
-      optionGroupNameSnapshot: string;
-      optionChoiceNameSnapshot: string;
-    }[];
   }[];
   productionLines: {
     id: string;
-    partNumber: string;
-    frameNeeded: string;
-    quantity: number;
-    currentStatus: string;
-  }[];
-  emailLogs: {
-    id: string;
-    status: string;
-    recipient: string;
-    createdAt: Date;
-  }[];
-  sheetSyncLogs: {
-    id: string;
-    status: string;
-    worksheetName: string | null;
-    createdAt: Date;
   }[];
 };
-
-function formatDate(date: Date) {
-  return formatCentralDateTime(date);
-}
-
-function formatDateOnly(date: Date | null) {
-  return formatCentralDate(date);
-}
-
-function formatPriorityLabel(priority: string) {
-  return priority === "HOLD" ? "HOT" : priority;
-}
 
 function getStatusClasses(status: string) {
   switch (status) {
@@ -69,6 +39,8 @@ function getStatusClasses(status: string) {
       return "bg-amber-50 text-amber-700 border-amber-200";
     case "COMPLETED":
       return "bg-green-50 text-green-700 border-green-200";
+    case "PAID":
+      return "bg-emerald-50 text-emerald-700 border-emerald-200";
     case "CHANGED":
       return "bg-blue-50 text-blue-700 border-blue-200";
     case "DRAFT":
@@ -80,52 +52,36 @@ function getStatusClasses(status: string) {
   }
 }
 
-function getProductionStatusClasses(status: string) {
-  switch (status) {
-    case "NEW":
-      return "bg-slate-100 text-slate-700 border-slate-200";
-    case "WAITING_ON_LEATHER":
-      return "bg-yellow-50 text-yellow-700 border-yellow-200";
-    case "CUTTING":
-    case "SEWING":
-    case "UPHOLSTERY":
-    case "FINAL_ASSEMBLY":
-    case "QC":
-      return "bg-blue-50 text-blue-700 border-blue-200";
-    case "READY":
-      return "bg-emerald-50 text-emerald-700 border-emerald-200";
-    case "PICKED_UP":
-      return "bg-purple-50 text-purple-700 border-purple-200";
-    case "BLOCKED":
-      return "bg-red-50 text-red-700 border-red-200";
-    default:
-      return "bg-white text-slate-700 border-slate-200";
-  }
+function formatPriorityLabel(priority: string) {
+  return priority === "HOLD" ? "HOT" : priority;
 }
 
-function getPriorityClasses(priority: string) {
-  switch (priority) {
-    case "RUSH":
-      return "bg-red-50 text-red-700 border-red-200";
-    case "HOLD":
-      return "bg-amber-50 text-amber-700 border-amber-200";
-    default:
-      return "bg-slate-100 text-slate-700 border-slate-200";
-  }
-}
+export default async function AdminOrdersPage({ searchParams }: PageProps) {
+  const params = await searchParams;
+  const query = String(params.q || "").trim();
 
-export default async function AdminOrdersPage() {
+  const searchWhere: Prisma.OrderWhereInput = query
+    ? {
+        OR: [
+          { orderNumber: { contains: query, mode: "insensitive" } },
+          { customerName: { contains: query, mode: "insensitive" } },
+          { customerEmail: { contains: query, mode: "insensitive" } },
+          { poNumber: { contains: query, mode: "insensitive" } },
+        ],
+      }
+    : {};
+
   const [
     totalOrders,
-    draftOrders,
+    changedOrders,
     sentToFactoryOrders,
     completedOrders,
-    readyOrders,
+    paidOrders,
     orders,
   ] = await Promise.all([
     prisma.order.count(),
     prisma.order.count({
-      where: { status: "DRAFT" },
+      where: { status: "CHANGED" },
     }),
     prisma.order.count({
       where: { status: "SENT_TO_FACTORY" },
@@ -134,27 +90,23 @@ export default async function AdminOrdersPage() {
       where: { status: "COMPLETED" },
     }),
     prisma.order.count({
-      where: { overallProductionStatus: "READY" },
+      where: { status: "PAID" },
     }),
     prisma.order.findMany({
+      where: searchWhere,
       orderBy: { createdAt: "desc" },
-      take: 50,
+      take: 100,
       include: {
         items: {
-          include: {
-            selections: true,
+          select: {
+            id: true,
+            productNameSnapshot: true,
           },
         },
         productionLines: {
-          orderBy: [{ partNumber: "asc" }, { frameNeeded: "asc" }],
-        },
-        emailLogs: {
-          orderBy: { createdAt: "desc" },
-          take: 1,
-        },
-        sheetSyncLogs: {
-          orderBy: { createdAt: "desc" },
-          take: 1,
+          select: {
+            id: true,
+          },
         },
       },
     }),
@@ -175,8 +127,7 @@ export default async function AdminOrdersPage() {
                 Track orders and production
               </h1>
               <p className="mt-4 max-w-2xl text-base sm:text-lg text-slate-600">
-                Review incoming customer orders, monitor production-line counts,
-                and keep an eye on overall factory progress.
+                Search, review, and open customer orders from one clean table.
               </p>
             </div>
 
@@ -207,9 +158,9 @@ export default async function AdminOrdersPage() {
 
           <div className="section-card-strong">
             <p className="text-xs uppercase tracking-[0.16em] text-slate-500">
-              Drafts
+              Changed Orders
             </p>
-            <p className="mt-3 text-4xl font-bold">{draftOrders}</p>
+            <p className="mt-3 text-4xl font-bold">{changedOrders}</p>
           </div>
 
           <div className="section-card-strong">
@@ -228,222 +179,152 @@ export default async function AdminOrdersPage() {
 
           <div className="section-card-strong">
             <p className="text-xs uppercase tracking-[0.16em] text-slate-500">
-              Production Ready
+              Paid Orders
             </p>
-            <p className="mt-3 text-4xl font-bold">{readyOrders}</p>
+            <p className="mt-3 text-4xl font-bold">{paidOrders}</p>
           </div>
         </section>
 
         <section className="mt-8 section-card-strong">
-          <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div>
               <p className="text-sm font-medium uppercase tracking-[0.18em] text-slate-500">
                 Orders
               </p>
-              <h2 className="mt-2 text-3xl font-bold">Latest 50 Orders</h2>
+              <h2 className="mt-2 text-3xl font-bold">
+                {query ? "Search Results" : "Latest Orders"}
+              </h2>
             </div>
 
-            <span className="status-pill">Sorted newest to oldest</span>
+            <form className="flex w-full gap-3 lg:max-w-xl">
+              <input
+                name="q"
+                defaultValue={query}
+                placeholder="Search order #, customer, email, or PO..."
+                className="w-full rounded-xl border bg-white px-4 py-3 text-sm outline-none focus:border-slate-400"
+              />
+              <button type="submit" className="button-primary whitespace-nowrap">
+                Search
+              </button>
+              {query ? (
+                <Link href="/admin/orders" className="button-secondary">
+                  Clear
+                </Link>
+              ) : null}
+            </form>
           </div>
 
-          {typedOrders.length === 0 ? (
-            <div className="rounded-2xl border border-dashed bg-white/70 p-10 text-center">
-              <p className="text-lg font-semibold text-slate-700">
-                No orders found.
-              </p>
-              <p className="mt-2 text-sm text-slate-500">
-                Orders will appear here once customers start submitting them.
-              </p>
-            </div>
-          ) : (
-            <div className="grid gap-4 xl:grid-cols-2">
-              {typedOrders.map((order: OrderRow) => {
-                const firstItem = order.items[0];
-                const latestEmail = order.emailLogs[0];
-                const latestSheet = order.sheetSyncLogs[0];
-                const selectionCount = order.items.reduce(
-                  (sum, item) => sum + item.selections.length,
-                  0
-                );
-                const firstProductionLine = order.productionLines[0];
+          <div className="overflow-x-auto rounded-2xl border bg-white">
+            <table className="w-full min-w-[1100px] text-left text-sm">
+              <thead className="border-b bg-slate-50 text-xs uppercase tracking-[0.14em] text-slate-500">
+                <tr>
+                  <th className="px-4 py-3">Order</th>
+                  <th className="px-4 py-3">Customer</th>
+                  <th className="px-4 py-3">Product</th>
+                  <th className="px-4 py-3">PO</th>
+                  <th className="px-4 py-3">Status</th>
+                  <th className="px-4 py-3">Production</th>
+                  <th className="px-4 py-3">Qty</th>
+                  <th className="px-4 py-3">Total</th>
+                  <th className="px-4 py-3">Created</th>
+                  <th className="px-4 py-3 text-right">Action</th>
+                </tr>
+              </thead>
 
-                return (
-                  <Link
-                    key={order.id}
-                    href={`/admin/orders/${order.id}`}
-                    className="premium-grid-card"
-                  >
-                    <div className="flex flex-col gap-5">
-                      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                        <div>
-                          <div className="flex flex-wrap items-center gap-2">
-                            <p className="text-lg font-semibold">
-                              {order.orderNumber}
-                            </p>
-                            <span
-                              className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${getStatusClasses(
-                                order.status
-                              )}`}
-                            >
-                              {order.status.replaceAll("_", " ")}
-                            </span>
-                            <span
-                              className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${getProductionStatusClasses(
-                                order.overallProductionStatus
-                              )}`}
-                            >
-                              {order.overallProductionStatus.replaceAll("_", " ")}
-                            </span>
-                            <span
-                              className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${getPriorityClasses(
-                                order.priority
-                              )}`}
-                            >
-                              {formatPriorityLabel(order.priority)}
-                            </span>
-                          </div>
+              <tbody>
+                {typedOrders.length === 0 ? (
+                  <tr>
+                    <td colSpan={10} className="px-4 py-10 text-center text-slate-500">
+                      No orders found.
+                    </td>
+                  </tr>
+                ) : (
+                  typedOrders.map((order) => {
+                    const firstItem = order.items[0];
 
-                          <p className="mt-2 text-sm text-slate-500">
+                    return (
+                      <tr
+                        key={order.id}
+                        className="border-b last:border-b-0 hover:bg-slate-50"
+                      >
+                        <td className="px-4 py-4 align-top">
+                          <p className="font-semibold text-slate-900">
+                            {order.orderNumber}
+                          </p>
+                          <p className="mt-1 text-xs text-slate-500">
+                            {formatCentralDateTime(order.updatedAt)}
+                          </p>
+                        </td>
+
+                        <td className="px-4 py-4 align-top">
+                          <p className="font-medium text-slate-900">
                             {order.customerName}
                           </p>
-                          <p className="text-sm text-slate-500">
+                          <p className="mt-1 text-xs text-slate-500">
                             {order.customerEmail}
                           </p>
-                          {order.customerPhone ? (
-                            <p className="text-sm text-slate-500">
-                              {order.customerPhone}
-                            </p>
-                          ) : null}
-                          {order.poNumber ? (
-                            <p className="mt-1 text-sm font-medium text-slate-700">
-                              PO #: {order.poNumber}
-                            </p>
-                          ) : null}
-                        </div>
+                        </td>
 
-                        <div className="sm:text-right">
-                          <p className="text-xs uppercase tracking-[0.16em] text-slate-500">
-                            Total
-                          </p>
-                          <p className="mt-1 text-2xl font-bold text-slate-900">
-                            {formatCurrency(Number(order.total))}
-                          </p>
-                          <p className="mt-2 text-sm text-slate-500">
-                            Qty: {order.quantity}
-                          </p>
-                        </div>
-                      </div>
+                        <td className="px-4 py-4 align-top text-slate-700">
+                          {firstItem?.productNameSnapshot || "—"}
+                        </td>
 
-                      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                        <div className="soft-panel">
-                          <p className="text-xs uppercase tracking-[0.16em] text-slate-500">
-                            Product
-                          </p>
-                          <p className="mt-2 font-semibold text-slate-900">
-                            {firstItem?.productNameSnapshot || "—"}
-                          </p>
-                        </div>
+                        <td className="px-4 py-4 align-top text-slate-700">
+                          {order.poNumber || "—"}
+                        </td>
 
-                        <div className="soft-panel">
-                          <p className="text-xs uppercase tracking-[0.16em] text-slate-500">
-                            Selections
-                          </p>
-                          <p className="mt-2 font-semibold text-slate-900">
-                            {selectionCount}
-                          </p>
-                        </div>
+                        <td className="px-4 py-4 align-top">
+                          <span
+                            className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${getStatusClasses(
+                              order.status
+                            )}`}
+                          >
+                            {order.status.replaceAll("_", " ")}
+                          </span>
+                        </td>
 
-                        <div className="soft-panel">
-                          <p className="text-xs uppercase tracking-[0.16em] text-slate-500">
-                            Production Lines
+                        <td className="px-4 py-4 align-top">
+                          <p className="text-slate-700">
+                            {order.overallProductionStatus.replaceAll("_", " ")}
                           </p>
-                          <p className="mt-2 font-semibold text-slate-900">
-                            {order.productionLines.length}
+                          <p className="mt-1 text-xs text-slate-500">
+                            {order.productionLines.length} line
+                            {order.productionLines.length === 1 ? "" : "s"} ·{" "}
+                            {formatPriorityLabel(order.priority)}
                           </p>
-                        </div>
+                        </td>
 
-                        <div className="soft-panel">
-                          <p className="text-xs uppercase tracking-[0.16em] text-slate-500">
-                            Due Date
-                          </p>
-                          <p className="mt-2 font-semibold text-slate-900">
-                            {formatDateOnly(order.dueDate)}
-                          </p>
-                        </div>
-                      </div>
+                        <td className="px-4 py-4 align-top text-slate-700">
+                          {order.quantity}
+                        </td>
 
-                      {firstProductionLine ? (
-                        <div className="rounded-xl border bg-white/80 p-3">
-                          <p className="text-xs uppercase tracking-[0.16em] text-slate-500">
-                            First Production Line
-                          </p>
-                          <p className="mt-2 text-sm text-slate-700">
-                            {firstProductionLine.partNumber} / {firstProductionLine.frameNeeded}
-                          </p>
-                          <p className="mt-1 text-sm text-slate-500">
-                            Qty {firstProductionLine.quantity} ·{" "}
-                            {firstProductionLine.currentStatus.replaceAll("_", " ")}
-                          </p>
-                        </div>
-                      ) : null}
+                        <td className="px-4 py-4 align-top font-semibold text-slate-900">
+                          {formatCurrency(Number(order.total))}
+                        </td>
 
-                      <div className="grid gap-3 sm:grid-cols-3">
-                        <div>
-                          <p className="text-xs uppercase tracking-[0.16em] text-slate-500">
-                            Created
-                          </p>
-                          <p className="mt-1 text-sm text-slate-700">
-                            {formatDate(order.createdAt)}
-                          </p>
-                        </div>
+                        <td className="px-4 py-4 align-top text-slate-700">
+                          {formatCentralDateTime(order.createdAt)}
+                        </td>
 
-                        <div>
-                          <p className="text-xs uppercase tracking-[0.16em] text-slate-500">
-                            Latest Email
-                          </p>
-                          <p className="mt-1 text-sm text-slate-700">
-                            {latestEmail
-                              ? `${latestEmail.status} → ${latestEmail.recipient}`
-                              : "No email logs"}
-                          </p>
-                        </div>
+                        <td className="px-4 py-4 text-right align-top">
+                          <Link
+                            href={`/admin/orders/${order.id}`}
+                            className="rounded-lg bg-slate-900 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800"
+                          >
+                            View
+                          </Link>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
 
-                        <div>
-                          <p className="text-xs uppercase tracking-[0.16em] text-slate-500">
-                            Latest Sheet Sync
-                          </p>
-                          <p className="mt-1 text-sm text-slate-700">
-                            {latestSheet
-                              ? `${latestSheet.status} · ${
-                                  latestSheet.worksheetName || "Orders"
-                                }`
-                              : "No sheet logs"}
-                          </p>
-                        </div>
-                      </div>
-
-                      {order.notes ? (
-                        <div className="rounded-xl border bg-white/80 p-3">
-                          <p className="text-xs uppercase tracking-[0.16em] text-slate-500">
-                            Notes
-                          </p>
-                          <p className="mt-2 text-sm text-slate-600">
-                            {order.notes}
-                          </p>
-                        </div>
-                      ) : null}
-
-                      {order.pickedUpAt ? (
-                        <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm font-medium text-emerald-700">
-                          Picked up on {formatDate(order.pickedUpAt)}
-                        </div>
-                      ) : null}
-                    </div>
-                  </Link>
-                );
-              })}
-            </div>
-          )}
+          <p className="mt-4 text-sm text-slate-500">
+            Showing {typedOrders.length} order{typedOrders.length === 1 ? "" : "s"}.
+          </p>
         </section>
       </div>
     </main>
