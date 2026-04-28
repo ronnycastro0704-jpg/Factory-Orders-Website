@@ -2,9 +2,14 @@ import Link from "next/link";
 import {
   Prisma,
   OrderPriority,
+  OrderStatus,
   ProductionOverallStatus,
 } from "@prisma/client";
 import { prisma } from "../../../lib/prisma";
+import {
+  formatCentralDate,
+  formatCentralDateTime,
+} from "../../../lib/central-time";
 
 type PageProps = {
   searchParams: Promise<{
@@ -55,30 +60,26 @@ type ProductionLineRow = {
     orderNumber: string;
     poNumber: string | null;
     customerName: string;
-    status: string;
+    status: OrderStatus;
     overallProductionStatus: ProductionOverallStatus;
   };
 };
 
-const productionStatusOptions: readonly ProductionOverallStatus[] = [
-  "NEW",
-  "WAITING_ON_LEATHER",
-  "CUTTING",
-  "SEWING",
-  "UPHOLSTERY",
-  "FINAL_ASSEMBLY",
-  "QC",
-  "READY",
-  "PICKED_UP",
-  "BLOCKED",
+const orderStatusOptions: readonly OrderStatus[] = [
+  "DRAFT",
+  "SUBMITTED",
+  "CHANGED",
+  "SENT_TO_FACTORY",
+  "COMPLETED",
+  "PAID",
+  "CANCELLED",
 ];
 
-type StatusFilter = "ALL" | "PAID" | ProductionOverallStatus;
+type StatusFilter = "ALL_ACTIVE" | OrderStatus;
 
 const statusOptions: readonly StatusFilter[] = [
-  "ALL",
-  ...productionStatusOptions,
-  "PAID",
+  "ALL_ACTIVE",
+  ...orderStatusOptions,
 ];
 
 const priorityUiOptions = ["ALL", "NORMAL", "RUSH", "HOT"] as const;
@@ -100,13 +101,13 @@ function normalizeQueryValue(value: string | string[] | undefined) {
 function normalizeStatusFilter(value: string): StatusFilter {
   const normalized = value.trim().toUpperCase();
 
-  if (normalized === "ALL" || normalized === "PAID") {
-    return normalized;
+  if (normalized === "ALL_ACTIVE" || normalized === "ALL") {
+    return "ALL_ACTIVE";
   }
 
-  return productionStatusOptions.includes(normalized as ProductionOverallStatus)
-    ? (normalized as ProductionOverallStatus)
-    : "ALL";
+  return orderStatusOptions.includes(normalized as OrderStatus)
+    ? (normalized as OrderStatus)
+    : "ALL_ACTIVE";
 }
 
 function normalizePriorityFilter(value: string): PriorityUiFilter {
@@ -135,19 +136,12 @@ function normalizeOverdueFilter(value: string): OverdueFilter {
 
 function formatDateOnly(date: Date | null) {
   if (!date) return "—";
-
-  return new Intl.DateTimeFormat("en-US", {
-    dateStyle: "medium",
-  }).format(date);
+  return formatCentralDate(date);
 }
 
 function formatDateTime(date: Date | null) {
   if (!date) return "—";
-
-  return new Intl.DateTimeFormat("en-US", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(date);
+  return formatCentralDateTime(date);
 }
 
 function formatPriorityLabel(priority: OrderPriority) {
@@ -195,6 +189,27 @@ function getStatusClasses(status: ProductionOverallStatus) {
       return "bg-blue-50 text-blue-700 border-blue-200";
     case "WAITING_ON_LEATHER":
       return "bg-yellow-50 text-yellow-700 border-yellow-200";
+    default:
+      return "bg-slate-100 text-slate-700 border-slate-200";
+  }
+}
+
+function getOrderStatusClasses(status: OrderStatus) {
+  switch (status) {
+    case "PAID":
+      return "bg-emerald-50 text-emerald-700 border-emerald-200";
+    case "CHANGED":
+      return "bg-blue-50 text-blue-700 border-blue-200";
+    case "SENT_TO_FACTORY":
+      return "bg-amber-50 text-amber-700 border-amber-200";
+    case "COMPLETED":
+      return "bg-green-50 text-green-700 border-green-200";
+    case "CANCELLED":
+      return "bg-red-50 text-red-700 border-red-200";
+    case "DRAFT":
+      return "bg-slate-100 text-slate-700 border-slate-200";
+    case "SUBMITTED":
+      return "bg-indigo-50 text-indigo-700 border-indigo-200";
     default:
       return "bg-slate-100 text-slate-700 border-slate-200";
   }
@@ -272,6 +287,11 @@ function getStageSummary(line: ProductionLineRow) {
   return activeStage;
 }
 
+function formatStatusOptionLabel(option: StatusFilter) {
+  if (option === "ALL_ACTIVE") return "ALL ACTIVE";
+  return option.replaceAll("_", " ");
+}
+
 export default async function AdminProductionPage({
   searchParams,
 }: PageProps) {
@@ -299,25 +319,21 @@ export default async function AdminProductionPage({
     );
   }
 
-if (status === "PAID") {
-  andFilters.push({
-    order: {
-      status: "PAID",
-    },
-  });
-} else {
-  andFilters.push({
-    order: {
-      status: {
-        not: "PAID",
+  if (status === "ALL_ACTIVE") {
+    andFilters.push({
+      order: {
+        status: {
+          notIn: ["PAID", "CANCELLED"],
+        },
       },
-    },
-  });
-
-  if (status !== "ALL") {
-    andFilters.push({ currentStatus: status });
+    });
+  } else {
+    andFilters.push({
+      order: {
+        status,
+      },
+    });
   }
-}
 
   if (priority !== "ALL") {
     andFilters.push({ priority });
@@ -346,54 +362,49 @@ if (status === "PAID") {
     ...(andFilters.length > 0 ? { AND: andFilters } : {}),
   };
 
-  const unpaidOrderFilter: Prisma.ProductionLineWhereInput = {
-  order: {
-    status: {
-      not: "PAID",
+  const activeOrderFilter: Prisma.ProductionLineWhereInput = {
+    order: {
+      status: {
+        notIn: ["PAID", "CANCELLED"],
+      },
     },
-  },
-};
+  };
 
-const [totalLines, overdueLines, blockedLines, readyLines, pickedUpLines, lines] =
-  await Promise.all([
-    prisma.productionLine.count({
-      where: unpaidOrderFilter,
-    }),
-
-    prisma.productionLine.count({
-      where: {
-        AND: [
-          unpaidOrderFilter,
-          { dueDate: { lt: now } },
-          { pickedUp: false },
-          {
-            currentStatus: {
-              notIn: ["READY", "PICKED_UP"],
+  const [totalLines, overdueLines, blockedLines, readyLines, pickedUpLines, lines] =
+    await Promise.all([
+      prisma.productionLine.count({
+        where: activeOrderFilter,
+      }),
+      prisma.productionLine.count({
+        where: {
+          AND: [
+            activeOrderFilter,
+            { dueDate: { lt: now } },
+            { pickedUp: false },
+            {
+              currentStatus: {
+                notIn: ["READY", "PICKED_UP"],
+              },
             },
-          },
-        ],
-      },
-    }),
-
-    prisma.productionLine.count({
-      where: {
-        AND: [unpaidOrderFilter, { currentStatus: "BLOCKED" }],
-      },
-    }),
-
-    prisma.productionLine.count({
-      where: {
-        AND: [unpaidOrderFilter, { currentStatus: "READY" }],
-      },
-    }),
-
-    prisma.productionLine.count({
-      where: {
-        AND: [unpaidOrderFilter, { pickedUp: true }],
-      },
-    }),
-
-    prisma.productionLine.findMany({
+          ],
+        },
+      }),
+      prisma.productionLine.count({
+        where: {
+          AND: [activeOrderFilter, { currentStatus: "BLOCKED" }],
+        },
+      }),
+      prisma.productionLine.count({
+        where: {
+          AND: [activeOrderFilter, { currentStatus: "READY" }],
+        },
+      }),
+      prisma.productionLine.count({
+        where: {
+          AND: [activeOrderFilter, { pickedUp: true }],
+        },
+      }),
+      prisma.productionLine.findMany({
         where,
         orderBy: [{ dueDate: "asc" }, { updatedAt: "desc" }],
         include: {
@@ -429,8 +440,7 @@ const [totalLines, overdueLines, blockedLines, readyLines, pickedUpLines, lines]
               </h1>
               <p className="mt-4 max-w-2xl text-base sm:text-lg text-slate-600">
                 Monitor every production line across the factory, filter by
-                stage, and jump directly into the order detail page to update
-                progress.
+                order status, and jump directly into production details.
               </p>
             </div>
 
@@ -451,7 +461,7 @@ const [totalLines, overdueLines, blockedLines, readyLines, pickedUpLines, lines]
         <section className="grid gap-6 md:grid-cols-2 xl:grid-cols-5">
           <div className="section-card-strong">
             <p className="text-xs uppercase tracking-[0.16em] text-slate-500">
-              Total Lines
+              Total Active Lines
             </p>
             <p className="mt-3 text-4xl font-bold">{totalLines}</p>
           </div>
@@ -502,7 +512,9 @@ const [totalLines, overdueLines, blockedLines, readyLines, pickedUpLines, lines]
             </div>
 
             <div>
-              <label className="mb-1 block text-sm font-medium">Status</label>
+              <label className="mb-1 block text-sm font-medium">
+                Order Status
+              </label>
               <select
                 name="status"
                 defaultValue={status}
@@ -510,7 +522,7 @@ const [totalLines, overdueLines, blockedLines, readyLines, pickedUpLines, lines]
               >
                 {statusOptions.map((option) => (
                   <option key={option} value={option}>
-                    {option.replaceAll("_", " ")}
+                    {formatStatusOptionLabel(option)}
                   </option>
                 ))}
               </select>
@@ -618,6 +630,15 @@ const [totalLines, overdueLines, blockedLines, readyLines, pickedUpLines, lines]
                             <p className="text-lg font-semibold">
                               {line.partNumber} / {line.frameNeeded}
                             </p>
+
+                            <span
+                              className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${getOrderStatusClasses(
+                                line.order.status
+                              )}`}
+                            >
+                              {line.order.status.replaceAll("_", " ")}
+                            </span>
+
                             <span
                               className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${getStatusClasses(
                                 line.currentStatus
@@ -625,6 +646,7 @@ const [totalLines, overdueLines, blockedLines, readyLines, pickedUpLines, lines]
                             >
                               {line.currentStatus.replaceAll("_", " ")}
                             </span>
+
                             <span
                               className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${getPriorityClasses(
                                 line.priority
@@ -632,11 +654,13 @@ const [totalLines, overdueLines, blockedLines, readyLines, pickedUpLines, lines]
                             >
                               {formatPriorityLabel(line.priority)}
                             </span>
+
                             {line.pickedUpAt ? (
                               <span className="inline-flex rounded-full border px-3 py-1 text-xs font-semibold bg-purple-50 text-purple-700 border-purple-200">
                                 Picked Up {formatDateOnly(line.pickedUpAt)}
                               </span>
                             ) : null}
+
                             {isOverdue ? (
                               <span className="inline-flex rounded-full border px-3 py-1 text-xs font-semibold bg-red-50 text-red-700 border-red-200">
                                 Overdue
@@ -646,7 +670,9 @@ const [totalLines, overdueLines, blockedLines, readyLines, pickedUpLines, lines]
 
                           <p className="mt-2 text-sm text-slate-500">
                             Order {line.order.orderNumber}
-                            {line.order.poNumber ? ` · PO # ${line.order.poNumber}` : ""}
+                            {line.order.poNumber
+                              ? ` · PO # ${line.order.poNumber}`
+                              : ""}
                           </p>
                           <p className="text-sm text-slate-500">
                             {line.order.customerName}
