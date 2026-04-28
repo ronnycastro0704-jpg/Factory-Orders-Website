@@ -1,11 +1,11 @@
 import Link from "next/link";
+import { notFound } from "next/navigation";
 import { prisma } from "../../../../lib/prisma";
+import { formatCurrency } from "../../../../lib/utils";
 import {
   formatCentralDate,
   formatCentralDateTime,
 } from "../../../../lib/central-time";
-import { formatCurrency } from "../../../../lib/utils";
-import { notFound } from "next/navigation";
 import FactoryActions from "./factory-actions";
 import ProductionLineEditor from "./production-line-editor";
 
@@ -28,34 +28,6 @@ type OrderItemWithSelections = {
   basePriceSnapshot: unknown;
   lineTotal: unknown;
   selections: OrderSelectionItem[];
-};
-
-type OrderRevisionItem = {
-  id: string;
-  revisionNumber: number;
-  changeReason: string | null;
-  changedBy: string | null;
-  createdAt: Date;
-};
-
-type EmailLogItem = {
-  id: string;
-  eventType: string;
-  status: string;
-  recipient: string;
-  subject: string | null;
-  errorMessage: string | null;
-  createdAt: Date;
-};
-
-type SheetSyncLogItem = {
-  id: string;
-  status: string;
-  spreadsheetId: string | null;
-  worksheetName: string | null;
-  spreadsheetRowId: string | null;
-  errorMessage: string | null;
-  createdAt: Date;
 };
 
 type ProductionLineItem = {
@@ -93,11 +65,40 @@ type ProductionLineItem = {
   updatedAt: Date;
 };
 
+type OrderRevisionItem = {
+  id: string;
+  revisionNumber: number;
+  changeReason: string | null;
+  changedBy: string | null;
+  createdAt: Date;
+};
+
 function formatPriorityLabel(priority: string) {
   return priority === "HOLD" ? "HOT" : priority;
 }
 
-function formatStatusBadge(status: string) {
+function cleanChoiceLabel(value: string) {
+  return value.replaceAll("|||", " — ");
+}
+
+function getOrderStatusClasses(status: string) {
+  switch (status) {
+    case "PAID":
+      return "bg-emerald-50 text-emerald-700 border-emerald-200";
+    case "CHANGED":
+      return "bg-blue-50 text-blue-700 border-blue-200";
+    case "SENT_TO_FACTORY":
+      return "bg-amber-50 text-amber-700 border-amber-200";
+    case "COMPLETED":
+      return "bg-green-50 text-green-700 border-green-200";
+    case "CANCELLED":
+      return "bg-red-50 text-red-700 border-red-200";
+    default:
+      return "bg-slate-100 text-slate-700 border-slate-200";
+  }
+}
+
+function getProductionStatusClasses(status: string) {
   switch (status) {
     case "BLOCKED":
       return "bg-red-50 text-red-700 border-red-200";
@@ -118,23 +119,6 @@ function formatStatusBadge(status: string) {
   }
 }
 
-function formatOrderStatusBadge(status: string) {
-  switch (status) {
-    case "PAID":
-      return "bg-emerald-50 text-emerald-700 border-emerald-200";
-    case "CHANGED":
-      return "bg-blue-50 text-blue-700 border-blue-200";
-    case "SENT_TO_FACTORY":
-      return "bg-amber-50 text-amber-700 border-amber-200";
-    case "COMPLETED":
-      return "bg-green-50 text-green-700 border-green-200";
-    case "CANCELLED":
-      return "bg-red-50 text-red-700 border-red-200";
-    default:
-      return "bg-slate-100 text-slate-700 border-slate-200";
-  }
-}
-
 export default async function AdminOrderDetailPage({ params }: PageProps) {
   const { id } = await params;
 
@@ -149,12 +133,6 @@ export default async function AdminOrderDetailPage({ params }: PageProps) {
       revisions: {
         orderBy: { createdAt: "desc" },
       },
-      emailLogs: {
-        orderBy: { createdAt: "desc" },
-      },
-      sheetSyncLogs: {
-        orderBy: { createdAt: "desc" },
-      },
       productionLines: {
         orderBy: [{ partNumber: "asc" }, { frameNeeded: "asc" }],
       },
@@ -166,10 +144,8 @@ export default async function AdminOrderDetailPage({ params }: PageProps) {
   }
 
   const typedItems = order.items as OrderItemWithSelections[];
-  const typedRevisions = order.revisions as OrderRevisionItem[];
-  const typedEmailLogs = order.emailLogs as EmailLogItem[];
-  const typedSheetSyncLogs = order.sheetSyncLogs as SheetSyncLogItem[];
   const typedProductionLines = order.productionLines as ProductionLineItem[];
+  const typedRevisions = order.revisions as OrderRevisionItem[];
 
   return (
     <main className="min-h-screen bg-slate-50 p-8 text-slate-900">
@@ -214,7 +190,7 @@ export default async function AdminOrderDetailPage({ params }: PageProps) {
 
             <div className="flex flex-wrap gap-2">
               <span
-                className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${formatOrderStatusBadge(
+                className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${getOrderStatusClasses(
                   order.status
                 )}`}
               >
@@ -222,7 +198,7 @@ export default async function AdminOrderDetailPage({ params }: PageProps) {
               </span>
 
               <span
-                className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${formatStatusBadge(
+                className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${getProductionStatusClasses(
                   order.overallProductionStatus
                 )}`}
               >
@@ -232,12 +208,6 @@ export default async function AdminOrderDetailPage({ params }: PageProps) {
               <span className="inline-flex rounded-full border bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
                 Priority: {formatPriorityLabel(order.priority)}
               </span>
-
-              {order.pickedUpAt ? (
-                <span className="inline-flex rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
-                  Picked Up {formatCentralDate(order.pickedUpAt)}
-                </span>
-              ) : null}
             </div>
           </div>
 
@@ -289,7 +259,9 @@ export default async function AdminOrderDetailPage({ params }: PageProps) {
         <div className="rounded-2xl border bg-white p-6 shadow-sm">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <h2 className="text-2xl font-semibold">Customer Order Choices</h2>
+              <h2 className="text-2xl font-semibold">
+                Customer Order Choices
+              </h2>
               <p className="mt-2 text-sm text-slate-500">
                 Read-only view of exactly what the customer selected.
               </p>
@@ -309,7 +281,8 @@ export default async function AdminOrderDetailPage({ params }: PageProps) {
                       {item.productNameSnapshot}
                     </h3>
                     <p className="mt-1 text-sm text-slate-600">
-                      Base Price: {formatCurrency(Number(item.basePriceSnapshot))}
+                      Base Price:{" "}
+                      {formatCurrency(Number(item.basePriceSnapshot))}
                     </p>
                   </div>
 
@@ -329,26 +302,39 @@ export default async function AdminOrderDetailPage({ params }: PageProps) {
                     </thead>
 
                     <tbody>
-                      {item.selections.map((selection) => (
-                        <tr
-                          key={selection.id}
-                          className="border-b last:border-b-0"
-                        >
-                          <td className="px-4 py-3 font-medium text-slate-900">
-                            {selection.optionGroupNameSnapshot}
-                          </td>
-                          <td className="px-4 py-3 text-slate-700">
-                            {selection.optionChoiceNameSnapshot}
-                          </td>
-                          <td className="px-4 py-3 text-right font-medium">
-                            {Number(selection.priceDeltaSnapshot) === 0
-                              ? "Included"
-                              : formatCurrency(
-                                  Number(selection.priceDeltaSnapshot)
-                                )}
+                      {item.selections.length === 0 ? (
+                        <tr>
+                          <td
+                            colSpan={3}
+                            className="px-4 py-6 text-center text-slate-500"
+                          >
+                            No selections saved for this item.
                           </td>
                         </tr>
-                      ))}
+                      ) : (
+                        item.selections.map((selection) => (
+                          <tr
+                            key={selection.id}
+                            className="border-b last:border-b-0"
+                          >
+                            <td className="px-4 py-3 font-medium text-slate-900">
+                              {selection.optionGroupNameSnapshot}
+                            </td>
+                            <td className="px-4 py-3 text-slate-700">
+                              {cleanChoiceLabel(
+                                selection.optionChoiceNameSnapshot
+                              )}
+                            </td>
+                            <td className="px-4 py-3 text-right font-medium">
+                              {Number(selection.priceDeltaSnapshot) === 0
+                                ? "Included"
+                                : formatCurrency(
+                                    Number(selection.priceDeltaSnapshot)
+                                  )}
+                            </td>
+                          </tr>
+                        ))
+                      )}
                     </tbody>
                   </table>
                 </div>
@@ -364,7 +350,7 @@ export default async function AdminOrderDetailPage({ params }: PageProps) {
             <div>
               <h2 className="text-2xl font-semibold">Production Lines</h2>
               <p className="mt-2 text-sm text-slate-500">
-                Track each part / frame combination through the factory.
+                Factory production tracking for this order.
               </p>
             </div>
 
@@ -376,8 +362,7 @@ export default async function AdminOrderDetailPage({ params }: PageProps) {
 
           {typedProductionLines.length === 0 ? (
             <div className="mt-6 rounded-xl border border-dashed bg-slate-50 p-6 text-sm text-slate-500">
-              No production lines yet. They will appear once the order is sent
-              to factory and includes valid Part # / Frame Needed combinations.
+              No production lines yet.
             </div>
           ) : (
             <div className="mt-6 space-y-6">
@@ -398,142 +383,32 @@ export default async function AdminOrderDetailPage({ params }: PageProps) {
         </div>
 
         <div className="rounded-2xl border bg-white p-6 shadow-sm">
-          <h2 className="text-2xl font-semibold">Completed Furniture Photos</h2>
-          <p className="mt-2 text-sm text-slate-500">
-            Quick visual inventory of finished production lines.
-          </p>
+          <h2 className="text-2xl font-semibold">Revision History</h2>
 
-          {typedProductionLines.filter((line) => line.completedPhotoUrl)
-            .length === 0 ? (
-            <p className="mt-4 text-sm text-slate-500">
-              No completed furniture photos uploaded yet.
-            </p>
-          ) : (
-            <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-              {typedProductionLines
-                .filter((line) => line.completedPhotoUrl)
-                .map((line) => (
-                  <div
-                    key={`${line.id}-photo`}
-                    className="rounded-2xl border bg-slate-50 p-4"
-                  >
-                    <img
-                      src={line.completedPhotoUrl || ""}
-                      alt={`${line.partNumber} completed`}
-                      className="h-52 w-full rounded-xl object-cover"
-                    />
-                    <p className="mt-3 font-semibold">
-                      {line.partNumber} / {line.frameNeeded}
-                    </p>
-                    <p className="mt-1 text-sm text-slate-500">
-                      Qty {line.quantity}
-                    </p>
-                  </div>
-                ))}
-            </div>
-          )}
-        </div>
-
-        <div className="grid gap-8 lg:grid-cols-3">
-          <div className="rounded-2xl border bg-white p-6 shadow-sm">
-            <h2 className="text-2xl font-semibold">Revision History</h2>
-
-            <div className="mt-4 space-y-4">
-              {typedRevisions.length === 0 ? (
-                <p className="text-slate-500">No revisions yet.</p>
-              ) : (
-                typedRevisions.map((revision) => (
-                  <div
-                    key={revision.id}
-                    className="rounded-xl border bg-slate-50 p-4"
-                  >
-                    <p className="font-medium">
-                      Revision #{revision.revisionNumber}
-                    </p>
-                    <p className="mt-1 text-sm text-slate-500">
-                      {revision.changeReason || "No reason provided"}
-                    </p>
-                    <p className="mt-1 text-sm text-slate-500">
-                      Changed by: {revision.changedBy || "Unknown"}
-                    </p>
-                    <p className="mt-1 text-sm text-slate-500">
-                      {formatCentralDateTime(revision.createdAt)}
-                    </p>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-
-          <div className="rounded-2xl border bg-white p-6 shadow-sm">
-            <h2 className="text-2xl font-semibold">Email Logs</h2>
-
-            <div className="mt-4 space-y-4">
-              {typedEmailLogs.length === 0 ? (
-                <p className="text-slate-500">No email logs yet.</p>
-              ) : (
-                typedEmailLogs.map((log) => (
-                  <div
-                    key={log.id}
-                    className="rounded-xl border bg-slate-50 p-4"
-                  >
-                    <p className="font-medium">
-                      {log.eventType} — {log.status}
-                    </p>
-                    <p className="mt-1 text-sm text-slate-500">
-                      To: {log.recipient}
-                    </p>
-                    <p className="mt-1 text-sm text-slate-500">
-                      Subject: {log.subject || "No subject"}
-                    </p>
-                    {log.errorMessage ? (
-                      <p className="mt-1 text-sm text-red-600">
-                        Error: {log.errorMessage}
-                      </p>
-                    ) : null}
-                    <p className="mt-1 text-sm text-slate-500">
-                      {formatCentralDateTime(log.createdAt)}
-                    </p>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-
-          <div className="rounded-2xl border bg-white p-6 shadow-sm">
-            <h2 className="text-2xl font-semibold">Google Sheets Logs</h2>
-
-            <div className="mt-4 space-y-4">
-              {typedSheetSyncLogs.length === 0 ? (
-                <p className="text-slate-500">No sheets sync logs yet.</p>
-              ) : (
-                typedSheetSyncLogs.map((log) => (
-                  <div
-                    key={log.id}
-                    className="rounded-xl border bg-slate-50 p-4"
-                  >
-                    <p className="font-medium">{log.status}</p>
-                    <p className="mt-1 text-sm text-slate-500">
-                      Spreadsheet: {log.spreadsheetId || "Unknown"}
-                    </p>
-                    <p className="mt-1 text-sm text-slate-500">
-                      Worksheet: {log.worksheetName || "Unknown"}
-                    </p>
-                    <p className="mt-1 text-sm text-slate-500">
-                      Row Sync Marker: {log.spreadsheetRowId || "Unknown"}
-                    </p>
-                    {log.errorMessage ? (
-                      <p className="mt-1 text-sm text-red-600">
-                        Error: {log.errorMessage}
-                      </p>
-                    ) : null}
-                    <p className="mt-1 text-sm text-slate-500">
-                      {formatCentralDateTime(log.createdAt)}
-                    </p>
-                  </div>
-                ))
-              )}
-            </div>
+          <div className="mt-4 space-y-4">
+            {typedRevisions.length === 0 ? (
+              <p className="text-slate-500">No revisions yet.</p>
+            ) : (
+              typedRevisions.map((revision) => (
+                <div
+                  key={revision.id}
+                  className="rounded-xl border bg-slate-50 p-4"
+                >
+                  <p className="font-medium">
+                    Revision #{revision.revisionNumber}
+                  </p>
+                  <p className="mt-1 text-sm text-slate-500">
+                    {revision.changeReason || "No reason provided"}
+                  </p>
+                  <p className="mt-1 text-sm text-slate-500">
+                    Changed by: {revision.changedBy || "Unknown"}
+                  </p>
+                  <p className="mt-1 text-sm text-slate-500">
+                    {formatCentralDateTime(revision.createdAt)}
+                  </p>
+                </div>
+              ))
+            )}
           </div>
         </div>
       </div>
