@@ -608,7 +608,7 @@ const [totalLines, overdueLines, blockedLines, readyLines, pickedUpLines, lines]
                 return (
                   <Link
                     key={line.id}
-                    href={`/admin/orders/${line.order.id}`}
+                    href={`/admin/production/${line.order.id}`}
                     className="premium-grid-card"
                   >
                     <div className="flex flex-col gap-5">
