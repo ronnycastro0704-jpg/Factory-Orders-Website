@@ -170,6 +170,11 @@ function buildSelectionRows(selections: ResolvedSelection[]) {
   const rows: Array<{
     optionGroupNameSnapshot: string;
     optionChoiceNameSnapshot: string;
+    optionChoiceImageUrlSnapshot: string | null;
+    leatherNameSnapshot: string | null;
+    leatherGradeSnapshot: string | null;
+    leatherImageUrlSnapshot: string | null;
+    laseredBrandImageUrlSnapshot: string | null;
     priceDeltaSnapshot: number;
     leatherInventoryUsageSnapshot: number | null;
   }> = [];
@@ -178,6 +183,11 @@ function buildSelectionRows(selections: ResolvedSelection[]) {
     rows.push({
       optionGroupNameSnapshot: selection.groupName,
       optionChoiceNameSnapshot: selection.choiceLabel,
+      optionChoiceImageUrlSnapshot: selection.imageUrl || null,
+      leatherNameSnapshot: null,
+      leatherGradeSnapshot: null,
+      leatherImageUrlSnapshot: null,
+      laseredBrandImageUrlSnapshot: null,
       priceDeltaSnapshot: Number(selection.baseAmount || 0),
       leatherInventoryUsageSnapshot: Number(
         selection.leatherInventoryUsage || 0
@@ -190,6 +200,11 @@ function buildSelectionRows(selections: ResolvedSelection[]) {
         optionChoiceNameSnapshot: `${selection.choiceLabel}${SELECTION_META_SEPARATOR}${selection.leatherName}${
           selection.leatherGrade ? ` (${selection.leatherGrade})` : ""
         }`,
+        optionChoiceImageUrlSnapshot: null,
+        leatherNameSnapshot: selection.leatherName || null,
+        leatherGradeSnapshot: selection.leatherGrade || null,
+        leatherImageUrlSnapshot: selection.leatherImageUrl || null,
+        laseredBrandImageUrlSnapshot: null,
         priceDeltaSnapshot: Number(selection.leatherSurcharge || 0),
         leatherInventoryUsageSnapshot: null,
       });
@@ -199,6 +214,11 @@ function buildSelectionRows(selections: ResolvedSelection[]) {
       rows.push({
         optionGroupNameSnapshot: `${selection.groupName} Lasered Brand`,
         optionChoiceNameSnapshot: `${selection.choiceLabel}${SELECTION_META_SEPARATOR}Yes`,
+        optionChoiceImageUrlSnapshot: null,
+        leatherNameSnapshot: null,
+        leatherGradeSnapshot: null,
+        leatherImageUrlSnapshot: null,
+        laseredBrandImageUrlSnapshot: selection.laseredBrandImageUrl || null,
         priceDeltaSnapshot: 0,
         leatherInventoryUsageSnapshot: null,
       });
@@ -208,6 +228,11 @@ function buildSelectionRows(selections: ResolvedSelection[]) {
       rows.push({
         optionGroupNameSnapshot: `${selection.groupName} Lasered Brand Image`,
         optionChoiceNameSnapshot: `${selection.choiceLabel}${SELECTION_META_SEPARATOR}${selection.laseredBrandImageUrl}`,
+        optionChoiceImageUrlSnapshot: null,
+        leatherNameSnapshot: null,
+        leatherGradeSnapshot: null,
+        leatherImageUrlSnapshot: null,
+        laseredBrandImageUrlSnapshot: selection.laseredBrandImageUrl || null,
         priceDeltaSnapshot: 0,
         leatherInventoryUsageSnapshot: null,
       });

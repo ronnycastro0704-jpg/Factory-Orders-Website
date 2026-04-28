@@ -153,6 +153,11 @@ model OrderItemSelection {
   orderItem                     OrderItem @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
   optionGroupNameSnapshot       String
   optionChoiceNameSnapshot      String
+  optionChoiceImageUrlSnapshot String?
+  leatherNameSnapshot          String?
+  leatherGradeSnapshot         String?
+  leatherImageUrlSnapshot      String?
+  laseredBrandImageUrlSnapshot String?
   priceDeltaSnapshot            Decimal   @default(0) @db.Decimal(10, 2)
   leatherInventoryUsageSnapshot Decimal?  @db.Decimal(10, 2)
   createdAt                     DateTime  @default(now())

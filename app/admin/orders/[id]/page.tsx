@@ -17,6 +17,11 @@ type OrderSelectionItem = {
   id: string;
   optionGroupNameSnapshot: string;
   optionChoiceNameSnapshot: string;
+  optionChoiceImageUrlSnapshot: string | null;
+  leatherNameSnapshot: string | null;
+  leatherGradeSnapshot: string | null;
+  leatherImageUrlSnapshot: string | null;
+  laseredBrandImageUrlSnapshot: string | null;
   priceDeltaSnapshot: unknown;
 };
 
@@ -207,28 +212,79 @@ export default async function AdminOrderReadOnlyPage({ params }: PageProps) {
                         </span>
                       </div>
 
-                      <div className="rounded-2xl border border-[var(--brand)] bg-[var(--brand-soft)] p-4 ring-2 ring-[var(--brand)]">
-                        <div className="flex items-start justify-between gap-4">
-                          <div>
-                            <p className="font-semibold">
-                              {cleanChoiceLabel(
-                                selection.optionChoiceNameSnapshot
-                              )}
-                            </p>
-                            <p className="mt-2 text-sm text-slate-500">
-                              Saved from the customer&apos;s submitted order.
-                            </p>
-                          </div>
+<div className="rounded-2xl border border-[var(--brand)] bg-[var(--brand-soft)] p-4 ring-2 ring-[var(--brand)]">
+  {selection.optionChoiceImageUrlSnapshot ||
+  selection.leatherImageUrlSnapshot ||
+  selection.laseredBrandImageUrlSnapshot ? (
+    <div className="mb-4 grid gap-4 sm:grid-cols-3">
+      {selection.optionChoiceImageUrlSnapshot ? (
+        <div className="rounded-xl border bg-white p-3">
+          <p className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+            Part
+          </p>
+          <img
+            src={selection.optionChoiceImageUrlSnapshot}
+            alt={cleanChoiceLabel(selection.optionChoiceNameSnapshot)}
+            className="h-32 w-full rounded-lg object-contain"
+          />
+        </div>
+      ) : null}
 
-                          <div className="whitespace-nowrap text-sm font-medium">
-                            {Number(selection.priceDeltaSnapshot) === 0
-                              ? "Included"
-                              : `+${formatCurrency(
-                                  Number(selection.priceDeltaSnapshot)
-                                )}`}
-                          </div>
-                        </div>
-                      </div>
+      {selection.leatherImageUrlSnapshot ? (
+        <div className="rounded-xl border bg-white p-3">
+          <p className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+            Leather
+          </p>
+          <img
+            src={selection.leatherImageUrlSnapshot}
+            alt={selection.leatherNameSnapshot || "Selected leather"}
+            className="h-32 w-full rounded-lg object-contain"
+          />
+          {selection.leatherNameSnapshot ? (
+            <p className="mt-2 text-sm font-medium text-slate-900">
+              {selection.leatherNameSnapshot}
+            </p>
+          ) : null}
+          {selection.leatherGradeSnapshot ? (
+            <p className="text-xs text-slate-500">
+              {selection.leatherGradeSnapshot}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+
+      {selection.laseredBrandImageUrlSnapshot ? (
+        <div className="rounded-xl border bg-white p-3">
+          <p className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+            Lasered Brand
+          </p>
+          <img
+            src={selection.laseredBrandImageUrlSnapshot}
+            alt="Lasered brand"
+            className="h-32 w-full rounded-lg object-contain"
+          />
+        </div>
+      ) : null}
+    </div>
+  ) : null}
+
+  <div className="flex items-start justify-between gap-4">
+    <div>
+      <p className="font-semibold">
+        {cleanChoiceLabel(selection.optionChoiceNameSnapshot)}
+      </p>
+      <p className="mt-2 text-sm text-slate-500">
+        Saved from the customer&apos;s submitted order.
+      </p>
+    </div>
+
+    <div className="whitespace-nowrap text-sm font-medium">
+      {Number(selection.priceDeltaSnapshot) === 0
+        ? "Included"
+        : `+${formatCurrency(Number(selection.priceDeltaSnapshot))}`}
+    </div>
+  </div>
+</div>
                     </div>
                   ))
                 )}
