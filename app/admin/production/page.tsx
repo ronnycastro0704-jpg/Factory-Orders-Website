@@ -346,28 +346,54 @@ if (status === "PAID") {
     ...(andFilters.length > 0 ? { AND: andFilters } : {}),
   };
 
-  const [totalLines, overdueLines, blockedLines, readyLines, pickedUpLines, lines] =
-    await Promise.all([
-      prisma.productionLine.count(),
-prisma.productionLine.count({
-  where: {
-    order: {
-      status: {
-        not: "PAID",
-      },
+  const unpaidOrderFilter: Prisma.ProductionLineWhereInput = {
+  order: {
+    status: {
+      not: "PAID",
     },
   },
-}),
-      prisma.productionLine.count({
-        where: { currentStatus: "BLOCKED" },
-      }),
-      prisma.productionLine.count({
-        where: { currentStatus: "READY" },
-      }),
-      prisma.productionLine.count({
-        where: { pickedUp: true },
-      }),
-      prisma.productionLine.findMany({
+};
+
+const [totalLines, overdueLines, blockedLines, readyLines, pickedUpLines, lines] =
+  await Promise.all([
+    prisma.productionLine.count({
+      where: unpaidOrderFilter,
+    }),
+
+    prisma.productionLine.count({
+      where: {
+        AND: [
+          unpaidOrderFilter,
+          { dueDate: { lt: now } },
+          { pickedUp: false },
+          {
+            currentStatus: {
+              notIn: ["READY", "PICKED_UP"],
+            },
+          },
+        ],
+      },
+    }),
+
+    prisma.productionLine.count({
+      where: {
+        AND: [unpaidOrderFilter, { currentStatus: "BLOCKED" }],
+      },
+    }),
+
+    prisma.productionLine.count({
+      where: {
+        AND: [unpaidOrderFilter, { currentStatus: "READY" }],
+      },
+    }),
+
+    prisma.productionLine.count({
+      where: {
+        AND: [unpaidOrderFilter, { pickedUp: true }],
+      },
+    }),
+
+    prisma.productionLine.findMany({
         where,
         orderBy: [{ dueDate: "asc" }, { updatedAt: "desc" }],
         include: {
