@@ -1,73 +1,97 @@
-/*import Link from "next/link";
-import { auth } from "../auth";
-import LogoutButton from "../logout-button";
+import Link from "next/link";
+import { auth, signOut } from "@/auth";
+import { isAdminEmail } from "@/lib/admin";
 
 export default async function SiteHeader() {
   const session = await auth();
-
-  const user = session?.user;
-  const role = user?.role;
-  const isAdminUser = role === "ADMIN" || role === "STAFF";
+  const email = session?.user?.email || null;
+  const name = session?.user?.name || email || "Account";
+  const showAdmin = isAdminEmail(email);
 
   return (
-    <header className="border-b bg-white">
-      <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
-        <div className="flex items-center gap-6">
-          <Link href="/" className="text-lg font-bold text-slate-900">
-            Furniture Orders
-          </Link>
-
-          <nav className="flex items-center gap-4 text-sm text-slate-600">
-            <Link href="/" className="hover:text-slate-900">
-              Builder
-            </Link>
-
-            {user && (
-              <Link href="/my/orders" className="hover:text-slate-900">
-                My Orders
-              </Link>
-            )}
-
-            {user && isAdminUser && (
-              <Link href="/admin" className="hover:text-slate-900 font-medium">
-                Open Admin
-              </Link>
-            )}
-          </nav>
-        </div>
-
-        <div className="flex items-center gap-3">
-          {user ? (
-            <>
-              <div className="text-right">
-                <p className="text-sm font-medium text-slate-900">
-                  {user.name || "User"}
+    <header className="sticky top-0 z-50 border-b bg-white/85 backdrop-blur">
+      <div className="page-shell">
+        <div className="flex min-h-[72px] flex-col gap-3 py-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-3">
+            <Link
+              href="/"
+              className="inline-flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2 shadow-sm hover:bg-slate-50"
+            >
+              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--brand)] text-sm font-bold text-white">
+                FO
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-slate-900">
+                  Furniture Orders
                 </p>
                 <p className="text-xs text-slate-500">
-                  {user.email} • {role}
+                  Customer + Factory Platform
                 </p>
               </div>
-              <LogoutButton />
-            </>
-          ) : (
-            <>
-              <Link
-                href="/signup"
-                className="rounded-lg border px-3 py-2 text-sm hover:bg-slate-100"
-              >
-                Create account
+            </Link>
+
+            <nav className="hidden items-center gap-2 md:flex">
+              <Link href="/" className="button-secondary">
+                Customer Side
               </Link>
 
-              <Link
-                href="/login"
-                className="rounded-lg bg-slate-900 px-3 py-2 text-sm text-white hover:bg-slate-800"
-              >
-                Sign in
+              <Link href="/my/orders" className="button-secondary">
+                My Orders
               </Link>
-            </>
-          )}
+
+              {showAdmin ? (
+                <Link href="/admin" className="button-primary">
+                  Open Admin
+                </Link>
+              ) : null}
+            </nav>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3">
+            {session?.user ? (
+              <>
+                <div className="rounded-xl border bg-white px-3 py-2 text-sm shadow-sm">
+                  <p className="font-medium text-slate-900">{name}</p>
+                  {email ? (
+                    <p className="text-xs text-slate-500">{email}</p>
+                  ) : null}
+                </div>
+
+                <form
+                  action={async () => {
+                    "use server";
+                    await signOut({ redirectTo: "/login" });
+                  }}
+                >
+                  <button type="submit" className="button-primary">
+                    Sign Out
+                  </button>
+                </form>
+              </>
+            ) : (
+              <Link href="/login" className="button-primary">
+                Sign In
+              </Link>
+            )}
+          </div>
+
+          <nav className="flex flex-wrap items-center gap-2 md:hidden">
+            <Link href="/" className="button-secondary">
+              Customer Side
+            </Link>
+
+            <Link href="/my/orders" className="button-secondary">
+              My Orders
+            </Link>
+
+            {showAdmin ? (
+              <Link href="/admin" className="button-primary">
+                Open Admin
+              </Link>
+            ) : null}
+          </nav>
         </div>
       </div>
     </header>
   );
-} */
+}
