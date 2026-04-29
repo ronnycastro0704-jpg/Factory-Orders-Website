@@ -33,11 +33,11 @@ export default auth((req) => {
     pathname.startsWith("/my/orders/") ||
     (pathname.startsWith("/orders/") && pathname.endsWith("/edit"));
 
-  if (isLoginRoute && isLoggedIn) {
-    return NextResponse.redirect(
-      new URL(isAdmin ? "/admin/products" : "/my/orders", req.url)
-    );
-  }
+if (isLoginRoute && isLoggedIn) {
+  return NextResponse.redirect(
+    new URL(isAdmin ? "/admin" : "/my/orders", req.url)
+  );
+}
 
   if ((isAdminRoute || isCustomerRoute) && !isLoggedIn) {
     const loginUrl = new URL("/login", req.url);
