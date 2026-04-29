@@ -7,6 +7,7 @@ export default async function SiteHeader() {
 
   const user = session?.user;
   const role = user?.role;
+  const isAdminUser = role === "ADMIN" || role === "STAFF";
 
   return (
     <header className="border-b bg-white">
@@ -27,25 +28,28 @@ export default async function SiteHeader() {
                   My Orders
                 </Link>
 
-  {(role === "ADMIN" || role === "STAFF") ? (
-  <>
-    <Link href="/admin" className="hover:text-slate-900">
-      Admin Dashboard
-    </Link>
-    <Link href="/admin/products" className="hover:text-slate-900">
-      Products
-    </Link>
-    <Link href="/admin/leathers" className="hover:text-slate-900">
-      Leathers
-    </Link>
-    <Link href="/admin/approved-customers" className="hover:text-slate-900">
-      Approved Customers
-    </Link>
-    <Link href="/admin/orders" className="hover:text-slate-900">
-      Orders
-    </Link>
-  </>
-) : null}
+                {isAdminUser ? (
+                  <>
+                    <Link href="/admin" className="hover:text-slate-900">
+                      Dashboard
+                    </Link>
+                    <Link href="/admin/orders" className="hover:text-slate-900">
+                      Orders
+                    </Link>
+                    <Link href="/admin/products" className="hover:text-slate-900">
+                      Products
+                    </Link>
+                    <Link href="/admin/leathers" className="hover:text-slate-900">
+                      Leathers
+                    </Link>
+                    <Link
+                      href="/admin/approved-customers"
+                      className="hover:text-slate-900"
+                    >
+                      Approved Customers
+                    </Link>
+                  </>
+                ) : null}
               </>
             ) : null}
           </nav>
@@ -65,21 +69,21 @@ export default async function SiteHeader() {
               <LogoutButton />
             </>
           ) : (
-<>
-  <Link
-    href="/signup"
-    className="rounded-lg border px-3 py-2 text-sm hover:bg-slate-100"
-  >
-    Create account
-  </Link>
+            <>
+              <Link
+                href="/signup"
+                className="rounded-lg border px-3 py-2 text-sm hover:bg-slate-100"
+              >
+                Create account
+              </Link>
 
-  <Link
-    href="/login"
-    className="rounded-lg bg-slate-900 px-3 py-2 text-sm text-white hover:bg-slate-800"
-  >
-    Sign in
-  </Link>
-</>
+              <Link
+                href="/login"
+                className="rounded-lg bg-slate-900 px-3 py-2 text-sm text-white hover:bg-slate-800"
+              >
+                Sign in
+              </Link>
+            </>
           )}
         </div>
       </div>
