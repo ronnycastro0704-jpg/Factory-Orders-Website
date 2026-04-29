@@ -17,22 +17,26 @@ export default async function SiteHeader() {
             Furniture Orders
           </Link>
 
-          <nav className="flex items-center gap-4 text-sm text-slate-600">
+          <nav className="flex items-center gap-3 text-sm text-slate-600">
             <Link href="/" className="hover:text-slate-900">
               Builder
             </Link>
 
-            {user && (
-              <Link href="/my/orders" className="hover:text-slate-900">
-                My Orders
-              </Link>
-            )}
+            {user ? (
+              <>
+                <Link href="/my/orders" className="hover:text-slate-900">
+                  My Orders
+                </Link>
 
-            {user && isAdminUser && (
-              <Link href="/admin" className="hover:text-slate-900 font-medium">
-                Open Admin
-              </Link>
-            )}
+                {isAdminUser ? (
+                  <>
+      <Link href="/admin" className="hover:text-slate-900">
+  Open Admin
+</Link>
+                  </>
+                ) : null}
+              </>
+            ) : null}
           </nav>
         </div>
 
