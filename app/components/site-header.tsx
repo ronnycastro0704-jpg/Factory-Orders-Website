@@ -30,24 +30,9 @@ export default async function SiteHeader() {
 
                 {isAdminUser ? (
                   <>
-                    <Link href="/admin" className="hover:text-slate-900">
-                      Dashboard
-                    </Link>
-                    <Link href="/admin/orders" className="hover:text-slate-900">
-                      Orders
-                    </Link>
-                    <Link href="/admin/products" className="hover:text-slate-900">
-                      Products
-                    </Link>
-                    <Link href="/admin/leathers" className="hover:text-slate-900">
-                      Leathers
-                    </Link>
-                    <Link
-                      href="/admin/approved-customers"
-                      className="hover:text-slate-900"
-                    >
-                      Approved Customers
-                    </Link>
+      <Link href="/admin" className="hover:text-slate-900">
+  Open Admin
+</Link>
                   </>
                 ) : null}
               </>
