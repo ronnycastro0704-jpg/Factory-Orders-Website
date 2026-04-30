@@ -92,10 +92,8 @@ export default async function AdminOrderReadOnlyPage({ params }: PageProps) {
     })),
   ]);
 
-  const perUnitSubtotal = typedItems.reduce(
-    (sum, item) => sum + Number(item.lineTotal),
-    0
-  );
+const perUnitSubtotal =
+  order.quantity > 0 ? Number(order.total) / order.quantity : Number(order.total);
 
   return (
     <main className="min-h-screen bg-slate-50 p-8 text-slate-900">

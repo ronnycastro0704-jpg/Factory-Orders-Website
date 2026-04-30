@@ -430,7 +430,14 @@ export async function POST(request: Request) {
     }
 
     const productId = String(body.productId || "").trim();
-    const poNumber = String(body.poNumber || "").trim() || null;
+const poNumber = String(body.poNumber || "").trim();
+
+if (!poNumber) {
+  return NextResponse.json(
+    { error: "PO # is required." },
+    { status: 400 }
+  );
+}
     const customerName = approvedCustomer.name;
     const customerEmail = approvedCustomer.email;
     const customerPhone = String(body.customerPhone || "").trim() || null;

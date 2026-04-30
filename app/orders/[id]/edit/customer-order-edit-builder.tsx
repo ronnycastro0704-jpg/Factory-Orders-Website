@@ -213,7 +213,10 @@ export default function CustomerOrderEditBuilder({
   ] = useState<Record<string, File | null>>({});
 
   const [poNumber, setPoNumber] = useState(initialPoNumber);
-  const [quantity, setQuantity] = useState(sanitizeQuantity(initialQuantity));
+const [quantityInput, setQuantityInput] = useState(
+  String(sanitizeQuantity(initialQuantity))
+);
+const quantity = sanitizeQuantity(Number(quantityInput));
   const [customerName] = useState(initialCustomerName);
   const [customerEmail] = useState(initialCustomerEmail);
   const [customerPhone, setCustomerPhone] = useState(initialCustomerPhone);
@@ -502,12 +505,23 @@ export default function CustomerOrderEditBuilder({
     return payloadSelections;
   }
 
-  async function handleSaveChanges() {
-    setSaving(true);
-    setSaveError("");
-    setSaveMessage("");
+async function handleSaveChanges() {
+  setSaveError("");
+  setSaveMessage("");
 
-    try {
+  if (!poNumber.trim()) {
+    setSaveError("PO # is required.");
+    return;
+  }
+
+  if (quantity < 1) {
+    setSaveError("Quantity must be at least 1.");
+    return;
+  }
+
+  setSaving(true);
+
+  try {
       const payloadSelections = await buildSelectionPayload();
 
       const response = await fetch(`/api/orders/${orderId}`, {
@@ -1068,25 +1082,42 @@ export default function CustomerOrderEditBuilder({
 
           <div className="mt-4 space-y-4">
             <div>
-              <label className="mb-1 block text-sm font-medium">PO #</label>
-              <input
-                className="w-full rounded-lg border px-3 py-2"
-                value={poNumber}
-                onChange={(e) => setPoNumber(e.target.value)}
-                placeholder="Optional PO number"
-              />
+<label className="mb-1 block text-sm font-medium">
+  PO # <span className="text-red-600">*</span>
+</label>
+   <input
+  className="w-full rounded-lg border px-3 py-2"
+  value={poNumber}
+  onChange={(event) => setPoNumber(event.target.value)}
+  required
+/>
             </div>
 
             <div>
               <label className="mb-1 block text-sm font-medium">Quantity</label>
-              <input
-                type="number"
-                min={1}
-                step={1}
-                className="w-full rounded-lg border px-3 py-2"
-                value={quantity}
-                onChange={(e) => setQuantity(sanitizeQuantity(Number(e.target.value)))}
-              />
+<input
+  type="text"
+  inputMode="numeric"
+  pattern="[0-9]*"
+  className="w-full rounded-lg border px-3 py-2"
+  value={quantityInput}
+  onChange={(event) => {
+    const value = event.target.value;
+
+    if (/^\d*$/.test(value)) {
+      setQuantityInput(value);
+    }
+  }}
+  onBlur={() => {
+    const parsed = Number(quantityInput);
+
+    if (!Number.isFinite(parsed) || parsed < 1) {
+      setQuantityInput("1");
+    } else {
+      setQuantityInput(String(Math.round(parsed)));
+    }
+  }}
+/>
             </div>
 
             <div>
@@ -1177,7 +1208,7 @@ export default function CustomerOrderEditBuilder({
         </div>
       </div>
 
-      <div className="h-fit rounded-2xl border p-6 shadow-sm">
+      <div className="price-panel lg:sticky lg:top-24">
         <h2 className="text-2xl font-semibold">Itemized Price</h2>
 
         <div className="mt-2 text-sm text-slate-500">

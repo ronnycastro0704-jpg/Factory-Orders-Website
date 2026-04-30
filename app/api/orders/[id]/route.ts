@@ -584,7 +584,14 @@ export async function PUT(request: Request, context: RouteContext) {
     const { id } = await context.params;
     const body = await request.json();
 
-    const poNumber = String(body.poNumber || "").trim() || null;
+const poNumber = String(body.poNumber || "").trim();
+
+if (!poNumber) {
+  return NextResponse.json(
+    { error: "PO # is required." },
+    { status: 400 }
+  );
+}
     const customerPhone = String(body.customerPhone || "").trim() || null;
     const notes = String(body.notes || "").trim() || null;
     const changeReason = String(body.changeReason || "").trim() || "Order updated";
