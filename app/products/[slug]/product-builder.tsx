@@ -1218,8 +1218,8 @@ async function handleSendToFactory() {
         </div>
       </div>
 
-<div className="price-panel lg:sticky lg:top-24">
-        <h2 className="text-2xl font-semibold">Itemized Price</h2>
+<div className="price-panel lg:sticky lg:top-24 self-start">
+  <h2 className="text-2xl font-semibold">Itemized Price</h2>
 
         <div className="mt-2 text-sm text-slate-500">
           Prices below are per unit.
