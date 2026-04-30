@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import {
   ClipboardList,
   Factory,
+  LayoutDashboard,
   Package,
   Palette,
   UserCheck,
@@ -17,6 +18,12 @@ const adminLinks = [
     description: "Open the factory production dashboard.",
     href: "/admin/production",
     icon: Factory,
+  },
+  {
+    title: "Kanban Board",
+    description: "View production lines grouped by production status.",
+    href: "/admin/kanban",
+    icon: LayoutDashboard,
   },
   {
     title: "Orders",
