@@ -1,12 +1,20 @@
 import Link from "next/link";
+import { Prisma } from "@prisma/client";
 import { redirect } from "next/navigation";
 import { auth } from "../../../auth";
 import { prisma } from "../../../lib/prisma";
 import { formatCurrency } from "../../../lib/utils";
 
+type PageProps = {
+  searchParams: Promise<{
+    q?: string;
+  }>;
+};
+
 type OrderRow = {
   id: string;
   orderNumber: string;
+  poNumber: string | null;
   status: string;
   total: unknown;
   createdAt: Date;
@@ -27,6 +35,8 @@ function formatDate(date: Date) {
 
 function getStatusClasses(status: string) {
   switch (status) {
+    case "PAID":
+      return "bg-emerald-50 text-emerald-700 border-emerald-200";
     case "SENT_TO_FACTORY":
       return "bg-amber-50 text-amber-700 border-amber-200";
     case "COMPLETED":
@@ -42,19 +52,64 @@ function getStatusClasses(status: string) {
   }
 }
 
-export default async function MyOrdersPage() {
+export default async function MyOrdersPage({ searchParams }: PageProps) {
   const session = await auth();
 
   if (!session?.user?.email) {
     redirect("/login");
   }
 
+  const params = await searchParams;
+  const query = String(params.q || "").trim();
   const userEmail = session.user.email.toLowerCase();
 
+const normalizedStatusQuery = query.toUpperCase().replaceAll(" ", "_");
+
+const validStatusQuery = [
+  "DRAFT",
+  "SUBMITTED",
+  "CHANGED",
+  "SENT_TO_FACTORY",
+  "COMPLETED",
+  "PAID",
+  "CANCELLED",
+].includes(normalizedStatusQuery)
+  ? normalizedStatusQuery
+  : null;
+
+const where: Prisma.OrderWhereInput = {
+  customerEmail: userEmail,
+  ...(query
+    ? {
+        OR: [
+          { orderNumber: { contains: query, mode: "insensitive" } },
+          { poNumber: { contains: query, mode: "insensitive" } },
+          ...(validStatusQuery
+            ? [
+                {
+                  status: {
+                    equals:
+                      validStatusQuery as Prisma.EnumOrderStatusFilter["equals"],
+                  },
+                },
+              ]
+            : []),
+          {
+            items: {
+              some: {
+                productNameSnapshot: {
+                  contains: query,
+                  mode: "insensitive",
+                },
+              },
+            },
+          },
+        ],
+      }
+    : {}),
+};
   const orders = (await prisma.order.findMany({
-    where: {
-      customerEmail: userEmail,
-    },
+    where,
     orderBy: { createdAt: "desc" },
     include: {
       items: {
@@ -79,8 +134,7 @@ export default async function MyOrdersPage() {
                 Review your submitted and draft orders
               </h1>
               <p className="mt-4 max-w-2xl text-base sm:text-lg text-slate-600">
-                Open any order to review changes, continue editing drafts, and
-                keep track of what has already been sent to the factory.
+                Search by PO #, order number, product, or status.
               </p>
             </div>
 
@@ -93,7 +147,7 @@ export default async function MyOrdersPage() {
         </section>
 
         <section className="section-card-strong">
-          <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div>
               <p className="text-sm font-medium uppercase tracking-[0.18em] text-slate-500">
                 Orders
@@ -101,6 +155,25 @@ export default async function MyOrdersPage() {
               <h2 className="mt-2 text-3xl font-bold">Your Order History</h2>
             </div>
 
+            <form className="flex w-full gap-3 lg:max-w-xl">
+              <input
+                name="q"
+                defaultValue={query}
+                placeholder="Search PO #, order #, product, status..."
+                className="w-full rounded-xl border bg-white px-4 py-3 text-sm"
+              />
+              <button type="submit" className="button-primary whitespace-nowrap">
+                Search
+              </button>
+              {query ? (
+                <Link href="/my/orders" className="button-secondary">
+                  Clear
+                </Link>
+              ) : null}
+            </form>
+          </div>
+
+          <div className="mb-6">
             <span className="status-pill">
               {orders.length} order{orders.length === 1 ? "" : "s"}
             </span>
@@ -109,14 +182,16 @@ export default async function MyOrdersPage() {
           {orders.length === 0 ? (
             <div className="rounded-2xl border border-dashed bg-white/70 p-10 text-center">
               <p className="text-lg font-semibold text-slate-700">
-                You do not have any orders yet.
+                {query ? "No orders matched your search." : "You do not have any orders yet."}
               </p>
               <p className="mt-2 text-sm text-slate-500">
-                Go back to the product page and create your first order.
+                {query
+                  ? "Try searching a different PO #, order number, product, or status."
+                  : "Go back to the product page and create your first order."}
               </p>
               <div className="mt-6">
-                <Link href="/" className="button-primary">
-                  Browse Products
+                <Link href={query ? "/my/orders" : "/"} className="button-primary">
+                  {query ? "Clear Search" : "Browse Products"}
                 </Link>
               </div>
             </div>
@@ -132,7 +207,7 @@ export default async function MyOrdersPage() {
                         <div>
                           <div className="flex flex-wrap items-center gap-2">
                             <p className="text-lg font-semibold">
-                              {order.orderNumber}
+                              PO # {order.poNumber || "—"}
                             </p>
                             <span
                               className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${getStatusClasses(
@@ -142,6 +217,10 @@ export default async function MyOrdersPage() {
                               {order.status.replaceAll("_", " ")}
                             </span>
                           </div>
+
+                          <p className="mt-2 text-sm text-slate-500">
+                            Order #: {order.orderNumber}
+                          </p>
 
                           <p className="mt-3 text-sm text-slate-600">
                             Product: {firstItem?.productNameSnapshot || "—"}
