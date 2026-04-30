@@ -31,31 +31,42 @@ export default async function AdminLeathersPage({ searchParams }: PageProps) {
   const query = String(params.q || "").trim();
   const stockFilter = String(params.stock || "all").trim().toLowerCase();
 
-  const where: Prisma.LeatherWhereInput = {
-    ...(query
-      ? {
+const queryParts = query
+  .toLowerCase()
+  .split(/\s+/)
+  .map((part) => part.trim())
+  .filter(Boolean);
+
+const searchFilter: Prisma.LeatherWhereInput =
+  queryParts.length > 0
+    ? {
+        AND: queryParts.map((part) => ({
           OR: [
-            { name: { contains: query, mode: "insensitive" } },
-            { slug: { contains: query, mode: "insensitive" } },
-            { grade: { contains: query, mode: "insensitive" } },
+            { name: { contains: part, mode: "insensitive" } },
+            { slug: { contains: part, mode: "insensitive" } },
+            { grade: { contains: part, mode: "insensitive" } },
           ],
-        }
-      : {}),
-    ...(stockFilter === "negative"
-      ? {
-          inventoryUnits: {
-            lt: 0,
-          },
-        }
-      : {}),
-    ...(stockFilter === "low"
-      ? {
-          inventoryUnits: {
-            lt: 2,
-          },
-        }
-      : {}),
-  };
+        })),
+      }
+    : {};
+
+const where: Prisma.LeatherWhereInput = {
+  ...searchFilter,
+  ...(stockFilter === "negative"
+    ? {
+        inventoryUnits: {
+          lt: 0,
+        },
+      }
+    : {}),
+  ...(stockFilter === "low"
+    ? {
+        inventoryUnits: {
+          lt: 2,
+        },
+      }
+    : {}),
+};
 
   const [allLeathers, leathers] = await Promise.all([
     prisma.leather.findMany({
