@@ -737,124 +737,23 @@ export default async function AdminKanbanPage({ searchParams }: PageProps) {
                           const stageSummary = getStageSummary(line);
 
                           return (
-                            <Link
-                              key={line.id}
-                              href={`/admin/production/${line.order.id}`}
-                              className="block rounded-2xl border bg-white p-3 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
-                            >
-                              <div className="space-y-3">
-                                <div>
-                                  <p className="font-semibold text-slate-900">
-                                    {line.partNumber} / {line.frameNeeded}
-                                  </p>
-                                  <p className="mt-1 text-xs text-slate-500">
-                                    Order {line.order.orderNumber}
-                                  </p>
-                                  {line.order.poNumber ? (
-                                    <p className="text-xs text-slate-500">
-                                      PO # {line.order.poNumber}
-                                    </p>
-                                  ) : null}
-                                  <p className="text-xs text-slate-500">
-                                    {line.order.customerName}
-                                  </p>
-                                </div>
+<Link
+  key={line.id}
+  href={`/admin/production/${line.order.id}`}
+  className="block rounded-xl border bg-white p-3 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+>
+  <div className="space-y-2">
+    <p className="text-sm font-semibold text-slate-900">
+      {line.partNumber} / {line.frameNeeded}
+    </p>
 
-                                <div className="flex flex-wrap gap-1.5">
-                                  <span
-                                    className={`inline-flex rounded-full border px-2 py-1 text-[11px] font-semibold ${getOrderStatusClasses(
-                                      line.order.status
-                                    )}`}
-                                  >
-                                    {line.order.status.replaceAll("_", " ")}
-                                  </span>
-
-                                  <span
-                                    className={`inline-flex rounded-full border px-2 py-1 text-[11px] font-semibold ${getPriorityClasses(
-                                      line.priority
-                                    )}`}
-                                  >
-                                    {formatPriorityLabel(line.priority)}
-                                  </span>
-
-                                  {isOverdue ? (
-                                    <span className="inline-flex rounded-full border border-red-200 bg-red-50 px-2 py-1 text-[11px] font-semibold text-red-700">
-                                      Overdue
-                                    </span>
-                                  ) : null}
-                                </div>
-
-                                {line.completedPhotoUrl ? (
-                                  <div className="overflow-hidden rounded-xl border bg-white">
-                                    <img
-                                      src={line.completedPhotoUrl}
-                                      alt={`${line.partNumber} completed`}
-                                      className="h-32 w-full object-cover"
-                                    />
-                                  </div>
-                                ) : null}
-
-                                <div className="grid gap-2 text-xs">
-                                  <div className="rounded-xl bg-slate-50 p-2">
-                                    <p className="uppercase tracking-[0.14em] text-slate-500">
-                                      Qty
-                                    </p>
-                                    <p className="mt-1 font-semibold">
-                                      {line.quantity}
-                                    </p>
-                                  </div>
-
-                                  <div className="rounded-xl bg-slate-50 p-2">
-                                    <p className="uppercase tracking-[0.14em] text-slate-500">
-                                      Due
-                                    </p>
-                                    <p className="mt-1 font-semibold">
-                                      {formatDateOnly(line.dueDate)}
-                                    </p>
-                                  </div>
-
-                                  <div className="rounded-xl bg-slate-50 p-2">
-                                    <p className="uppercase tracking-[0.14em] text-slate-500">
-                                      Leather
-                                    </p>
-                                    <p className="mt-1 font-semibold">
-                                      {line.bodyLeather || "—"}
-                                    </p>
-                                  </div>
-
-                                  <div className="rounded-xl bg-slate-50 p-2">
-                                    <p className="uppercase tracking-[0.14em] text-slate-500">
-                                      Assignee
-                                    </p>
-                                    <p className="mt-1 font-semibold">
-                                      {currentAssignee || "—"}
-                                    </p>
-                                  </div>
-                                </div>
-
-                                <div className="rounded-xl border bg-white/80 p-2">
-                                  <div className="flex items-center justify-between gap-2">
-                                    <p className="text-[11px] uppercase tracking-[0.14em] text-slate-500">
-                                      Stage
-                                    </p>
-                                    <span
-                                      className={`inline-flex rounded-full border px-2 py-1 text-[11px] font-semibold ${getStageValueClasses(
-                                        stageSummary.value
-                                      )}`}
-                                    >
-                                      {formatStageLabel(stageSummary.value)}
-                                    </span>
-                                  </div>
-                                  <p className="mt-1 text-xs text-slate-700">
-                                    {stageSummary.label}
-                                  </p>
-                                </div>
-
-                                <p className="text-[11px] text-slate-400">
-                                  Updated {formatDateTime(line.updatedAt)}
-                                </p>
-                              </div>
-                            </Link>
+    <div className="space-y-1 text-xs text-slate-500">
+      <p>Order {line.order.orderNumber}</p>
+      <p>PO # {line.order.poNumber || "—"}</p>
+      <p>{line.order.customerName}</p>
+    </div>
+  </div>
+</Link>
                           );
                         })
                       )}
