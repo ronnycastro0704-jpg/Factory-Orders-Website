@@ -16,13 +16,24 @@ type OrderRow = {
   orderNumber: string;
   poNumber: string | null;
   status: string;
+  quantity: number;
   total: unknown;
   createdAt: Date;
   updatedAt: Date;
   items: {
     id: string;
     productNameSnapshot: string;
+    selections: {
+      id: string;
+      leatherNameSnapshot: string | null;
+      leatherInventoryUsageSnapshot: unknown | null;
+    }[];
   }[];
+};
+
+type LeatherInventoryRow = {
+  name: string;
+  inventoryUnits: unknown;
 };
 
 function formatDate(date: Date) {
@@ -63,51 +74,52 @@ export default async function MyOrdersPage({ searchParams }: PageProps) {
   const query = String(params.q || "").trim();
   const userEmail = session.user.email.toLowerCase();
 
-const normalizedStatusQuery = query.toUpperCase().replaceAll(" ", "_");
+  const normalizedStatusQuery = query.toUpperCase().replaceAll(" ", "_");
 
-const validStatusQuery = [
-  "DRAFT",
-  "SUBMITTED",
-  "CHANGED",
-  "SENT_TO_FACTORY",
-  "COMPLETED",
-  "PAID",
-  "CANCELLED",
-].includes(normalizedStatusQuery)
-  ? normalizedStatusQuery
-  : null;
+  const validStatusQuery = [
+    "DRAFT",
+    "SUBMITTED",
+    "CHANGED",
+    "SENT_TO_FACTORY",
+    "COMPLETED",
+    "PAID",
+    "CANCELLED",
+  ].includes(normalizedStatusQuery)
+    ? normalizedStatusQuery
+    : null;
 
-const where: Prisma.OrderWhereInput = {
-  customerEmail: userEmail,
-  ...(query
-    ? {
-        OR: [
-          { orderNumber: { contains: query, mode: "insensitive" } },
-          { poNumber: { contains: query, mode: "insensitive" } },
-          ...(validStatusQuery
-            ? [
-                {
-                  status: {
-                    equals:
-                      validStatusQuery as Prisma.EnumOrderStatusFilter["equals"],
+  const where: Prisma.OrderWhereInput = {
+    customerEmail: userEmail,
+    ...(query
+      ? {
+          OR: [
+            { orderNumber: { contains: query, mode: "insensitive" } },
+            { poNumber: { contains: query, mode: "insensitive" } },
+            ...(validStatusQuery
+              ? [
+                  {
+                    status: {
+                      equals:
+                        validStatusQuery as Prisma.EnumOrderStatusFilter["equals"],
+                    },
                   },
-                },
-              ]
-            : []),
-          {
-            items: {
-              some: {
-                productNameSnapshot: {
-                  contains: query,
-                  mode: "insensitive",
+                ]
+              : []),
+            {
+              items: {
+                some: {
+                  productNameSnapshot: {
+                    contains: query,
+                    mode: "insensitive",
+                  },
                 },
               },
             },
-          },
-        ],
-      }
-    : {}),
-};
+          ],
+        }
+      : {}),
+  };
+
   const orders = (await prisma.order.findMany({
     where,
     orderBy: { createdAt: "desc" },
@@ -116,10 +128,52 @@ const where: Prisma.OrderWhereInput = {
         select: {
           id: true,
           productNameSnapshot: true,
+          selections: {
+            select: {
+              id: true,
+              leatherNameSnapshot: true,
+              leatherInventoryUsageSnapshot: true,
+            },
+          },
         },
       },
     },
   })) as OrderRow[];
+
+  const selectedLeatherNames = Array.from(
+    new Set(
+      orders
+        .flatMap((order) =>
+          order.items.flatMap((item) =>
+            item.selections
+              .map((selection) => selection.leatherNameSnapshot)
+              .filter(Boolean)
+          )
+        )
+        .map((name) => String(name))
+    )
+  );
+
+  const leatherInventoryRows = selectedLeatherNames.length
+    ? ((await prisma.leather.findMany({
+        where: {
+          name: {
+            in: selectedLeatherNames,
+          },
+        },
+        select: {
+          name: true,
+          inventoryUnits: true,
+        },
+      })) as LeatherInventoryRow[])
+    : [];
+
+  const leatherInventoryMap = new Map(
+    leatherInventoryRows.map((leather) => [
+      leather.name.trim().toLowerCase(),
+      Number(leather.inventoryUnits || 0),
+    ])
+  );
 
   return (
     <main className="min-h-screen p-4 sm:p-6 lg:p-8">
@@ -182,7 +236,9 @@ const where: Prisma.OrderWhereInput = {
           {orders.length === 0 ? (
             <div className="rounded-2xl border border-dashed bg-white/70 p-10 text-center">
               <p className="text-lg font-semibold text-slate-700">
-                {query ? "No orders matched your search." : "You do not have any orders yet."}
+                {query
+                  ? "No orders matched your search."
+                  : "You do not have any orders yet."}
               </p>
               <p className="mt-2 text-sm text-slate-500">
                 {query
@@ -199,6 +255,40 @@ const where: Prisma.OrderWhereInput = {
             <div className="grid gap-4 xl:grid-cols-2">
               {orders.map((order: OrderRow) => {
                 const firstItem = order.items[0];
+
+                const leatherWarnings = order.items.flatMap((item) =>
+                  item.selections
+                    .filter((selection) => selection.leatherNameSnapshot)
+                    .map((selection) => {
+                      const leatherName = String(
+                        selection.leatherNameSnapshot || ""
+                      );
+                      const inventoryUnits =
+                        leatherInventoryMap.get(
+                          leatherName.trim().toLowerCase()
+                        ) ?? null;
+                      const neededUnits =
+                        Number(selection.leatherInventoryUsageSnapshot || 0) *
+                        order.quantity;
+
+                      if (inventoryUnits === null) return null;
+
+                      if (inventoryUnits <= 0) {
+                        return `${leatherName}: out of stock`;
+                      }
+
+                      if (neededUnits > 0 && inventoryUnits < neededUnits) {
+                        return `${leatherName}: low stock`;
+                      }
+
+                      if (inventoryUnits < 2) {
+                        return `${leatherName}: low stock`;
+                      }
+
+                      return null;
+                    })
+                    .filter(Boolean)
+                );
 
                 return (
                   <div key={order.id} className="premium-grid-card">
@@ -225,6 +315,19 @@ const where: Prisma.OrderWhereInput = {
                           <p className="mt-3 text-sm text-slate-600">
                             Product: {firstItem?.productNameSnapshot || "—"}
                           </p>
+
+                          {leatherWarnings.length > 0 ? (
+                            <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                              <p className="font-semibold">
+                                Leather inventory note
+                              </p>
+                              <ul className="mt-1 list-inside list-disc">
+                                {leatherWarnings.map((warning) => (
+                                  <li key={String(warning)}>{warning}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          ) : null}
                         </div>
 
                         <div className="sm:text-right">
@@ -265,7 +368,8 @@ const where: Prisma.OrderWhereInput = {
                           Open Order
                         </Link>
 
-                        {order.status === "DRAFT" || order.status === "CHANGED" ? (
+                        {order.status === "DRAFT" ||
+                        order.status === "CHANGED" ? (
                           <Link
                             href={`/orders/${order.id}/edit`}
                             className="button-secondary"

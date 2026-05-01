@@ -23,6 +23,7 @@ type ProductChoice = {
   allowsLaseredBrand: boolean;
   isBinaryOption: boolean;
   isQuickPick: boolean;
+  leatherInventoryUsage: unknown | null;
   isBodyLeather: boolean;
   frameNeededCode: string | null;
   gradeAUpcharge: unknown | null;
@@ -65,6 +66,7 @@ type LeatherRecord = {
   slug: string;
   grade: string;
   imageUrl: string | null;
+  inventoryUnits: unknown;
 };
 
 export default async function ProductPage({ params }: PageProps) {
@@ -106,14 +108,19 @@ export default async function ProductPage({ params }: PageProps) {
       slug: group.slug,
       type: group.type,
       required: group.required,
-      choices: group.choices.map((choice: ProductChoice) => ({
-        id: choice.id,
-        label: choice.label,
-        value: choice.value,
-        description: choice.description,
-        imageUrl: choice.imageUrl,
-        priceDelta: Number(choice.priceDelta),
-        usesLeatherGrades: choice.usesLeatherGrades,
+choices: group.choices.map((choice: ProductChoice) => ({
+  id: choice.id,
+  label: choice.label,
+  value: choice.value,
+  description: choice.description,
+  imageUrl: choice.imageUrl,
+  priceDelta: Number(choice.priceDelta),
+  leatherInventoryUsage:
+    choice.leatherInventoryUsage === null
+      ? null
+      : Number(choice.leatherInventoryUsage),
+
+  usesLeatherGrades: choice.usesLeatherGrades,
         appliesLeatherSurcharge: choice.appliesLeatherSurcharge,
         allowsLaseredBrand: choice.allowsLaseredBrand,
         isBinaryOption: choice.isBinaryOption,
@@ -146,13 +153,14 @@ export default async function ProductPage({ params }: PageProps) {
     })),
   };
 
-  const serializedLeathers = leathers.map((leather: LeatherRecord) => ({
-    id: leather.id,
-    name: leather.name,
-    slug: leather.slug,
-    grade: leather.grade,
-    imageUrl: leather.imageUrl,
-  }));
+const serializedLeathers = leathers.map((leather: LeatherRecord) => ({
+  id: leather.id,
+  name: leather.name,
+  slug: leather.slug,
+  grade: leather.grade,
+  imageUrl: leather.imageUrl,
+  inventoryUnits: Number(leather.inventoryUnits || 0),
+}));
 
   return (
     <main className="min-h-screen p-4 sm:p-6 lg:p-8">

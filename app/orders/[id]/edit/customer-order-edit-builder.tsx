@@ -24,6 +24,7 @@ type Choice = {
   gradeHOHUpcharge: number | null;
   gradeAxisUpcharge: number | null;
   gradeBuffaloUpcharge: number | null;
+  leatherInventoryUsage: number | null;
   comUpcharge: number | null;
 };
 
@@ -48,7 +49,8 @@ type Leather = {
   name: string;
   slug: string;
   grade: string;
-  imageUrl?: string | null;
+  imageUrl: string | null;
+  inventoryUnits: number;
 };
 
 type Props = {
@@ -137,6 +139,38 @@ function sanitizeQuantity(value: number | null | undefined) {
   }
 
   return Math.max(1, Math.round(parsed));
+}
+
+function formatLeatherInventory(value: number) {
+  return `${value.toFixed(2)} units available`;
+}
+
+function getLeatherInventoryStatus(inventoryUnits: number, neededUnits: number) {
+  if (inventoryUnits <= 0) {
+    return {
+      label: "Out of stock — may delay order",
+      className: "border-red-200 bg-red-50 text-red-700",
+    };
+  }
+
+  if (neededUnits > 0 && inventoryUnits < neededUnits) {
+    return {
+      label: "Low stock for this order — may delay order",
+      className: "border-amber-200 bg-amber-50 text-amber-700",
+    };
+  }
+
+  if (inventoryUnits < 2) {
+    return {
+      label: "Low stock",
+      className: "border-amber-200 bg-amber-50 text-amber-700",
+    };
+  }
+
+  return {
+    label: "In stock",
+    className: "border-emerald-200 bg-emerald-50 text-emerald-700",
+  };
 }
 
 function getLeatherSurcharge(choice: Choice, grade: string) {
@@ -961,11 +995,17 @@ async function handleSaveChanges() {
                               </div>
                             ) : (
                               <div className="grid max-h-[28rem] gap-3 overflow-y-auto pr-1 sm:grid-cols-2 xl:grid-cols-3">
-                                {filteredLeathers.map((leather) => {
-                                  const isSelectedLeather =
-                                    selectedLeatherId === leather.id;
+{filteredLeathers.map((leather) => {
+  const isSelectedLeather = selectedLeatherId === leather.id;
+  const neededUnits =
+    Number(choice.leatherInventoryUsage || 0) * quantity;
 
-                                  return (
+  const inventoryStatus = getLeatherInventoryStatus(
+    Number(leather.inventoryUnits || 0),
+    neededUnits
+  );
+
+  return (
                                     <button
                                       key={leather.id}
                                       type="button"
@@ -1010,6 +1050,27 @@ async function handleSaveChanges() {
                                         <p className="mt-2 inline-flex rounded-full bg-slate-100 px-2 py-1 text-xs font-medium text-slate-700">
                                           {leather.grade}
                                         </p>
+                                        <div className="mt-3 rounded-xl border bg-white/80 p-3">
+  <p className="text-xs uppercase tracking-[0.14em] text-slate-500">
+    Factory Inventory
+  </p>
+
+  <p className="mt-1 text-sm font-semibold text-slate-900">
+    {formatLeatherInventory(Number(leather.inventoryUnits || 0))}
+  </p>
+
+  {neededUnits > 0 ? (
+    <p className="mt-1 text-xs text-slate-500">
+      This order needs about {neededUnits.toFixed(2)} units.
+    </p>
+  ) : null}
+
+  <span
+    className={`mt-2 inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${inventoryStatus.className}`}
+  >
+    {inventoryStatus.label}
+  </span>
+</div>
                                       </div>
                                     </button>
                                   );

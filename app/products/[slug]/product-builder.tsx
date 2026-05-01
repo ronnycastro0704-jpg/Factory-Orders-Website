@@ -23,6 +23,7 @@ type Choice = {
   gradeEMBUpcharge: number | null;
   gradeHOHUpcharge: number | null;
   gradeAxisUpcharge: number | null;
+  leatherInventoryUsage: number | null;
   gradeBuffaloUpcharge: number | null;
   comUpcharge: number | null;
 };
@@ -48,7 +49,8 @@ type Leather = {
   name: string;
   slug: string;
   grade: string;
-  imageUrl?: string | null;
+  imageUrl: string | null;
+  inventoryUnits: number;
 };
 
 type Props = {
@@ -125,6 +127,38 @@ function sanitizeQuantity(value: number | null | undefined) {
   }
 
   return Math.max(1, Math.round(parsed));
+}
+
+function formatLeatherInventory(value: number) {
+  return `${value.toFixed(2)} units available`;
+}
+
+function getLeatherInventoryStatus(inventoryUnits: number, neededUnits: number) {
+  if (inventoryUnits <= 0) {
+    return {
+      label: "Out of stock — may delay order",
+      className: "border-red-200 bg-red-50 text-red-700",
+    };
+  }
+
+  if (neededUnits > 0 && inventoryUnits < neededUnits) {
+    return {
+      label: "Low stock for this order — may delay order",
+      className: "border-amber-200 bg-amber-50 text-amber-700",
+    };
+  }
+
+  if (inventoryUnits < 2) {
+    return {
+      label: "Low stock",
+      className: "border-amber-200 bg-amber-50 text-amber-700",
+    };
+  }
+
+  return {
+    label: "In stock",
+    className: "border-emerald-200 bg-emerald-50 text-emerald-700",
+  };
 }
 
 function getLeatherSurcharge(choice: Choice, grade: string) {
@@ -975,11 +1009,17 @@ async function handleSendToFactory() {
                               </div>
                             ) : (
                               <div className="grid max-h-[28rem] gap-3 overflow-y-auto pr-1 sm:grid-cols-2 xl:grid-cols-3">
-                                {filteredLeathers.map((leather) => {
-                                  const isSelectedLeather =
-                                    selectedLeatherId === leather.id;
+{filteredLeathers.map((leather) => {
+  const isSelectedLeather = selectedLeatherId === leather.id;
+  const neededUnits =
+    Number(choice.leatherInventoryUsage || 0) * quantity;
 
-                                  return (
+  const inventoryStatus = getLeatherInventoryStatus(
+    Number(leather.inventoryUnits || 0),
+    neededUnits
+  );
+
+  return (
                                     <button
                                       key={leather.id}
                                       type="button"

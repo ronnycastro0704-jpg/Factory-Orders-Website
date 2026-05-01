@@ -47,6 +47,7 @@ type ProductChoice = {
   gradeBUpcharge: unknown | null;
   gradeEMBUpcharge: unknown | null;
   gradeHOHUpcharge: unknown | null;
+  leatherInventoryUsage: unknown | null;
   gradeAxisUpcharge: unknown | null;
   gradeBuffaloUpcharge: unknown | null;
   comUpcharge: unknown | null;
@@ -77,6 +78,7 @@ type LeatherRecord = {
   slug: string;
   grade: string;
   imageUrl: string | null;
+  inventoryUnits: unknown;
 };
 
 const SELECTION_META_SEPARATOR = "|||";
@@ -340,14 +342,19 @@ export default async function CustomerOrderEditPage({ params }: PageProps) {
       slug: group.slug,
       type: group.type,
       required: group.required,
-      choices: group.choices.map((choice: ProductChoice) => ({
-        id: choice.id,
-        label: choice.label,
-        value: choice.value,
-        description: choice.description,
-        imageUrl: choice.imageUrl,
-        priceDelta: Number(choice.priceDelta),
-        usesLeatherGrades: choice.usesLeatherGrades,
+choices: group.choices.map((choice: ProductChoice) => ({
+  id: choice.id,
+  label: choice.label,
+  value: choice.value,
+  description: choice.description,
+  imageUrl: choice.imageUrl,
+  priceDelta: Number(choice.priceDelta),
+  leatherInventoryUsage:
+    choice.leatherInventoryUsage === null
+      ? null
+      : Number(choice.leatherInventoryUsage),
+
+  usesLeatherGrades: choice.usesLeatherGrades,
         appliesLeatherSurcharge: choice.appliesLeatherSurcharge,
         allowsLaseredBrand: choice.allowsLaseredBrand,
         isBinaryOption: choice.isBinaryOption,
@@ -378,13 +385,14 @@ export default async function CustomerOrderEditPage({ params }: PageProps) {
     })),
   };
 
-  const serializedLeathers = leathers.map((leather: LeatherRecord) => ({
-    id: leather.id,
-    name: leather.name,
-    slug: leather.slug,
-    grade: leather.grade,
-    imageUrl: leather.imageUrl,
-  }));
+const serializedLeathers = leathers.map((leather: LeatherRecord) => ({
+  id: leather.id,
+  name: leather.name,
+  slug: leather.slug,
+  grade: leather.grade,
+  imageUrl: leather.imageUrl,
+  inventoryUnits: Number(leather.inventoryUnits || 0),
+}));
 
   return (
     <main className="min-h-screen bg-white p-8 text-slate-900">
