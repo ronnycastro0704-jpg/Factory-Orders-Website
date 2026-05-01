@@ -255,40 +255,20 @@ export default async function MyOrdersPage({ searchParams }: PageProps) {
             <div className="grid gap-4 xl:grid-cols-2">
               {orders.map((order: OrderRow) => {
                 const firstItem = order.items[0];
+const leatherInventoryNotes = order.items.flatMap((item) =>
+  item.selections
+    .filter((selection) => selection.leatherNameSnapshot)
+    .map((selection) => {
+      const leatherName = String(selection.leatherNameSnapshot || "");
+      const inventoryUnits =
+        leatherInventoryMap.get(leatherName.trim().toLowerCase()) ?? null;
 
-                const leatherWarnings = order.items.flatMap((item) =>
-                  item.selections
-                    .filter((selection) => selection.leatherNameSnapshot)
-                    .map((selection) => {
-                      const leatherName = String(
-                        selection.leatherNameSnapshot || ""
-                      );
-                      const inventoryUnits =
-                        leatherInventoryMap.get(
-                          leatherName.trim().toLowerCase()
-                        ) ?? null;
-                      const neededUnits =
-                        Number(selection.leatherInventoryUsageSnapshot || 0) *
-                        order.quantity;
+      if (inventoryUnits === null) return null;
 
-                      if (inventoryUnits === null) return null;
-
-                      if (inventoryUnits <= 0) {
-                        return `${leatherName}: out of stock`;
-                      }
-
-                      if (neededUnits > 0 && inventoryUnits < neededUnits) {
-                        return `${leatherName}: low stock`;
-                      }
-
-                      if (inventoryUnits < 2) {
-                        return `${leatherName}: low stock`;
-                      }
-
-                      return null;
-                    })
-                    .filter(Boolean)
-                );
+      return `${leatherName}: ${inventoryUnits.toFixed(2)} units in stock`;
+    })
+    .filter(Boolean)
+);
 
                 return (
                   <div key={order.id} className="premium-grid-card">
@@ -316,18 +296,18 @@ export default async function MyOrdersPage({ searchParams }: PageProps) {
                             Product: {firstItem?.productNameSnapshot || "—"}
                           </p>
 
-                          {leatherWarnings.length > 0 ? (
-                            <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-                              <p className="font-semibold">
-                                Leather inventory note
-                              </p>
-                              <ul className="mt-1 list-inside list-disc">
-                                {leatherWarnings.map((warning) => (
-                                  <li key={String(warning)}>{warning}</li>
-                                ))}
-                              </ul>
-                            </div>
-                          ) : null}
+{leatherInventoryNotes.length > 0 ? (
+  <div className="mt-3 rounded-xl border bg-white/80 p-3 text-sm text-slate-700">
+    <p className="font-semibold text-slate-900">
+      Current leather stock
+    </p>
+    <ul className="mt-1 list-inside list-disc">
+      {leatherInventoryNotes.map((note) => (
+        <li key={String(note)}>{note}</li>
+      ))}
+    </ul>
+  </div>
+) : null}
                         </div>
 
                         <div className="sm:text-right">
