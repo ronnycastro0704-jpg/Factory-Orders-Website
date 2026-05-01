@@ -1048,23 +1048,44 @@ async function handleSendToFactory() {
                                           </div>
                                         )}
                                       </div>
+<div className="p-3">
+  <div className="flex items-start justify-between gap-2">
+    <p className="font-semibold text-slate-900">
+      {leather.name}
+    </p>
+    {isSelectedLeather ? (
+      <span className="rounded-full bg-[var(--brand)] px-2 py-1 text-[10px] font-semibold text-white">
+        Selected
+      </span>
+    ) : null}
+  </div>
 
-                                      <div className="p-3">
-                                        <div className="flex items-start justify-between gap-2">
-                                          <p className="font-semibold text-slate-900">
-                                            {leather.name}
-                                          </p>
-                                          {isSelectedLeather ? (
-                                            <span className="rounded-full bg-[var(--brand)] px-2 py-1 text-[10px] font-semibold text-white">
-                                              Selected
-                                            </span>
-                                          ) : null}
-                                        </div>
+  <p className="mt-2 inline-flex rounded-full bg-slate-100 px-2 py-1 text-xs font-medium text-slate-700">
+    {leather.grade}
+  </p>
 
-                                        <p className="mt-2 inline-flex rounded-full bg-slate-100 px-2 py-1 text-xs font-medium text-slate-700">
-                                          {leather.grade}
-                                        </p>
-                                      </div>
+  <div className="mt-3 rounded-xl border bg-white/80 p-3">
+    <p className="text-xs uppercase tracking-[0.14em] text-slate-500">
+      Factory Inventory
+    </p>
+
+    <p className="mt-1 text-sm font-semibold text-slate-900">
+      {formatLeatherInventory(Number(leather.inventoryUnits || 0))}
+    </p>
+
+    {neededUnits > 0 ? (
+      <p className="mt-1 text-xs text-slate-500">
+        This order needs about {neededUnits.toFixed(2)} units.
+      </p>
+    ) : null}
+
+    <span
+      className={`mt-2 inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${inventoryStatus.className}`}
+    >
+      {inventoryStatus.label}
+    </span>
+  </div>
+</div>
                                     </button>
                                   );
                                 })}
