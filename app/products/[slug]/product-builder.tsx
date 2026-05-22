@@ -128,7 +128,6 @@ function sanitizeQuantity(value: number | null | undefined) {
 
   return Math.max(1, Math.round(parsed));
 }
-
 function getMissingRequiredGroups(
   groups: Group[],
   selectedOptions: Record<string, string[]>
@@ -140,6 +139,37 @@ function getMissingRequiredGroups(
       return selectedChoiceIds.length === 0;
     })
     .map((group) => group.name);
+}
+
+function getMissingRequiredLeathers(
+  groups: Group[],
+  selectedOptions: Record<string, string[]>,
+  selectedLeatherBySelectionKey: Record<string, string>
+) {
+  const missing: string[] = [];
+
+  for (const group of groups) {
+    if (!group.required) continue;
+
+    const selectedChoiceIds = selectedOptions[group.id] || [];
+
+    for (const choiceId of selectedChoiceIds) {
+      const choice = group.choices.find((item) => item.id === choiceId);
+
+      if (!choice) continue;
+
+      if (!choice.usesLeatherGrades) continue;
+
+      const selectionKey = makeSelectionKey(group.id, choice.id);
+      const selectedLeatherId = selectedLeatherBySelectionKey[selectionKey];
+
+      if (!selectedLeatherId) {
+        missing.push(`${group.name} - ${choice.label}`);
+      }
+    }
+  }
+
+  return missing;
 }
 
 function formatLeatherInventory(value: number) {
@@ -578,6 +608,19 @@ async function handleSendToFactory() {
   if (missingRequiredGroups.length > 0) {
     setSaveError(
       `Please complete required options: ${missingRequiredGroups.join(", ")}.`
+    );
+    return;
+  }
+
+  const missingRequiredLeathers = getMissingRequiredLeathers(
+    product.optionGroups,
+    selectedOptions,
+    selectedLeatherBySelectionKey
+  );
+
+  if (missingRequiredLeathers.length > 0) {
+    setSaveError(
+      `Please choose leather for: ${missingRequiredLeathers.join(", ")}.`
     );
     return;
   }

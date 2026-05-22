@@ -65,9 +65,52 @@ function normalizeEmail(value: string) {
   return value.trim().toLowerCase();
 }
 
-function normalizeText(value: string) {
-  return value.trim().toLowerCase();
+function normalizeText(value?: string | null) {
+  return String(value || "").trim().toLowerCase();
 }
+
+function getMissingRequiredValidationMessages(
+  requiredGroups: {
+    name: string;
+    choices: {
+      label: string;
+      usesLeatherGrades: boolean;
+    }[];
+  }[],
+  selections: IncomingSelection[]
+) {
+  const messages: string[] = [];
+
+  for (const group of requiredGroups) {
+    const groupSelections = selections.filter(
+      (selection) =>
+        normalizeText(selection.groupName) === normalizeText(group.name)
+    );
+
+    if (groupSelections.length === 0) {
+      messages.push(`Please complete required option: ${group.name}.`);
+      continue;
+    }
+
+    for (const selection of groupSelections) {
+      const matchingChoice = group.choices.find(
+        (choice) =>
+          normalizeText(choice.label) === normalizeText(selection.choiceLabel)
+      );
+
+      if (!matchingChoice) continue;
+
+      if (matchingChoice.usesLeatherGrades && !selection.leatherName) {
+        messages.push(
+          `Please choose leather for: ${group.name} - ${matchingChoice.label}.`
+        );
+      }
+    }
+  }
+
+  return messages;
+}
+
 
 function getMissingRequiredGroups(
   requiredGroups: { name: string }[],
@@ -506,6 +549,15 @@ const product = await prisma.product.findUnique({
       },
       select: {
         name: true,
+        choices: {
+          where: {
+            active: true,
+          },
+          select: {
+            label: true,
+            usesLeatherGrades: true,
+          },
+        },
       },
     },
   },
@@ -515,6 +567,18 @@ if (!product || !product.active) {
   return NextResponse.json(
     { error: "Product not found." },
     { status: 404 }
+  );
+}
+
+const requiredValidationMessages = getMissingRequiredValidationMessages(
+  product.optionGroups,
+  rawSelections
+);
+
+if (requiredValidationMessages.length > 0) {
+  return NextResponse.json(
+    { error: requiredValidationMessages.join(" ") },
+    { status: 400 }
   );
 }
 

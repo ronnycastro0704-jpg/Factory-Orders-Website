@@ -70,8 +70,50 @@ function normalizeEmail(value: string) {
   return value.trim().toLowerCase();
 }
 
-function normalizeText(value: string) {
-  return value.trim().toLowerCase();
+function normalizeText(value?: string | null) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function getMissingRequiredValidationMessages(
+  requiredGroups: {
+    name: string;
+    choices: {
+      label: string;
+      usesLeatherGrades: boolean;
+    }[];
+  }[],
+  selections: IncomingSelection[]
+) {
+  const messages: string[] = [];
+
+  for (const group of requiredGroups) {
+    const groupSelections = selections.filter(
+      (selection) =>
+        normalizeText(selection.groupName) === normalizeText(group.name)
+    );
+
+    if (groupSelections.length === 0) {
+      messages.push(`Please complete required option: ${group.name}.`);
+      continue;
+    }
+
+    for (const selection of groupSelections) {
+      const matchingChoice = group.choices.find(
+        (choice) =>
+          normalizeText(choice.label) === normalizeText(selection.choiceLabel)
+      );
+
+      if (!matchingChoice) continue;
+
+      if (matchingChoice.usesLeatherGrades && !selection.leatherName) {
+        messages.push(
+          `Please choose leather for: ${group.name} - ${matchingChoice.label}.`
+        );
+      }
+    }
+  }
+
+  return messages;
 }
 
 function getMissingRequiredGroups(
@@ -724,6 +766,68 @@ const approvedCustomer = await getApprovedCustomerProfile(viewerEmail);
     const customerEmail = normalizeEmail(order.customerEmail);
 
     const item = order.items[0];
+
+    if (!statusOnlyUpdate) {
+  const requiredGroups = await prisma.optionGroup.findMany({
+    where: {
+      productId: item.productId,
+      active: true,
+      required: true,
+    },
+    select: {
+      name: true,
+      choices: {
+        where: {
+          active: true,
+        },
+        select: {
+          label: true,
+          usesLeatherGrades: true,
+        },
+      },
+    },
+  });
+
+  const requiredValidationMessages = getMissingRequiredValidationMessages(
+    requiredGroups,
+    rawSelections
+  );
+
+  if (requiredValidationMessages.length > 0) {
+    return NextResponse.json(
+      { error: requiredValidationMessages.join(" ") },
+      { status: 400 }
+    );
+  }
+}
+
+
+    const productRequiredGroups = await prisma.optionGroup.findMany({
+  where: {
+    productId: item.productId,
+    active: true,
+    required: true,
+  },
+  select: {
+    name: true,
+  },
+});
+
+const missingRequiredGroups = getMissingRequiredGroups(
+  productRequiredGroups,
+  rawSelections
+);
+
+if (missingRequiredGroups.length > 0) {
+  return NextResponse.json(
+    {
+      error: `Please complete required options: ${missingRequiredGroups.join(
+        ", "
+      )}.`,
+    },
+    { status: 400 }
+  );
+}
 
     const quantity = sanitizeQuantity(
       Number(
