@@ -65,6 +65,23 @@ function normalizeEmail(value: string) {
   return value.trim().toLowerCase();
 }
 
+function normalizeText(value: string) {
+  return value.trim().toLowerCase();
+}
+
+function getMissingRequiredGroups(
+  requiredGroups: { name: string }[],
+  selections: IncomingSelection[]
+) {
+  const selectedGroupNames = new Set(
+    selections.map((selection) => normalizeText(selection.groupName || ""))
+  );
+
+  return requiredGroups
+    .filter((group) => !selectedGroupNames.has(normalizeText(group.name)))
+    .map((group) => group.name);
+}
+
 
 function generateOrderNumber() {
   const now = new Date();
@@ -476,23 +493,48 @@ if (!poNumber) {
       );
     }
 
-    const product = await prisma.product.findUnique({
-      where: { id: productId },
-      select: {
-        id: true,
-        name: true,
+const product = await prisma.product.findUnique({
+  where: { id: productId },
+  select: {
+    id: true,
+    name: true,
+    active: true,
+    optionGroups: {
+      where: {
         active: true,
+        required: true,
       },
-    });
+      select: {
+        name: true,
+      },
+    },
+  },
+});
 
-    if (!product || !product.active) {
-      return NextResponse.json(
-        { error: "Product not found." },
-        { status: 404 }
-      );
-    }
+if (!product || !product.active) {
+  return NextResponse.json(
+    { error: "Product not found." },
+    { status: 404 }
+  );
+}
 
-    const submittingUser = await prisma.user.findUnique({
+const missingRequiredGroups = getMissingRequiredGroups(
+  product.optionGroups,
+  rawSelections
+);
+
+if (missingRequiredGroups.length > 0) {
+  return NextResponse.json(
+    {
+      error: `Please complete required options: ${missingRequiredGroups.join(
+        ", "
+      )}.`,
+    },
+    { status: 400 }
+  );
+}
+
+const submittingUser = await prisma.user.findUnique({
       where: { email: signedInEmail },
       select: { id: true },
     });

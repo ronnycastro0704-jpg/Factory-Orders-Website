@@ -141,6 +141,19 @@ function sanitizeQuantity(value: number | null | undefined) {
   return Math.max(1, Math.round(parsed));
 }
 
+function getMissingRequiredGroups(
+  groups: Group[],
+  selectedOptions: Record<string, string[]>
+) {
+  return groups
+    .filter((group) => group.required)
+    .filter((group) => {
+      const selectedChoiceIds = selectedOptions[group.id] || [];
+      return selectedChoiceIds.length === 0;
+    })
+    .map((group) => group.name);
+}
+
 function formatLeatherInventory(value: number) {
   return `${value.toFixed(2)} units available`;
 }
@@ -545,6 +558,18 @@ async function handleSaveChanges() {
 
   if (!poNumber.trim()) {
     setSaveError("PO # is required.");
+    return;
+  }
+
+  const missingRequiredGroups = getMissingRequiredGroups(
+    product.optionGroups,
+    selectedOptions
+  );
+
+  if (missingRequiredGroups.length > 0) {
+    setSaveError(
+      `Please complete required options: ${missingRequiredGroups.join(", ")}.`
+    );
     return;
   }
 

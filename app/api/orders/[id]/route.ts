@@ -70,6 +70,23 @@ function normalizeEmail(value: string) {
   return value.trim().toLowerCase();
 }
 
+function normalizeText(value: string) {
+  return value.trim().toLowerCase();
+}
+
+function getMissingRequiredGroups(
+  requiredGroups: { name: string }[],
+  selections: IncomingSelection[]
+) {
+  const selectedGroupNames = new Set(
+    selections.map((selection) => normalizeText(selection.groupName || ""))
+  );
+
+  return requiredGroups
+    .filter((group) => !selectedGroupNames.has(normalizeText(group.name)))
+    .map((group) => group.name);
+}
+
 
 function isAdminEmail(email?: string | null) {
   if (!email) return false;
