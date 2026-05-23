@@ -138,12 +138,40 @@ function isGroupLockedByQuickPick(
     group.choices.some((choice) => choice.usesLeatherGrades)
   );
 }
+function isQuickPickChoice(choice: Choice) {
+  return choice.isQuickPick || choice.label.toLowerCase().includes("quick pick");
+}
+
+function getActiveQuickPick(
+  groups: Group[],
+  selectedOptions: Record<string, string[]>
+) {
+  for (const group of groups) {
+    const selectedChoiceIds = selectedOptions[group.id] || [];
+
+    for (const choiceId of selectedChoiceIds) {
+      const choice = group.choices.find((item) => item.id === choiceId);
+
+      if (choice && isQuickPickChoice(choice)) {
+        return {
+          groupId: group.id,
+          choice,
+        };
+      }
+    }
+  }
+
+  return null;
+}
+
+
 
 function getMissingRequiredGroups(
   groups: Group[],
-  selectedOptions: Record<string, string[]>,
-  activeQuickPick: { groupId: string; choice: Choice } | null
+  selectedOptions: Record<string, string[]>
 ) {
+  const activeQuickPick = getActiveQuickPick(groups, selectedOptions);
+
   return groups
     .filter((group) => group.required)
     .filter((group) => !isGroupLockedByQuickPick(group, activeQuickPick))
@@ -157,9 +185,9 @@ function getMissingRequiredGroups(
 function getMissingRequiredLeathers(
   groups: Group[],
   selectedOptions: Record<string, string[]>,
-  selectedLeatherBySelectionKey: Record<string, string>,
-  activeQuickPick: { groupId: string; choice: Choice } | null
+  selectedLeatherBySelectionKey: Record<string, string>
 ) {
+  const activeQuickPick = getActiveQuickPick(groups, selectedOptions);
   const missing: string[] = [];
 
   for (const group of groups) {
@@ -327,24 +355,9 @@ useEffect(() => {
   const [saveMessage, setSaveMessage] = useState("");
   const [saveError, setSaveError] = useState("");
 
-  const activeQuickPick = useMemo(() => {
-    for (const group of product.optionGroups) {
-      const selectedChoiceIds = selectedOptions[group.id] || [];
-
-      for (const choiceId of selectedChoiceIds) {
-        const choice = group.choices.find((item) => item.id === choiceId);
-
-        if (choice?.isQuickPick) {
-          return {
-            groupId: group.id,
-            choice,
-          };
-        }
-      }
-    }
-
-    return null;
-  }, [product.optionGroups, selectedOptions]);
+const activeQuickPick = useMemo(() => {
+  return getActiveQuickPick(product.optionGroups, selectedOptions);
+}, [product.optionGroups, selectedOptions]);
 
   function setSingleChoice(groupId: string, choiceId: string) {
     const group = product.optionGroups.find((item) => item.id === groupId);
@@ -616,8 +629,7 @@ if (!poNumber.trim()) {
 
 const missingRequiredGroups = getMissingRequiredGroups(
   product.optionGroups,
-  selectedOptions,
-  activeQuickPick
+  selectedOptions
 );
 
 if (missingRequiredGroups.length > 0) {
@@ -630,8 +642,7 @@ if (missingRequiredGroups.length > 0) {
 const missingRequiredLeathers = getMissingRequiredLeathers(
   product.optionGroups,
   selectedOptions,
-  selectedLeatherBySelectionKey,
-  activeQuickPick
+  selectedLeatherBySelectionKey
 );
 
 if (missingRequiredLeathers.length > 0) {
