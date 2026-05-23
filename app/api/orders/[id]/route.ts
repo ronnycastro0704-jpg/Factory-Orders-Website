@@ -74,19 +74,79 @@ function normalizeText(value?: string | null) {
   return String(value || "").trim().toLowerCase();
 }
 
-function getMissingRequiredValidationMessages(
-  requiredGroups: {
+function getActiveQuickPickGroupName(
+  groups: {
     name: string;
     choices: {
       label: string;
       usesLeatherGrades: boolean;
+      isQuickPick: boolean;
+    }[];
+  }[],
+  selections: IncomingSelection[]
+) {
+  for (const group of groups) {
+    const groupSelections = selections.filter(
+      (selection) =>
+        normalizeText(selection.groupName) === normalizeText(group.name)
+    );
+
+    for (const selection of groupSelections) {
+      const matchingChoice = group.choices.find(
+        (choice) =>
+          normalizeText(choice.label) === normalizeText(selection.choiceLabel)
+      );
+
+      if (matchingChoice?.isQuickPick) {
+        return group.name;
+      }
+    }
+  }
+
+  return null;
+}
+
+function isApiGroupLockedByQuickPick(
+  group: {
+    name: string;
+    choices: {
+      usesLeatherGrades: boolean;
+    }[];
+  },
+  activeQuickPickGroupName: string | null
+) {
+  return (
+    Boolean(activeQuickPickGroupName) &&
+    normalizeText(group.name) !== normalizeText(activeQuickPickGroupName) &&
+    group.choices.some((choice) => choice.usesLeatherGrades)
+  );
+}
+
+function getRequiredValidationMessages(
+  groups: {
+    name: string;
+    required: boolean;
+    choices: {
+      label: string;
+      usesLeatherGrades: boolean;
+      isQuickPick: boolean;
     }[];
   }[],
   selections: IncomingSelection[]
 ) {
   const messages: string[] = [];
+  const activeQuickPickGroupName = getActiveQuickPickGroupName(
+    groups,
+    selections
+  );
 
-  for (const group of requiredGroups) {
+  for (const group of groups) {
+    if (!group.required) continue;
+
+    if (isApiGroupLockedByQuickPick(group, activeQuickPickGroupName)) {
+      continue;
+    }
+
     const groupSelections = selections.filter(
       (selection) =>
         normalizeText(selection.groupName) === normalizeText(group.name)
@@ -551,78 +611,6 @@ function extractLatestRevisionSnapshot(afterJson: unknown): RevisionSelectionSna
   };
 }
 
-export async function GET(_: Request, context: RouteContext) {
-  try {
-    const session = await auth();
-
-    if (!session?.user?.email) {
-      return NextResponse.json(
-        { error: "You must be signed in." },
-        { status: 401 }
-      );
-    }
-
-    const viewerEmail = normalizeEmail(session.user.email);
-    const { id } = await context.params;
-
-    const viewerUser = await prisma.user.findUnique({
-      where: { email: viewerEmail },
-      select: { id: true },
-    });
-
-    const order = await prisma.order.findUnique({
-      where: { id },
-      include: {
-        items: {
-          include: {
-            selections: true,
-          },
-        },
-        revisions: {
-          orderBy: { createdAt: "desc" },
-        },
-        emailLogs: {
-          orderBy: { createdAt: "desc" },
-        },
-        sheetSyncLogs: {
-          orderBy: { createdAt: "desc" },
-        },
-        productionLines: {
-          orderBy: [{ partNumber: "asc" }, { frameNeeded: "asc" }],
-        },
-      },
-    });
-
-    if (!order) {
-      return NextResponse.json({ error: "Order not found." }, { status: 404 });
-    }
-
-    const isSubmitter =
-      Boolean(order.userId) &&
-      Boolean(viewerUser?.id) &&
-      order.userId === viewerUser?.id;
-
-    const isCustomer = normalizeEmail(order.customerEmail) === viewerEmail;
-
-    const allowed = isSubmitter || isCustomer || isAdminEmail(viewerEmail);
-
-    if (!allowed) {
-      return NextResponse.json(
-        { error: "You are not allowed to view this order." },
-        { status: 403 }
-      );
-    }
-
-    return NextResponse.json(order);
-  } catch (error) {
-    console.error("GET ORDER ERROR:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch order." },
-      { status: 500 }
-    );
-  }
-}
-
 export async function PUT(request: Request, context: RouteContext) {
   try {
     const session = await auth();
@@ -643,20 +631,11 @@ export async function PUT(request: Request, context: RouteContext) {
     const { id } = await context.params;
     const body = await request.json();
 
-const poNumber = String(body.poNumber || "").trim();
+    const isAdminUser = isAdminEmail(viewerEmail);
+    const adminUpdate = body.adminUpdate === true && isAdminUser;
 
-if (!poNumber) {
-  return NextResponse.json(
-    { error: "PO # is required." },
-    { status: 400 }
-  );
-}
-    const customerPhone = String(body.customerPhone || "").trim() || null;
-    const notes = String(body.notes || "").trim() || null;
-    const changeReason = String(body.changeReason || "").trim() || "Order updated";
-    const productName = String(body.productName || "").trim();
-    const basePrice = Number(body.basePrice || 0);
-    const total = Number(body.total || 0);
+    const requestedStatus =
+      typeof body.status === "string" ? body.status.trim() : "";
 
     const rawSelections = Array.isArray(body.selections)
       ? (body.selections as IncomingSelection[])
@@ -666,19 +645,8 @@ if (!poNumber) {
       ? (body.lineItems as IncomingLineItem[])
       : [];
 
-
-const requestedStatus =
-  typeof body.status === "string" ? body.status.trim() : "";
-
-const statusOnlyUpdate =
-  requestedStatus.length > 0 && rawSelections.length === 0;
-
-if (rawSelections.length === 0 && !statusOnlyUpdate) {
-  return NextResponse.json(
-    { error: "At least one selection is required." },
-    { status: 400 }
-  );
-}
+    const statusOnlyUpdate =
+      requestedStatus.length > 0 && rawSelections.length === 0;
 
     const order = await prisma.order.findUnique({
       where: { id },
@@ -707,53 +675,139 @@ if (rawSelections.length === 0 && !statusOnlyUpdate) {
 
     const isCustomer = normalizeEmail(order.customerEmail) === viewerEmail;
 
-    const allowed = isSubmitter || isCustomer || isAdminEmail(viewerEmail);
+    const allowed = isSubmitter || isCustomer || isAdminUser;
 
-if (!allowed) {
-  return NextResponse.json(
-    { error: "You are not allowed to edit this order." },
-    { status: 403 }
-  );
-}
+    if (!allowed) {
+      return NextResponse.json(
+        { error: "You are not allowed to edit this order." },
+        { status: 403 }
+      );
+    }
 
-if (statusOnlyUpdate) {
-  if (!isAdminEmail(viewerEmail)) {
-    return NextResponse.json(
-      { error: "Only admins can update order status directly." },
-      { status: 403 }
-    );
-  }
+    const allowedStatuses: OrderStatus[] = [
+      "DRAFT",
+      "SUBMITTED",
+      "CHANGED",
+      "SENT_TO_FACTORY",
+      "COMPLETED",
+      "PAID",
+      "CANCELLED",
+    ];
 
-  const allowedStatuses: OrderStatus[] = [
-    "DRAFT",
-    "SUBMITTED",
-    "CHANGED",
-    "SENT_TO_FACTORY",
-    "COMPLETED",
-    "PAID",
-    "CANCELLED",
-  ];
+    if (statusOnlyUpdate || adminUpdate) {
+      if (!isAdminUser) {
+        return NextResponse.json(
+          { error: "Only admins can update order status directly." },
+          { status: 403 }
+        );
+      }
 
-  if (!allowedStatuses.includes(requestedStatus as OrderStatus)) {
-    return NextResponse.json(
-      { error: "Invalid order status." },
-      { status: 400 }
-    );
-  }
+      const nextAdminStatus =
+        requestedStatus.length > 0
+          ? (requestedStatus as OrderStatus)
+          : order.status;
 
-  const updatedOrder = await prisma.order.update({
-    where: { id },
-    data: {
-      status: requestedStatus as OrderStatus,
-      customerPhone,
-      notes,
-    },
-  });
+      if (!allowedStatuses.includes(nextAdminStatus)) {
+        return NextResponse.json(
+          { error: "Invalid order status." },
+          { status: 400 }
+        );
+      }
 
-  return NextResponse.json(updatedOrder);
-}
+      const adminCustomerName =
+        String(body.customerName || "").trim() || order.customerName;
 
-const approvedCustomer = await getApprovedCustomerProfile(viewerEmail);
+      const adminCustomerEmail = String(body.customerEmail || "").trim()
+        ? normalizeEmail(String(body.customerEmail))
+        : order.customerEmail;
+
+      const adminCustomerPhone =
+        body.customerPhone === undefined
+          ? order.customerPhone
+          : String(body.customerPhone || "").trim() || null;
+
+      const adminNotes =
+        body.notes === undefined
+          ? order.notes
+          : String(body.notes || "").trim() || null;
+
+      const changeReason =
+        String(body.changeReason || "").trim() || "Admin order update";
+
+      const nextRevisionNumber =
+        order.revisions.length > 0 ? order.revisions[0].revisionNumber + 1 : 1;
+
+      const [updatedOrder] = await prisma.$transaction([
+        prisma.order.update({
+          where: { id },
+          data: {
+            customerName: adminCustomerName,
+            customerEmail: adminCustomerEmail,
+            customerPhone: adminCustomerPhone,
+            notes: adminNotes,
+            status: nextAdminStatus,
+          },
+        }),
+        prisma.orderRevision.create({
+          data: {
+            orderId: id,
+            revisionNumber: nextRevisionNumber,
+            changedBy: viewerEmail,
+            changeReason,
+            beforeJson: {
+              status: order.status,
+              customerName: order.customerName,
+              customerEmail: order.customerEmail,
+              customerPhone: order.customerPhone,
+              notes: order.notes,
+              poNumber: order.poNumber,
+              quantity: order.quantity,
+              priority: order.priority,
+              dueDate: order.dueDate,
+            },
+            afterJson: {
+              status: nextAdminStatus,
+              customerName: adminCustomerName,
+              customerEmail: adminCustomerEmail,
+              customerPhone: adminCustomerPhone,
+              notes: adminNotes,
+              poNumber: order.poNumber,
+              quantity: order.quantity,
+              priority: order.priority,
+              dueDate: order.dueDate,
+            },
+          },
+        }),
+      ]);
+
+      return NextResponse.json(updatedOrder);
+    }
+
+    if (rawSelections.length === 0) {
+      return NextResponse.json(
+        { error: "At least one selection is required." },
+        { status: 400 }
+      );
+    }
+
+    const poNumber = String(body.poNumber || "").trim();
+
+    if (!poNumber) {
+      return NextResponse.json(
+        { error: "PO # is required." },
+        { status: 400 }
+      );
+    }
+
+    const customerPhone = String(body.customerPhone || "").trim() || null;
+    const notes = String(body.notes || "").trim() || null;
+    const changeReason =
+      String(body.changeReason || "").trim() || "Order updated";
+    const productName = String(body.productName || "").trim();
+    const basePrice = Number(body.basePrice || 0);
+    const total = Number(body.total || 0);
+
+    const approvedCustomer = await getApprovedCustomerProfile(viewerEmail);
 
     if (isCustomer && !approvedCustomer) {
       return NextResponse.json(
@@ -767,64 +821,35 @@ const approvedCustomer = await getApprovedCustomerProfile(viewerEmail);
 
     const item = order.items[0];
 
-    if (!statusOnlyUpdate) {
-  const requiredGroups = await prisma.optionGroup.findMany({
-    where: {
-      productId: item.productId,
-      active: true,
-      required: true,
-    },
-    select: {
-      name: true,
-      choices: {
-        where: {
-          active: true,
-        },
-        select: {
-          label: true,
-          usesLeatherGrades: true,
-        },
-      },
-    },
-  });
-
-  const requiredValidationMessages = getMissingRequiredValidationMessages(
-    requiredGroups,
-    rawSelections
-  );
-
-  if (requiredValidationMessages.length > 0) {
-    return NextResponse.json(
-      { error: requiredValidationMessages.join(" ") },
-      { status: 400 }
-    );
-  }
-}
-
-
-    const productRequiredGroups = await prisma.optionGroup.findMany({
+const requiredGroups = await prisma.optionGroup.findMany({
   where: {
     productId: item.productId,
     active: true,
-    required: true,
   },
   select: {
     name: true,
+    required: true,
+    choices: {
+      where: {
+        active: true,
+      },
+      select: {
+        label: true,
+        usesLeatherGrades: true,
+        isQuickPick: true,
+      },
+    },
   },
 });
 
-const missingRequiredGroups = getMissingRequiredGroups(
-  productRequiredGroups,
+const requiredValidationMessages = getRequiredValidationMessages(
+  requiredGroups,
   rawSelections
 );
 
-if (missingRequiredGroups.length > 0) {
+if (requiredValidationMessages.length > 0) {
   return NextResponse.json(
-    {
-      error: `Please complete required options: ${missingRequiredGroups.join(
-        ", "
-      )}.`,
-    },
+    { error: requiredValidationMessages.join(" ") },
     { status: 400 }
   );
 }
@@ -838,7 +863,12 @@ if (missingRequiredGroups.length > 0) {
           1
       )
     );
-    const priority = normalizePriority(body.priority, order.priority as OrderPriority);
+
+    const priority = normalizePriority(
+      body.priority,
+      order.priority as OrderPriority
+    );
+
     const dueDateInput = parseOptionalDate(body.dueDate);
     const dueDate = dueDateInput.raw === "" ? order.dueDate : dueDateInput.date;
 
@@ -855,10 +885,14 @@ if (missingRequiredGroups.length > 0) {
     );
 
     const selectionRows = buildSelectionRows(selections);
+
     const nextRevisionNumber =
       order.revisions.length > 0 ? order.revisions[0].revisionNumber + 1 : 1;
+
     const nextStatus = order.status === "DRAFT" ? "DRAFT" : "CHANGED";
+
     const bodyLeather = buildBodyLeather(selections) || null;
+
     const nextProductionLines = buildProductionLines(
       selections,
       productName || item.productNameSnapshot,
@@ -871,6 +905,7 @@ if (missingRequiredGroups.length > 0) {
     const previousRevisionSnapshot = extractLatestRevisionSnapshot(
       order.revisions[0]?.afterJson
     );
+
     const previousSelections = await enrichSelectionsWithLeatherUsage(
       item.productId,
       previousRevisionSnapshot.selections
@@ -964,6 +999,7 @@ if (missingRequiredGroups.length > 0) {
           line,
         ])
       );
+
       const nextMap = new Map(
         nextProductionLines.map((line) => [
           `${line.partNumber}|||${line.frameNeeded}`,

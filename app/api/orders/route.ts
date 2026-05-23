@@ -69,19 +69,79 @@ function normalizeText(value?: string | null) {
   return String(value || "").trim().toLowerCase();
 }
 
-function getMissingRequiredValidationMessages(
-  requiredGroups: {
+function getActiveQuickPickGroupName(
+  groups: {
     name: string;
     choices: {
       label: string;
       usesLeatherGrades: boolean;
+      isQuickPick: boolean;
+    }[];
+  }[],
+  selections: IncomingSelection[]
+) {
+  for (const group of groups) {
+    const groupSelections = selections.filter(
+      (selection) =>
+        normalizeText(selection.groupName) === normalizeText(group.name)
+    );
+
+    for (const selection of groupSelections) {
+      const matchingChoice = group.choices.find(
+        (choice) =>
+          normalizeText(choice.label) === normalizeText(selection.choiceLabel)
+      );
+
+      if (matchingChoice?.isQuickPick) {
+        return group.name;
+      }
+    }
+  }
+
+  return null;
+}
+
+function isApiGroupLockedByQuickPick(
+  group: {
+    name: string;
+    choices: {
+      usesLeatherGrades: boolean;
+    }[];
+  },
+  activeQuickPickGroupName: string | null
+) {
+  return (
+    Boolean(activeQuickPickGroupName) &&
+    normalizeText(group.name) !== normalizeText(activeQuickPickGroupName) &&
+    group.choices.some((choice) => choice.usesLeatherGrades)
+  );
+}
+
+function getRequiredValidationMessages(
+  groups: {
+    name: string;
+    required: boolean;
+    choices: {
+      label: string;
+      usesLeatherGrades: boolean;
+      isQuickPick: boolean;
     }[];
   }[],
   selections: IncomingSelection[]
 ) {
   const messages: string[] = [];
+  const activeQuickPickGroupName = getActiveQuickPickGroupName(
+    groups,
+    selections
+  );
 
-  for (const group of requiredGroups) {
+  for (const group of groups) {
+    if (!group.required) continue;
+
+    if (isApiGroupLockedByQuickPick(group, activeQuickPickGroupName)) {
+      continue;
+    }
+
     const groupSelections = selections.filter(
       (selection) =>
         normalizeText(selection.groupName) === normalizeText(group.name)
@@ -545,10 +605,10 @@ const product = await prisma.product.findUnique({
     optionGroups: {
       where: {
         active: true,
-        required: true,
       },
       select: {
         name: true,
+        required: true,
         choices: {
           where: {
             active: true,
@@ -556,6 +616,7 @@ const product = await prisma.product.findUnique({
           select: {
             label: true,
             usesLeatherGrades: true,
+            isQuickPick: true,
           },
         },
       },
@@ -569,8 +630,7 @@ if (!product || !product.active) {
     { status: 404 }
   );
 }
-
-const requiredValidationMessages = getMissingRequiredValidationMessages(
+const requiredValidationMessages = getRequiredValidationMessages(
   product.optionGroups,
   rawSelections
 );

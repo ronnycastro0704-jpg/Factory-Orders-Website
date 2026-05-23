@@ -141,12 +141,25 @@ function sanitizeQuantity(value: number | null | undefined) {
   return Math.max(1, Math.round(parsed));
 }
 
+function isGroupLockedByQuickPick(
+  group: Group,
+  activeQuickPick: { groupId: string; choice: Choice } | null
+) {
+  return (
+    Boolean(activeQuickPick) &&
+    group.id !== activeQuickPick?.groupId &&
+    group.choices.some((choice) => choice.usesLeatherGrades)
+  );
+}
+
 function getMissingRequiredGroups(
   groups: Group[],
-  selectedOptions: Record<string, string[]>
+  selectedOptions: Record<string, string[]>,
+  activeQuickPick: { groupId: string; choice: Choice } | null
 ) {
   return groups
     .filter((group) => group.required)
+    .filter((group) => !isGroupLockedByQuickPick(group, activeQuickPick))
     .filter((group) => {
       const selectedChoiceIds = selectedOptions[group.id] || [];
       return selectedChoiceIds.length === 0;
@@ -157,12 +170,14 @@ function getMissingRequiredGroups(
 function getMissingRequiredLeathers(
   groups: Group[],
   selectedOptions: Record<string, string[]>,
-  selectedLeatherBySelectionKey: Record<string, string>
+  selectedLeatherBySelectionKey: Record<string, string>,
+  activeQuickPick: { groupId: string; choice: Choice } | null
 ) {
   const missing: string[] = [];
 
   for (const group of groups) {
     if (!group.required) continue;
+    if (isGroupLockedByQuickPick(group, activeQuickPick)) continue;
 
     const selectedChoiceIds = selectedOptions[group.id] || [];
 
@@ -170,7 +185,6 @@ function getMissingRequiredLeathers(
       const choice = group.choices.find((item) => item.id === choiceId);
 
       if (!choice) continue;
-
       if (!choice.usesLeatherGrades) continue;
 
       const selectionKey = makeSelectionKey(group.id, choice.id);
@@ -588,39 +602,41 @@ async function handleSaveChanges() {
   setSaveMessage("");
 
   if (!poNumber.trim()) {
-    setSaveError("PO # is required.");
-    return;
-  }
+  setSaveError("PO # is required.");
+  return;
+}
 
-  const missingRequiredGroups = getMissingRequiredGroups(
-    product.optionGroups,
-    selectedOptions
+const missingRequiredGroups = getMissingRequiredGroups(
+  product.optionGroups,
+  selectedOptions,
+  activeQuickPick
+);
+
+if (missingRequiredGroups.length > 0) {
+  setSaveError(
+    `Please complete required options: ${missingRequiredGroups.join(", ")}.`
   );
+  return;
+}
 
-  if (missingRequiredGroups.length > 0) {
-    setSaveError(
-      `Please complete required options: ${missingRequiredGroups.join(", ")}.`
-    );
-    return;
-  }
+const missingRequiredLeathers = getMissingRequiredLeathers(
+  product.optionGroups,
+  selectedOptions,
+  selectedLeatherBySelectionKey,
+  activeQuickPick
+);
 
-  const missingRequiredLeathers = getMissingRequiredLeathers(
-    product.optionGroups,
-    selectedOptions,
-    selectedLeatherBySelectionKey
+if (missingRequiredLeathers.length > 0) {
+  setSaveError(
+    `Please choose leather for: ${missingRequiredLeathers.join(", ")}.`
   );
+  return;
+}
 
-  if (missingRequiredLeathers.length > 0) {
-    setSaveError(
-      `Please choose leather for: ${missingRequiredLeathers.join(", ")}.`
-    );
-    return;
-  }
-
-  if (quantity < 1) {
-    setSaveError("Quantity must be at least 1.");
-    return;
-  }
+if (quantity < 1) {
+  setSaveError("Quantity must be at least 1.");
+  return;
+}
 
   setSaving(true);
 

@@ -55,14 +55,15 @@ export default function EditOrderForm({
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          customerName,
-          customerEmail,
-          customerPhone,
-          notes,
-          status,
-          changeReason,
-        }),
+body: JSON.stringify({
+  adminUpdate: true,
+  customerName,
+  customerEmail,
+  customerPhone,
+  notes,
+  status,
+  changeReason,
+}),
       });
 
       const data = await response.json();
