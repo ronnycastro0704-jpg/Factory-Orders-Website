@@ -92,9 +92,13 @@ function getActiveQuickPickGroupName(
           normalizeText(choice.label) === normalizeText(selection.choiceLabel)
       );
 
-      if (matchingChoice?.isQuickPick) {
-        return group.name;
-      }
+const isQuickPick =
+  matchingChoice?.isQuickPick ||
+  normalizeText(selection.choiceLabel).includes("quick pick");
+
+if (isQuickPick) {
+  return group.name;
+}
     }
   }
 
@@ -172,18 +176,7 @@ function getRequiredValidationMessages(
 }
 
 
-function getMissingRequiredGroups(
-  requiredGroups: { name: string }[],
-  selections: IncomingSelection[]
-) {
-  const selectedGroupNames = new Set(
-    selections.map((selection) => normalizeText(selection.groupName || ""))
-  );
 
-  return requiredGroups
-    .filter((group) => !selectedGroupNames.has(normalizeText(group.name)))
-    .map((group) => group.name);
-}
 
 
 function generateOrderNumber() {
@@ -602,25 +595,25 @@ const product = await prisma.product.findUnique({
     id: true,
     name: true,
     active: true,
-    optionGroups: {
+optionGroups: {
+  where: {
+    active: true,
+  },
+  select: {
+    name: true,
+    required: true,
+    choices: {
       where: {
         active: true,
       },
       select: {
-        name: true,
-        required: true,
-        choices: {
-          where: {
-            active: true,
-          },
-          select: {
-            label: true,
-            usesLeatherGrades: true,
-            isQuickPick: true,
-          },
-        },
+        label: true,
+        usesLeatherGrades: true,
+        isQuickPick: true,
       },
     },
+  },
+},
   },
 });
 
@@ -642,21 +635,7 @@ if (requiredValidationMessages.length > 0) {
   );
 }
 
-const missingRequiredGroups = getMissingRequiredGroups(
-  product.optionGroups,
-  rawSelections
-);
 
-if (missingRequiredGroups.length > 0) {
-  return NextResponse.json(
-    {
-      error: `Please complete required options: ${missingRequiredGroups.join(
-        ", "
-      )}.`,
-    },
-    { status: 400 }
-  );
-}
 
 const submittingUser = await prisma.user.findUnique({
       where: { email: signedInEmail },
