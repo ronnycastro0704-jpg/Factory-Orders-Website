@@ -21,6 +21,30 @@ export async function PUT(request: Request, context: RouteContext) {
     const { id } = await context.params;
     const body = await request.json();
 
+    const inventoryAdjustmentRaw = body.inventoryAdjustment;
+
+    if (inventoryAdjustmentRaw !== undefined) {
+      const inventoryAdjustment = Number(inventoryAdjustmentRaw);
+
+      if (!Number.isFinite(inventoryAdjustment)) {
+        return NextResponse.json(
+          { error: "Inventory adjustment must be a valid number." },
+          { status: 400 }
+        );
+      }
+
+      const leather = await prisma.leather.update({
+        where: { id },
+        data: {
+          inventoryUnits: {
+            increment: inventoryAdjustment,
+          },
+        },
+      });
+
+      return NextResponse.json(leather);
+    }
+
     const name = String(body.name || "").trim();
     const grade = String(body.grade || "").trim();
     const imageUrl = String(body.imageUrl || "").trim();

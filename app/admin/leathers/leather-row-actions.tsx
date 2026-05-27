@@ -36,12 +36,68 @@ export default function LeatherRowActions({ leather }: Props) {
   );
   const [active, setActive] = useState(leather.active ?? true);
 
+  const [inventoryAdjustment, setInventoryAdjustment] = useState("");
   const [loading, setLoading] = useState(false);
+  const [adjusting, setAdjusting] = useState(false);
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+
+  async function handleInventoryAdjustment() {
+    const adjustment = Number(inventoryAdjustment);
+
+    setError("");
+    setSuccess("");
+
+    if (!Number.isFinite(adjustment)) {
+      setError("Enter a valid adjustment. Example: +20 or -5.");
+      return;
+    }
+
+    if (adjustment === 0) {
+      setError("Adjustment cannot be 0.");
+      return;
+    }
+
+    setAdjusting(true);
+
+    try {
+      const response = await fetch(`/api/admin/leathers/${leather.id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          inventoryAdjustment: adjustment,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(data.error || "Failed to adjust inventory.");
+        setAdjusting(false);
+        return;
+      }
+
+      setInventoryAdjustment("");
+      setSuccess(
+        adjustment > 0
+          ? `Added ${adjustment.toFixed(2)} units.`
+          : `Removed ${Math.abs(adjustment).toFixed(2)} units.`
+      );
+      router.refresh();
+    } catch (error) {
+      console.error(error);
+      setError("Failed to adjust inventory.");
+    } finally {
+      setAdjusting(false);
+    }
+  }
 
   async function handleSave() {
     setLoading(true);
     setError("");
+    setSuccess("");
 
     try {
       const response = await fetch(`/api/admin/leathers/${leather.id}`, {
@@ -85,6 +141,7 @@ export default function LeatherRowActions({ leather }: Props) {
 
     setLoading(true);
     setError("");
+    setSuccess("");
 
     try {
       const response = await fetch(`/api/admin/leathers/${leather.id}`, {
@@ -110,22 +167,64 @@ export default function LeatherRowActions({ leather }: Props) {
 
   if (!editing) {
     return (
-      <div className="mt-3 flex flex-wrap gap-2">
-        <button
-          type="button"
-          onClick={() => setEditing(true)}
-          className="rounded-lg border px-3 py-2 text-sm hover:bg-slate-100"
-        >
-          Edit
-        </button>
-        <button
-          type="button"
-          onClick={handleDelete}
-          disabled={loading}
-          className="rounded-lg border border-red-200 px-3 py-2 text-sm text-red-600 hover:bg-red-50 disabled:opacity-50"
-        >
-          Delete
-        </button>
+      <div className="mt-4 space-y-3">
+        <div className="rounded-xl border bg-white p-3">
+          <p className="text-xs font-medium uppercase tracking-[0.14em] text-slate-500">
+            Inventory Adjustment
+          </p>
+
+          <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+            <input
+              type="number"
+              step="0.01"
+              className="w-full rounded-lg border px-3 py-2 text-sm"
+              value={inventoryAdjustment}
+              onChange={(event) => setInventoryAdjustment(event.target.value)}
+              placeholder="Example: +20 or -5"
+            />
+
+            <button
+              type="button"
+              onClick={handleInventoryAdjustment}
+              disabled={adjusting}
+              className="rounded-lg bg-slate-900 px-4 py-2 text-sm text-white hover:bg-slate-800 disabled:opacity-50"
+            >
+              {adjusting ? "Applying..." : "Apply"}
+            </button>
+          </div>
+
+          <p className="mt-2 text-xs text-slate-500">
+            Use positive numbers to add inventory, or negative numbers to remove
+            inventory.
+          </p>
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => setEditing(true)}
+            className="rounded-lg border px-3 py-2 text-sm hover:bg-slate-100"
+          >
+            Edit
+          </button>
+
+          <button
+            type="button"
+            onClick={handleDelete}
+            disabled={loading || adjusting}
+            className="rounded-lg border border-red-200 px-3 py-2 text-sm text-red-600 hover:bg-red-50 disabled:opacity-50"
+          >
+            Delete
+          </button>
+        </div>
+
+        {error ? (
+          <p className="text-sm font-medium text-red-600">{error}</p>
+        ) : null}
+
+        {success ? (
+          <p className="text-sm font-medium text-green-600">{success}</p>
+        ) : null}
       </div>
     );
   }
@@ -162,12 +261,13 @@ export default function LeatherRowActions({ leather }: Props) {
           className="w-full rounded-lg border px-3 py-2"
           value={imageUrl}
           onChange={(e) => setImageUrl(e.target.value)}
-          placeholder="https://..."
         />
       </div>
 
       <div>
-        <label className="mb-1 block text-sm font-medium">Inventory Units</label>
+        <label className="mb-1 block text-sm font-medium">
+          Inventory Units
+        </label>
         <input
           type="number"
           step="0.01"
@@ -175,6 +275,10 @@ export default function LeatherRowActions({ leather }: Props) {
           value={inventoryUnits}
           onChange={(e) => setInventoryUnits(e.target.value)}
         />
+        <p className="mt-1 text-xs text-slate-500">
+          This field sets the exact final inventory. Use the adjustment box
+          outside edit mode to add or subtract inventory.
+        </p>
       </div>
 
       <label className="flex items-center gap-2 text-sm">
@@ -186,7 +290,9 @@ export default function LeatherRowActions({ leather }: Props) {
         Active
       </label>
 
-      {error ? <p className="text-sm text-red-600">{error}</p> : null}
+      {error ? (
+        <p className="text-sm font-medium text-red-600">{error}</p>
+      ) : null}
 
       <div className="flex flex-wrap gap-2">
         <button
@@ -197,18 +303,21 @@ export default function LeatherRowActions({ leather }: Props) {
         >
           {loading ? "Saving..." : "Save"}
         </button>
+
         <button
           type="button"
           onClick={() => {
             setEditing(false);
             setError("");
+            setSuccess("");
             setName(leather.name);
             setGrade(leather.grade);
             setImageUrl(leather.imageUrl || "");
             setInventoryUnits(String(leather.inventoryUnits));
             setActive(leather.active ?? true);
           }}
-          className="rounded-lg border px-3 py-2 text-sm hover:bg-slate-100"
+          disabled={loading}
+          className="rounded-lg border px-3 py-2 text-sm hover:bg-slate-100 disabled:opacity-50"
         >
           Cancel
         </button>
