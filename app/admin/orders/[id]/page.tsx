@@ -351,18 +351,41 @@ const perUnitSubtotal =
                   />
                 </div>
 
-                <div>
-                  <label className="mb-1 block text-sm font-medium">
-                    Notes
-                  </label>
-                  <textarea
-                    className="w-full rounded-lg border bg-gray-100 px-3 py-2 text-gray-700"
-                    rows={4}
-                    value={order.notes || ""}
-                    readOnly
-                    disabled
-                  />
-                </div>
+<div>
+  <label className="mb-1 block text-sm font-medium">
+    Notes
+  </label>
+  <textarea
+    className="w-full rounded-lg border bg-gray-100 px-3 py-2 text-gray-700"
+    rows={4}
+    value={order.notes || ""}
+    readOnly
+    disabled
+  />
+</div>
+
+{order.notesImageUrl ? (
+  <div>
+    <label className="mb-1 block text-sm font-medium">
+      Notes Image
+    </label>
+    <div className="rounded-xl border bg-white p-3">
+      <img
+        src={order.notesImageUrl}
+        alt="Customer notes reference"
+        className="max-h-72 rounded-lg object-contain"
+      />
+      <a
+        href={order.notesImageUrl}
+        target="_blank"
+        rel="noreferrer"
+        className="mt-3 inline-flex text-sm font-medium text-blue-600 underline"
+      >
+        Open full image
+      </a>
+    </div>
+  </div>
+) : null}
               </div>
             </div>
 

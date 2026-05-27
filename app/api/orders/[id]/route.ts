@@ -801,6 +801,7 @@ export async function PUT(request: Request, context: RouteContext) {
 
     const customerPhone = String(body.customerPhone || "").trim() || null;
     const notes = String(body.notes || "").trim() || null;
+    const notesImageUrl = String(body.notesImageUrl || "").trim() || null;
     const changeReason =
       String(body.changeReason || "").trim() || "Order updated";
     const productName = String(body.productName || "").trim();
@@ -943,6 +944,7 @@ if (requiredValidationMessages.length > 0) {
           customerEmail,
           customerPhone,
           notes,
+          notesImageUrl,
           total,
           subtotal: total,
           quantity,
@@ -974,6 +976,7 @@ if (requiredValidationMessages.length > 0) {
           changeReason,
           beforeJson: {
             status: order.status,
+            notesImageUrl: order.notesImageUrl,
             poNumber: order.poNumber,
             quantity: order.quantity,
             priority: order.priority,
@@ -983,6 +986,7 @@ if (requiredValidationMessages.length > 0) {
             status: nextStatus,
             poNumber,
             quantity,
+            notesImageUrl,
             priority,
             dueDate,
             selections,
@@ -1121,6 +1125,7 @@ if (requiredValidationMessages.length > 0) {
         customerEmail,
         customerPhone,
         notes,
+        notesImageUrl,
         productName: productName || item.productNameSnapshot,
         total,
         lineItems,

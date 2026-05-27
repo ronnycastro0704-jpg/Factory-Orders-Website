@@ -16,6 +16,7 @@ type OrderRow = {
   orderNumber: string;
   poNumber: string | null;
   status: string;
+  notesImageUrl: string | null;
   quantity: number;
   total: unknown;
   createdAt: Date;
@@ -120,25 +121,34 @@ export default async function MyOrdersPage({ searchParams }: PageProps) {
       : {}),
   };
 
-  const orders = (await prisma.order.findMany({
-    where,
-    orderBy: { createdAt: "desc" },
-    include: {
-      items: {
-        select: {
-          id: true,
-          productNameSnapshot: true,
-          selections: {
-            select: {
-              id: true,
-              leatherNameSnapshot: true,
-              leatherInventoryUsageSnapshot: true,
-            },
+const orders = (await prisma.order.findMany({
+  where,
+  orderBy: { createdAt: "desc" },
+  select: {
+    id: true,
+    orderNumber: true,
+    poNumber: true,
+    status: true,
+    quantity: true,
+    total: true,
+    notesImageUrl: true,
+    createdAt: true,
+    updatedAt: true,
+    items: {
+      select: {
+        id: true,
+        productNameSnapshot: true,
+        selections: {
+          select: {
+            id: true,
+            leatherNameSnapshot: true,
+            leatherInventoryUsageSnapshot: true,
           },
         },
       },
     },
-  })) as OrderRow[];
+  },
+})) as OrderRow[];
 
   const selectedLeatherNames = Array.from(
     new Set(
@@ -295,6 +305,11 @@ const leatherInventoryNotes = order.items.flatMap((item) =>
                           <p className="mt-3 text-sm text-slate-600">
                             Product: {firstItem?.productNameSnapshot || "—"}
                           </p>
+                          {order.notesImageUrl ? (
+  <p className="mt-2 inline-flex rounded-full border bg-white px-3 py-1 text-xs font-semibold text-slate-700">
+    Notes image attached
+  </p>
+) : null}
 
 {leatherInventoryNotes.length > 0 ? (
   <div className="mt-3 rounded-xl border bg-white/80 p-3 text-sm text-slate-700">

@@ -107,6 +107,7 @@ model Order {
   subtotal                Decimal                 @default(0) @db.Decimal(10, 2)
   total                   Decimal                 @default(0) @db.Decimal(10, 2)
   notes                   String?
+  notesImageUrl           String?
   sentToFactoryAt         DateTime?
   dueDate                 DateTime?
   priority                OrderPriority           @default(NORMAL)

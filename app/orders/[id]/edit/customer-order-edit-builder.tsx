@@ -66,6 +66,7 @@ type Props = {
   initialCustomerEmail: string;
   initialCustomerPhone: string;
   initialNotes: string;
+  initialNotesImageUrl: string;
   initialPoNumber?: string;
   initialQuantity?: number;
 };
@@ -342,6 +343,7 @@ export default function CustomerOrderEditBuilder({
   initialCustomerEmail,
   initialCustomerPhone,
   initialNotes,
+  initialNotesImageUrl,
   initialPoNumber = "",
   initialQuantity = 1,
 }: Props) {
@@ -380,6 +382,8 @@ const quantity = sanitizeQuantity(Number(quantityInput));
   const [customerEmail] = useState(initialCustomerEmail);
   const [customerPhone, setCustomerPhone] = useState(initialCustomerPhone);
   const [notes, setNotes] = useState(initialNotes);
+  const [notesImageFile, setNotesImageFile] = useState<File | null>(null);
+const [notesImageUrl, setNotesImageUrl] = useState(initialNotesImageUrl);
   const [changeReason, setChangeReason] = useState("");
 
   const [saving, setSaving] = useState(false);
@@ -390,27 +394,35 @@ const activeQuickPick = useMemo(() => {
   return getActiveQuickPickFromSelections(product.optionGroups, selectedOptions);
 }, [product.optionGroups, selectedOptions]);
 
-  function setSingleChoice(groupId: string, choiceId: string) {
-    const group = product.optionGroups.find((item) => item.id === groupId);
-    const choice = group?.choices.find((item) => item.id === choiceId);
+function setSingleChoice(groupId: string, choiceId: string) {
+  const group = product.optionGroups.find((item) => item.id === groupId);
+  const choice = group?.choices.find((item) => item.id === choiceId);
 
-    if (!choice) return;
+  if (!group || !choice) return;
 
-    if (choice.isQuickPick) {
-      setSelectedOptions((prev) => {
-        const next = keepNonLeatherSelections(prev, product.optionGroups, groupId);
-        next[groupId] = [choiceId];
-        return next;
-      });
-      return;
-    }
+  const current = selectedOptions[groupId] || [];
+  const alreadySelected = current.includes(choiceId);
 
+  if (!group.required && alreadySelected) {
+    clearGroupSelection(groupId);
+    return;
+  }
+
+  if (choice.isQuickPick) {
     setSelectedOptions((prev) => {
-      const next = { ...prev };
+      const next = keepNonLeatherSelections(prev, product.optionGroups, groupId);
       next[groupId] = [choiceId];
       return next;
     });
+    return;
   }
+
+  setSelectedOptions((prev) => {
+    const next = { ...prev };
+    next[groupId] = [choiceId];
+    return next;
+  });
+}
 
   function clearGroupSelection(groupId: string) {
     setSelectedOptions((prev) => {
@@ -691,7 +703,11 @@ if (quantity < 1) {
   setSaving(true);
 
   try {
-      const payloadSelections = await buildSelectionPayload();
+const payloadSelections = await buildSelectionPayload();
+
+const finalNotesImageUrl = notesImageFile
+  ? await uploadSingleImage(notesImageFile)
+  : notesImageUrl;
 
       const response = await fetch(`/api/orders/${orderId}`, {
         method: "PUT",
@@ -703,6 +719,7 @@ if (quantity < 1) {
           quantity: sanitizeQuantity(quantity),
           customerPhone,
           notes,
+          notesImageUrl: finalNotesImageUrl || null,
           changeReason,
           productName: product.name,
           basePrice: product.basePrice,
@@ -820,11 +837,23 @@ if (quantity < 1) {
                   </p>
                 </div>
 
-                {selectedChoiceIds.length > 0 ? (
-                  <span className="rounded-full border bg-green-50 px-3 py-1 text-xs font-semibold text-green-700">
-                    {selectedChoiceIds.length} selected
-                  </span>
-                ) : null}
+{selectedChoiceIds.length > 0 ? (
+  <div className="flex flex-wrap items-center gap-2">
+    <span className="rounded-full border bg-green-50 px-3 py-1 text-xs font-semibold text-green-700">
+      {selectedChoiceIds.length} selected
+    </span>
+
+    {!group.required ? (
+      <button
+        type="button"
+        onClick={() => clearGroupSelection(group.id)}
+        className="rounded-full border px-3 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-100"
+      >
+        Clear Selection
+      </button>
+    ) : null}
+  </div>
+) : null}
               </div>
 
               {groupDisabled && activeQuickPick ? (
@@ -1345,15 +1374,71 @@ if (quantity < 1) {
               />
             </div>
 
-            <div>
-              <label className="mb-1 block text-sm font-medium">Notes</label>
-              <textarea
-                className="w-full rounded-lg border px-3 py-2"
-                rows={4}
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-              />
-            </div>
+<div>
+  <label className="mb-1 block text-sm font-medium">Notes</label>
+  <textarea
+    className="w-full rounded-lg border px-3 py-2"
+    rows={4}
+    value={notes}
+    onChange={(e) => setNotes(e.target.value)}
+    placeholder="Optional notes"
+  />
+</div>
+
+<div>
+  <label className="mb-1 block text-sm font-medium">
+    Notes Image
+  </label>
+  <input
+    type="file"
+    accept="image/*"
+    className="w-full rounded-lg border px-3 py-2"
+    onChange={(event) => {
+      const file = event.target.files?.[0] || null;
+      setNotesImageFile(file);
+
+      if (file) {
+        setNotesImageUrl("");
+      }
+    }}
+  />
+  <p className="mt-1 text-xs text-slate-500">
+    Optional. Upload a cowhide, special material, or reference image.
+  </p>
+
+  {notesImageUrl || notesImageFile ? (
+    <div className="mt-3 rounded-xl border bg-white p-3">
+      <p className="text-xs font-medium uppercase tracking-[0.14em] text-slate-500">
+        Selected notes image
+      </p>
+
+      {notesImageFile ? (
+        <p className="mt-1 text-sm text-slate-700">
+          {notesImageFile.name}
+        </p>
+      ) : null}
+
+      {notesImageUrl ? (
+        <img
+          src={notesImageUrl}
+          alt="Notes reference"
+          className="mt-2 max-h-48 rounded-lg border object-contain"
+        />
+      ) : null}
+
+      <button
+        type="button"
+        onClick={() => {
+          setNotesImageFile(null);
+          setNotesImageUrl("");
+        }}
+        className="mt-3 rounded-lg border px-3 py-2 text-sm hover:bg-slate-100"
+      >
+        Remove Image
+      </button>
+    </div>
+  ) : null}
+</div>
 
             <div>
               <label className="mb-1 block text-sm font-medium">

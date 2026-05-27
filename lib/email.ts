@@ -35,6 +35,7 @@ type SendOrderEmailInput = {
   customerEmail: string;
   customerPhone?: string | null;
   notes?: string | null;
+  notesImageUrl?: string | null;
   productName: string;
   total: number;
   lineItems?: OrderLineItem[];
@@ -495,20 +496,21 @@ function getEmailCopy(type: SendOrderEmailInput["type"], orderNumber: string) {
 }
 
 export async function sendOrderNotification(input: SendOrderEmailInput) {
-  const {
-    type,
-    orderNumber,
-    poNumber,
-    quantity,
-    customerName,
-    customerEmail,
-    customerPhone,
-    notes,
-    productName,
-    total,
-    lineItems = [],
-    selections,
-  } = input;
+const {
+  type,
+  orderNumber,
+  poNumber,
+  quantity,
+  customerName,
+  customerEmail,
+  customerPhone,
+  notes,
+  notesImageUrl,
+  productName,
+  total,
+  lineItems = [],
+  selections,
+} = input;
 
   const from = process.env.MAIL_FROM;
   const notifyTo = process.env.ORDER_NOTIFY_TO;
@@ -536,7 +538,8 @@ export async function sendOrderNotification(input: SendOrderEmailInput) {
     `Product: ${productName}`,
     bodyLeatherSummary ? `Body Leather: ${bodyLeatherSummary}` : "",
     `Total: ${formatCurrency(total)}`,
-    notes ? `Notes: ${notes}` : "",
+notes ? `Notes: ${notes}` : "",
+notesImageUrl ? `Notes Image: ${notesImageUrl}` : "",
     "",
     "FACTORY SECTIONS:",
     buildFactorySelectionsText(selections),
@@ -571,7 +574,14 @@ export async function sendOrderNotification(input: SendOrderEmailInput) {
                   : ""
               }
               <div><strong>Total:</strong> ${formatCurrency(total)}</div>
-              ${notes ? `<div style="margin-top:6px;"><strong>Notes:</strong> ${escapeHtml(notes)}</div>` : ""}
+${notes ? `<div style="margin-top:6px;"><strong>Notes:</strong> ${escapeHtml(notes)}</div>` : ""}
+${
+  notesImageUrl
+    ? `<div style="margin-top:6px;"><strong>Notes Image:</strong> <a href="${escapeHtml(
+        notesImageUrl
+      )}">Open uploaded reference image</a></div>`
+    : ""
+}
             </td>
           </tr>
         </table>
@@ -609,7 +619,8 @@ export async function sendOrderNotification(input: SendOrderEmailInput) {
     "Selections:",
     buildSelectionsText(selections),
     "",
-    notes ? `Notes: ${notes}` : "",
+notes ? `Notes: ${notes}` : "",
+notesImageUrl ? `Notes Image: ${notesImageUrl}` : "",
     "",
     "If you need help, reply to this email.",
   ]
@@ -635,7 +646,14 @@ export async function sendOrderNotification(input: SendOrderEmailInput) {
             : ""
         }
         <p><strong>Total:</strong> ${formatCurrency(total)}</p>
-        ${notes ? `<p><strong>Notes:</strong> ${escapeHtml(notes)}</p>` : ""}
+${notes ? `<p><strong>Notes:</strong> ${escapeHtml(notes)}</p>` : ""}
+${
+  notesImageUrl
+    ? `<p><strong>Notes Image:</strong> <a href="${escapeHtml(
+        notesImageUrl
+      )}">Open uploaded reference image</a></p>`
+    : ""
+}
       </div>
 
       ${lineItemsHtml}

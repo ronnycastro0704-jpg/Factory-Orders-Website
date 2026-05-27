@@ -404,28 +404,29 @@ const serializedLeathers = leathers.map((leather: LeatherRecord) => ({
         </p>
 
         <div className="mt-8">
-          <CustomerOrderEditBuilder
-            orderId={order.id}
-            orderNumber={order.orderNumber}
-            product={serializedProduct}
-            leathers={serializedLeathers}
-            initialSelectedOptions={initialSelectedOptions}
-            initialSelectedLeatherBySelectionKey={
-              initialSelectedLeatherBySelectionKey
-            }
-            initialSelectedLaseredBrandBySelectionKey={
-              initialSelectedLaseredBrandBySelectionKey
-            }
-            initialSelectedLaseredBrandImageUrlBySelectionKey={
-              initialSelectedLaseredBrandImageUrlBySelectionKey
-            }
-            initialCustomerName={order.customerName}
-            initialCustomerEmail={order.customerEmail}
-            initialCustomerPhone={order.customerPhone || ""}
-            initialNotes={order.notes || ""}
-            initialPoNumber={order.poNumber || ""}
-            initialQuantity={initialQuantity}
-          />
+<CustomerOrderEditBuilder
+  orderId={order.id}
+  orderNumber={order.orderNumber}
+  product={serializedProduct}
+  leathers={serializedLeathers}
+  initialSelectedOptions={initialSelectedOptions}
+  initialSelectedLeatherBySelectionKey={
+    initialSelectedLeatherBySelectionKey
+  }
+  initialSelectedLaseredBrandBySelectionKey={
+    initialSelectedLaseredBrandBySelectionKey
+  }
+  initialSelectedLaseredBrandImageUrlBySelectionKey={
+    initialSelectedLaseredBrandImageUrlBySelectionKey
+  }
+  initialCustomerName={order.customerName}
+  initialCustomerEmail={order.customerEmail}
+  initialCustomerPhone={order.customerPhone || ""}
+  initialNotes={order.notes || ""}
+  initialNotesImageUrl={order.notesImageUrl || ""}
+  initialPoNumber={order.poNumber || ""}
+  initialQuantity={initialQuantity}
+/>
         </div>
       </div>
     </main>

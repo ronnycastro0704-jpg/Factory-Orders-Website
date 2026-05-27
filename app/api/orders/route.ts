@@ -555,6 +555,7 @@ if (!poNumber) {
     const customerEmail = approvedCustomer.email;
     const customerPhone = String(body.customerPhone || "").trim() || null;
     const notes = String(body.notes || "").trim() || null;
+    const notesImageUrl = String(body.notesImageUrl || "").trim() || null;
     const productName = String(body.productName || "").trim();
     const basePrice = Number(body.basePrice || 0);
     const total = Number(body.total || 0);
@@ -673,6 +674,7 @@ const submittingUser = await prisma.user.findUnique({
         customerEmail,
         customerPhone,
         notes,
+        notesImageUrl,
         status: nextStatus,
         subtotal: total,
         total,
@@ -777,6 +779,7 @@ const submittingUser = await prisma.user.findUnique({
         customerEmail,
         customerPhone,
         notes,
+        notesImageUrl,
         productName: productName || product.name,
         total,
         lineItems,
