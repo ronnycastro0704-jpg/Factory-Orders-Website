@@ -7,6 +7,16 @@ function formatCurrency(value: number) {
   }).format(value);
 }
 
+function normalizeEmail(value?: string | null) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function uniqueEmails(values: Array<string | null | undefined>) {
+  return Array.from(
+    new Set(values.map((value) => normalizeEmail(value)).filter(Boolean))
+  );
+}
+
 type OrderLineItem = {
   label: string;
   amount: number;
@@ -33,6 +43,7 @@ type SendOrderEmailInput = {
   quantity?: number | null;
   customerName: string;
   customerEmail: string;
+  recipientEmails?: string[];
   customerPhone?: string | null;
   notes?: string | null;
   notesImageUrl?: string | null;
@@ -503,6 +514,7 @@ const {
   quantity,
   customerName,
   customerEmail,
+  recipientEmails = [],
   customerPhone,
   notes,
   notesImageUrl,
@@ -514,6 +526,11 @@ const {
 
   const from = process.env.MAIL_FROM;
   const notifyTo = process.env.ORDER_NOTIFY_TO;
+  const customerRecipients = uniqueEmails([customerEmail, ...recipientEmails]);
+
+if (customerRecipients.length === 0) {
+  throw new Error("Missing customer recipient email.");
+}
 
   if (!from || !notifyTo) {
     throw new Error("Missing MAIL_FROM or ORDER_NOTIFY_TO.");
@@ -666,13 +683,12 @@ ${
       </p>
     </div>
   `;
-
-  await transporter.sendMail({
-    from,
-    to: customerEmail,
-    replyTo: notifyTo,
-    subject: copy.customerSubject,
-    text: customerText,
-    html: customerHtml,
-  });
+await transporter.sendMail({
+  from,
+  to: customerRecipients,
+  replyTo: notifyTo,
+  subject: copy.customerSubject,
+  text: customerText,
+  html: customerHtml,
+});
 }

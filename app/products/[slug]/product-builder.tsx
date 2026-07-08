@@ -56,6 +56,7 @@ type Leather = {
 type Props = {
   product: Product;
   leathers: Leather[];
+  isAdmin?: boolean;
 };
 
 type PriceLine = {
@@ -252,6 +253,21 @@ function getMissingRequiredLeathers(
   return missing;
 }
 
+function parseEmailList(value: string) {
+  return Array.from(
+    new Set(
+      value
+        .split(/[\s,;]+/)
+        .map((item) => item.trim().toLowerCase())
+        .filter(Boolean)
+    )
+  );
+}
+
+function getInvalidEmails(emails: string[]) {
+  return emails.filter((email) => !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email));
+}
+
 function formatLeatherInventory(value: number) {
   return `${value.toFixed(2)} units available`;
 }
@@ -315,7 +331,11 @@ function getSingleApplyRank(grade: string) {
   return 0;
 }
 
-export default function ProductBuilder({ product, leathers }: Props) {
+export default function ProductBuilder({
+  product,
+  leathers,
+  isAdmin = false,
+}: Props) {
   const [selectedOptions, setSelectedOptions] = useState<Record<string, string[]>>(
     {}
   );
@@ -345,6 +365,7 @@ export default function ProductBuilder({ product, leathers }: Props) {
   const quantity = sanitizeQuantity(Number(quantityInput));
   const [customerName, setCustomerName] = useState("");
   const [customerEmail, setCustomerEmail] = useState("");
+  const [notificationEmailsInput, setNotificationEmailsInput] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
   const [notes, setNotes] = useState("");
   const [notesImageFile, setNotesImageFile] = useState<File | null>(null);
@@ -375,10 +396,17 @@ useEffect(() => {
           ? email.split("@")[0]
           : "";
 
-      if (!cancelled) {
-        setCustomerName(name);
-        setCustomerEmail(email);
-      }
+if (!cancelled) {
+  if (isAdmin) {
+    setCustomerName("");
+    setCustomerEmail("");
+    setNotificationEmailsInput("");
+  } else {
+    setCustomerName(name);
+    setCustomerEmail(email);
+    setNotificationEmailsInput(email);
+  }
+}
     } catch (error) {
       console.error("Failed to load current customer:", error);
     }
@@ -389,7 +417,7 @@ useEffect(() => {
   return () => {
     cancelled = true;
   };
-}, []);
+}, [isAdmin]);
 
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState("");
@@ -704,6 +732,30 @@ if (quantity < 1) {
   setSaveError("Quantity must be at least 1.");
   return;
 }
+  const parsedNotificationEmails = isAdmin
+  ? parseEmailList(notificationEmailsInput || customerEmail)
+  : [customerEmail];
+
+const primaryCustomerEmail = isAdmin
+  ? customerEmail.trim().toLowerCase() || parsedNotificationEmails[0] || ""
+  : customerEmail;
+
+if (isAdmin && !customerName.trim()) {
+  setSaveError("Customer name is required for admin-created orders.");
+  return;
+}
+
+if (isAdmin && parsedNotificationEmails.length === 0) {
+  setSaveError("At least one customer email is required.");
+  return;
+}
+
+const invalidEmails = getInvalidEmails(parsedNotificationEmails);
+
+if (invalidEmails.length > 0) {
+  setSaveError(`Invalid email address: ${invalidEmails.join(", ")}`);
+  return;
+}
 
   setSaving(true);
 
@@ -725,7 +777,8 @@ const finalNotesImageUrl = notesImageFile
           poNumber,
           quantity: sanitizeQuantity(quantity),
           customerName,
-          customerEmail,
+          customerEmail: primaryCustomerEmail,
+          notificationEmails: parsedNotificationEmails,
           customerPhone,
           notes,
           notesImageUrl: finalNotesImageUrl || null,
@@ -1357,25 +1410,56 @@ const finalNotesImageUrl = notesImageFile
 
             <div>
               <label className="mb-1 block text-sm font-medium">Name</label>
-              <input
-                className="w-full rounded-lg border bg-gray-100 px-3 py-2 text-gray-700"
-                value={customerName}
-                readOnly
-                disabled
-                placeholder="Approved customer name"
-              />
+<input
+  className={`w-full rounded-lg border px-3 py-2 ${
+    isAdmin ? "" : "bg-gray-100 text-gray-700"
+  }`}
+  value={customerName}
+  onChange={(e) => setCustomerName(e.target.value)}
+  readOnly={!isAdmin}
+  disabled={!isAdmin}
+  placeholder={isAdmin ? "Client name" : "Approved customer name"}
+/>
             </div>
 
             <div>
               <label className="mb-1 block text-sm font-medium">Email</label>
-              <input
-                className="w-full rounded-lg border bg-gray-100 px-3 py-2 text-gray-700"
-                value={customerEmail}
-                readOnly
-                disabled
-                placeholder="Approved customer email"
-              />
+<input
+  className={`w-full rounded-lg border px-3 py-2 ${
+    isAdmin ? "" : "bg-gray-100 text-gray-700"
+  }`}
+  value={customerEmail}
+  onChange={(e) => {
+    setCustomerEmail(e.target.value);
+
+    if (isAdmin && !notificationEmailsInput.trim()) {
+      setNotificationEmailsInput(e.target.value);
+    }
+  }}
+  readOnly={!isAdmin}
+  disabled={!isAdmin}
+  placeholder={isAdmin ? "Primary client email" : "Approved customer email"}
+/>
             </div>
+
+            {isAdmin ? (
+  <div>
+    <label className="mb-1 block text-sm font-medium">
+      Send Order Emails To
+    </label>
+    <textarea
+      className="w-full rounded-lg border px-3 py-2"
+      rows={3}
+      value={notificationEmailsInput}
+      onChange={(e) => setNotificationEmailsInput(e.target.value)}
+      placeholder="client@example.com, purchasing@example.com, accounting@example.com"
+    />
+    <p className="mt-1 text-xs text-slate-500">
+      Separate multiple emails with commas, spaces, or new lines. These
+      recipients will receive the order and future update emails.
+    </p>
+  </div>
+) : null}
 
             <div>
               <label className="mb-1 block text-sm font-medium">Phone</label>

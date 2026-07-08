@@ -101,6 +101,7 @@ model Order {
   orderNumber             String                  @unique
   customerName            String
   customerEmail           String
+  notificationEmails String[] @default([])
   customerPhone           String?
   poNumber                String?
   status                  OrderStatus             @default(DRAFT)

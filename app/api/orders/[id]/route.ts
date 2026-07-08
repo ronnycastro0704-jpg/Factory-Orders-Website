@@ -70,6 +70,39 @@ function normalizeEmail(value: string) {
   return value.trim().toLowerCase();
 }
 
+function normalizeEmailList(value: unknown) {
+  const rawValues = Array.isArray(value) ? value : [value];
+
+  return Array.from(
+    new Set(
+      rawValues
+        .flatMap((item) => String(item || "").split(/[\s,;]+/))
+        .map((item) => normalizeEmail(item))
+        .filter(Boolean)
+    )
+  );
+}
+
+function isValidEmail(value: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
+
+function getInvalidEmails(emails: string[]) {
+  return emails.filter((email) => !isValidEmail(email));
+}
+
+function getOrderNotificationEmails(order: {
+  customerEmail: string;
+  notificationEmails?: string[] | null;
+}) {
+  const emails = normalizeEmailList([
+    ...(order.notificationEmails || []),
+    order.customerEmail,
+  ]);
+
+  return emails.length > 0 ? emails : [normalizeEmail(order.customerEmail)];
+}
+
 function normalizeText(value?: string | null) {
   return String(value || "").trim().toLowerCase();
 }
@@ -720,6 +753,31 @@ export async function PUT(request: Request, context: RouteContext) {
       const adminCustomerEmail = String(body.customerEmail || "").trim()
         ? normalizeEmail(String(body.customerEmail))
         : order.customerEmail;
+      
+      const requestedAdminNotificationEmails =
+  body.notificationEmails === undefined
+    ? getOrderNotificationEmails(order)
+    : normalizeEmailList(body.notificationEmails);
+
+const adminNotificationEmails = normalizeEmailList([
+  adminCustomerEmail,
+  ...requestedAdminNotificationEmails,
+]);
+
+const invalidAdminNotificationEmails = getInvalidEmails(
+  adminNotificationEmails
+);
+
+if (invalidAdminNotificationEmails.length > 0) {
+  return NextResponse.json(
+    {
+      error: `Invalid email address: ${invalidAdminNotificationEmails.join(
+        ", "
+      )}`,
+    },
+    { status: 400 }
+  );
+}
 
       const adminCustomerPhone =
         body.customerPhone === undefined
@@ -743,6 +801,7 @@ export async function PUT(request: Request, context: RouteContext) {
           data: {
             customerName: adminCustomerName,
             customerEmail: adminCustomerEmail,
+            notificationEmails: adminNotificationEmails,
             customerPhone: adminCustomerPhone,
             notes: adminNotes,
             status: nextAdminStatus,
@@ -758,6 +817,7 @@ export async function PUT(request: Request, context: RouteContext) {
               status: order.status,
               customerName: order.customerName,
               customerEmail: order.customerEmail,
+              notificationEmails: adminNotificationEmails,
               customerPhone: order.customerPhone,
               notes: order.notes,
               poNumber: order.poNumber,
@@ -769,6 +829,7 @@ export async function PUT(request: Request, context: RouteContext) {
               status: nextAdminStatus,
               customerName: adminCustomerName,
               customerEmail: adminCustomerEmail,
+              notificationEmails: adminNotificationEmails,
               customerPhone: adminCustomerPhone,
               notes: adminNotes,
               poNumber: order.poNumber,
@@ -819,6 +880,7 @@ export async function PUT(request: Request, context: RouteContext) {
 
     const customerName = order.customerName;
     const customerEmail = normalizeEmail(order.customerEmail);
+    const notificationEmails = getOrderNotificationEmails(order);
 
     const item = order.items[0];
 
@@ -1123,6 +1185,7 @@ if (requiredValidationMessages.length > 0) {
         quantity,
         customerName,
         customerEmail,
+        recipientEmails: notificationEmails,
         customerPhone,
         notes,
         notesImageUrl,
@@ -1146,13 +1209,13 @@ if (requiredValidationMessages.length > 0) {
 
       await prisma.emailLog.createMany({
         data: [
-          {
-            orderId: id,
-            eventType: "ORDER_UPDATED_CUSTOMER",
-            recipient: customerEmail,
-            subject: `Your order was updated: ${order.orderNumber}`,
-            status: "SENT",
-          },
+...notificationEmails.map((recipient) => ({
+  orderId: id,
+  eventType: "ORDER_UPDATED_CUSTOMER",
+  recipient,
+  subject: `Your order was updated: ${order.orderNumber}`,
+  status: "SENT",
+})),
           {
             orderId: id,
             eventType: "ORDER_UPDATED_INTERNAL",
@@ -1169,7 +1232,7 @@ if (requiredValidationMessages.length > 0) {
         data: {
           orderId: id,
           eventType: "ORDER_UPDATED",
-          recipient: customerEmail,
+recipient: notificationEmails.join(", ") || customerEmail,
           subject: `Your order was updated: ${order.orderNumber}`,
           status: "FAILED",
           errorMessage:

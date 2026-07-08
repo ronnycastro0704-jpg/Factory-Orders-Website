@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { auth } from "../../../auth";
+import { isAdminEmail } from "../../../lib/admin";
 import { prisma } from "../../../lib/prisma";
 import { formatCurrency } from "../../../lib/utils";
 import ProductBuilder from "./product-builder";
@@ -70,8 +71,9 @@ type LeatherRecord = {
 };
 
 export default async function ProductPage({ params }: PageProps) {
-  const { slug } = await params;
-  const session = await auth();
+const { slug } = await params;
+const session = await auth();
+const isAdmin = isAdminEmail(session?.user?.email);
 
   const product = (await prisma.product.findUnique({
     where: { slug },
@@ -258,10 +260,11 @@ const serializedLeathers = leathers.map((leather: LeatherRecord) => ({
           </div>
 
           {session?.user ? (
-            <ProductBuilder
-              product={serializedProduct}
-              leathers={serializedLeathers}
-            />
+<ProductBuilder
+  product={serializedProduct}
+  leathers={serializedLeathers}
+  isAdmin={isAdmin}
+/>
           ) : (
             <div className="rounded-2xl border border-dashed bg-white/70 p-10 text-center">
               <p className="text-xl font-semibold text-slate-900">

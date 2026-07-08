@@ -7,6 +7,7 @@ type Props = {
   orderId: string;
   initialCustomerName: string;
   initialCustomerEmail: string;
+  initialNotificationEmails?: string[];
   initialCustomerPhone: string;
   initialNotes: string;
   initialStatus: string;
@@ -26,6 +27,7 @@ export default function EditOrderForm({
   orderId,
   initialCustomerName,
   initialCustomerEmail,
+  initialNotificationEmails = [],
   initialCustomerPhone,
   initialNotes,
   initialStatus,
@@ -33,6 +35,11 @@ export default function EditOrderForm({
   const router = useRouter();
 
   const [customerName, setCustomerName] = useState(initialCustomerName);
+  const [notificationEmailsText, setNotificationEmailsText] = useState(
+  initialNotificationEmails.length > 0
+    ? initialNotificationEmails.join(", ")
+    : initialCustomerEmail
+);
   const [customerEmail, setCustomerEmail] = useState(initialCustomerEmail);
   const [customerPhone, setCustomerPhone] = useState(initialCustomerPhone);
   const [notes, setNotes] = useState(initialNotes);
@@ -59,6 +66,7 @@ body: JSON.stringify({
   adminUpdate: true,
   customerName,
   customerEmail,
+  notificationEmails: notificationEmailsText,
   customerPhone,
   notes,
   status,
@@ -104,6 +112,22 @@ body: JSON.stringify({
           onChange={(e) => setCustomerEmail(e.target.value)}
         />
       </div>
+
+      <div>
+  <label className="mb-1 block text-sm font-medium">
+    Send Order Emails To
+  </label>
+  <textarea
+    className="w-full rounded-lg border px-3 py-2"
+    rows={3}
+    value={notificationEmailsText}
+    onChange={(e) => setNotificationEmailsText(e.target.value)}
+    placeholder="client@example.com, purchasing@example.com"
+  />
+  <p className="mt-1 text-xs text-slate-500">
+    Separate multiple emails with commas, spaces, or new lines.
+  </p>
+</div>
 
       <div>
         <label className="mb-1 block text-sm font-medium">Customer Phone</label>

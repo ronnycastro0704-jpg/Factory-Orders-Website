@@ -5,6 +5,7 @@ import { prisma } from "../../../lib/prisma";
 import { sendOrderNotification } from "../../../lib/email";
 import { appendOrderRow } from "../../../lib/sheets";
 import { getApprovedCustomerProfile } from "../../../lib/approved-customer";
+import { isAdminEmail } from "../../../lib/admin";
 
 type IncomingSelection = {
   groupName: string;
@@ -63,6 +64,27 @@ function addDays(date: Date, days: number) {
 
 function normalizeEmail(value: string) {
   return value.trim().toLowerCase();
+}
+
+function normalizeEmailList(value: unknown) {
+  const rawValues = Array.isArray(value) ? value : [value];
+
+  return Array.from(
+    new Set(
+      rawValues
+        .flatMap((item) => String(item || "").split(/[\s,;]+/))
+        .map((item) => normalizeEmail(item))
+        .filter(Boolean)
+    )
+  );
+}
+
+function isValidEmail(value: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
+
+function getInvalidEmails(emails: string[]) {
+  return emails.filter((email) => !isValidEmail(email));
 }
 
 function normalizeText(value?: string | null) {
@@ -532,15 +554,18 @@ export async function POST(request: Request) {
 
     const body = await request.json();
 
-    const signedInEmail = normalizeEmail(session.user.email);
-    const approvedCustomer = await getApprovedCustomerProfile(signedInEmail);
+const signedInEmail = normalizeEmail(session.user.email);
+const isAdminUser = isAdminEmail(signedInEmail);
+const approvedCustomer = isAdminUser
+  ? null
+  : await getApprovedCustomerProfile(signedInEmail);
 
-    if (!approvedCustomer) {
-      return NextResponse.json(
-        { error: "This email is not approved to place customer orders." },
-        { status: 403 }
-      );
-    }
+if (!isAdminUser && !approvedCustomer) {
+  return NextResponse.json(
+    { error: "This email is not approved to place customer orders." },
+    { status: 403 }
+  );
+}
 
     const productId = String(body.productId || "").trim();
 const poNumber = String(body.poNumber || "").trim();
@@ -551,8 +576,46 @@ if (!poNumber) {
     { status: 400 }
   );
 }
-    const customerName = approvedCustomer.name;
-    const customerEmail = approvedCustomer.email;
+const requestedNotificationEmails = normalizeEmailList(
+  body.notificationEmails ?? body.customerEmails ?? body.customerEmail
+);
+
+const customerName = isAdminUser
+  ? String(body.customerName || "").trim()
+  : approvedCustomer!.name;
+
+const customerEmail = isAdminUser
+  ? normalizeEmail(String(body.customerEmail || requestedNotificationEmails[0] || ""))
+  : approvedCustomer!.email;
+
+const notificationEmails = isAdminUser
+  ? normalizeEmailList([customerEmail, ...requestedNotificationEmails])
+  : [customerEmail];
+
+if (!customerName) {
+  return NextResponse.json(
+    { error: "Customer name is required." },
+    { status: 400 }
+  );
+}
+
+if (!customerEmail) {
+  return NextResponse.json(
+    { error: "At least one customer email is required." },
+    { status: 400 }
+  );
+}
+
+const invalidNotificationEmails = getInvalidEmails(notificationEmails);
+
+if (invalidNotificationEmails.length > 0) {
+  return NextResponse.json(
+    {
+      error: `Invalid email address: ${invalidNotificationEmails.join(", ")}`,
+    },
+    { status: 400 }
+  );
+}
     const customerPhone = String(body.customerPhone || "").trim() || null;
     const notes = String(body.notes || "").trim() || null;
     const notesImageUrl = String(body.notesImageUrl || "").trim() || null;
@@ -672,6 +735,7 @@ const submittingUser = await prisma.user.findUnique({
         poNumber,
         customerName,
         customerEmail,
+        notificationEmails,
         customerPhone,
         notes,
         notesImageUrl,
@@ -713,6 +777,7 @@ const submittingUser = await prisma.user.findUnique({
               quantity,
               priority,
               dueDate,
+              notificationEmails,
               selections,
               lineItems,
             },
@@ -777,6 +842,7 @@ const submittingUser = await prisma.user.findUnique({
         quantity,
         customerName,
         customerEmail,
+        recipientEmails: notificationEmails,
         customerPhone,
         notes,
         notesImageUrl,
@@ -800,17 +866,17 @@ const submittingUser = await prisma.user.findUnique({
 
       await prisma.emailLog.createMany({
         data: [
-          {
-            orderId: createdOrder.id,
-            eventType: submitToFactory
-              ? "ORDER_SENT_TO_FACTORY_CUSTOMER"
-              : "ORDER_CREATED_CUSTOMER",
-            recipient: customerEmail,
-            subject: submitToFactory
-              ? `Your order was sent to the factory: ${createdOrder.orderNumber}`
-              : `We received your order draft: ${createdOrder.orderNumber}`,
-            status: "SENT",
-          },
+...notificationEmails.map((recipient) => ({
+  orderId: createdOrder.id,
+  eventType: submitToFactory
+    ? "ORDER_SENT_TO_FACTORY_CUSTOMER"
+    : "ORDER_CREATED_CUSTOMER",
+  recipient,
+  subject: submitToFactory
+    ? `Your order was sent to the factory: ${createdOrder.orderNumber}`
+    : `We received your order draft: ${createdOrder.orderNumber}`,
+  status: "SENT",
+})),
           {
             orderId: createdOrder.id,
             eventType: submitToFactory
@@ -831,7 +897,7 @@ const submittingUser = await prisma.user.findUnique({
         data: {
           orderId: createdOrder.id,
           eventType: submitToFactory ? "ORDER_SENT_TO_FACTORY" : "ORDER_CREATED",
-          recipient: customerEmail,
+          recipient: notificationEmails.join(", ") || customerEmail,
           subject: submitToFactory
             ? `Your order was sent to the factory: ${createdOrder.orderNumber}`
             : `We received your order draft: ${createdOrder.orderNumber}`,
