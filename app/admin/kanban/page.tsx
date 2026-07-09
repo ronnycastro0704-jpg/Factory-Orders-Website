@@ -10,6 +10,7 @@ import {
   formatCentralDate,
   formatCentralDateTime,
 } from "../../../lib/central-time";
+import KanbanBoard from "./kanban-board";
 
 type PageProps = {
   searchParams: Promise<{
@@ -342,6 +343,15 @@ function buildStageHref({
   return queryString ? `/admin/kanban?${queryString}` : "/admin/kanban";
 }
 
+function serializeKanbanLine(line: ProductionLineRow) {
+  return {
+    ...line,
+    dueDate: line.dueDate ? line.dueDate.toISOString() : null,
+    pickedUpAt: line.pickedUpAt ? line.pickedUpAt.toISOString() : null,
+    updatedAt: line.updatedAt.toISOString(),
+  };
+}
+
 export default async function AdminKanbanPage({ searchParams }: PageProps) {
   const params = await searchParams;
 
@@ -480,6 +490,11 @@ export default async function AdminKanbanPage({ searchParams }: PageProps) {
     ...column,
     lines: typedLines.filter((line) => line.currentStatus === column.key),
   }));
+
+  const kanbanBoardColumns = groupedLines.map((column) => ({
+  ...column,
+  lines: column.lines.map(serializeKanbanLine),
+}));
 
   return (
     <main className="min-h-screen p-4 sm:p-6 lg:p-8">
@@ -702,67 +717,9 @@ export default async function AdminKanbanPage({ searchParams }: PageProps) {
                 Try resetting the filters or send more orders to factory.
               </p>
             </div>
-          ) : (
-            <div className="overflow-x-auto pb-3">
-              <div className="grid min-w-[1800px] grid-cols-10 gap-4">
-                {groupedLines.map((column) => (
-                  <div
-                    key={column.key}
-                    className="rounded-2xl border bg-white/70 p-3"
-                  >
-                    <div className="mb-3 flex items-center justify-between gap-2">
-                      <h3 className="text-sm font-bold uppercase tracking-[0.12em] text-slate-700">
-                        {column.label}
-                      </h3>
-                      <span className="rounded-full border bg-white px-2 py-1 text-xs font-semibold text-slate-600">
-                        {column.lines.length}
-                      </span>
-                    </div>
-
-                    <div className="space-y-3">
-                      {column.lines.length === 0 ? (
-                        <div className="rounded-xl border border-dashed bg-white/60 p-4 text-center text-xs text-slate-400">
-                          Empty
-                        </div>
-                      ) : (
-                        column.lines.map((line) => {
-                          const currentAssignee = getCurrentAssignee(line);
-                          const isOverdue =
-                            Boolean(line.dueDate) &&
-                            !line.pickedUp &&
-                            !["READY", "PICKED_UP"].includes(
-                              line.currentStatus
-                            ) &&
-                            (line.dueDate?.getTime() ?? 0) < nowTime;
-                          const stageSummary = getStageSummary(line);
-
-                          return (
-<Link
-  key={line.id}
-  href={`/admin/production/${line.order.id}`}
-  className="block rounded-xl border bg-white p-3 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
->
-  <div className="space-y-2">
-    <p className="text-sm font-semibold text-slate-900">
-      {line.partNumber} / {line.frameNeeded}
-    </p>
-
-    <div className="space-y-1 text-xs text-slate-500">
-      <p>Order {line.order.orderNumber}</p>
-      <p>PO # {line.order.poNumber || "—"}</p>
-      <p>{line.order.customerName}</p>
-    </div>
-  </div>
-</Link>
-                          );
-                        })
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+) : (
+  <KanbanBoard columns={kanbanBoardColumns} nowIso={now.toISOString()} />
+)}
         </section>
       </div>
     </main>

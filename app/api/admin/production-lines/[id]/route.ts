@@ -250,6 +250,398 @@ function deriveOrderOverallStatus(
   return "NEW";
 }
 
+const PRODUCTION_STATUS_ORDER: ProductionOverallStatus[] = [
+  "NEW",
+  "WAITING_ON_LEATHER",
+  "CUTTING",
+  "SEWING",
+  "UPHOLSTERY",
+  "FINAL_ASSEMBLY",
+  "QC",
+  "READY",
+  "PICKED_UP",
+];
+
+const OVERALL_STATUS_VALUES = new Set<ProductionOverallStatus>([
+  "NEW",
+  "WAITING_ON_LEATHER",
+  "CUTTING",
+  "SEWING",
+  "UPHOLSTERY",
+  "FINAL_ASSEMBLY",
+  "QC",
+  "READY",
+  "PICKED_UP",
+  "BLOCKED",
+]);
+
+type StageField =
+  | "millFirstStatus"
+  | "leatherOrderedStatus"
+  | "millStatus"
+  | "frameAssemblyStatus"
+  | "leatherArrivedStatus"
+  | "leaCutStatus"
+  | "sewnStatus"
+  | "upholsteryStatus"
+  | "upholsteredStatus"
+  | "finalAssemblyStatus"
+  | "qcStatus";
+
+type KanbanMoveState = Record<StageField, ProductionStageStatus> & {
+  pickedUp: boolean;
+  pickedUpAt: Date | null;
+};
+
+const STAGE_FIELDS: StageField[] = [
+  "millFirstStatus",
+  "leatherOrderedStatus",
+  "millStatus",
+  "frameAssemblyStatus",
+  "leatherArrivedStatus",
+  "leaCutStatus",
+  "sewnStatus",
+  "upholsteryStatus",
+  "upholsteredStatus",
+  "finalAssemblyStatus",
+  "qcStatus",
+];
+
+function normalizeOverallStatus(value: unknown) {
+  const raw = String(value || "")
+    .trim()
+    .toUpperCase() as ProductionOverallStatus;
+
+  return OVERALL_STATUS_VALUES.has(raw) ? raw : null;
+}
+
+function canMoveByDrag(
+  currentStatus: ProductionOverallStatus,
+  targetStatus: ProductionOverallStatus
+) {
+  if (currentStatus === targetStatus) {
+    return {
+      allowed: false,
+      error: "This line is already in that kanban column.",
+    };
+  }
+
+  if (currentStatus === "PICKED_UP") {
+    return {
+      allowed: false,
+      error:
+        "Picked up lines cannot be moved by dragging. Open the production detail page if this was marked incorrectly.",
+    };
+  }
+
+  if (currentStatus === "BLOCKED" && targetStatus !== "BLOCKED") {
+    return {
+      allowed: false,
+      error:
+        "Blocked lines must be unblocked from the production detail page so the blocked dropdown can be cleared intentionally.",
+    };
+  }
+
+  if (targetStatus === "BLOCKED") {
+    return {
+      allowed: true,
+      error: "",
+    };
+  }
+
+  const currentIndex = PRODUCTION_STATUS_ORDER.indexOf(currentStatus);
+  const targetIndex = PRODUCTION_STATUS_ORDER.indexOf(targetStatus);
+
+  if (currentIndex === -1 || targetIndex === -1) {
+    return {
+      allowed: false,
+      error: "This kanban move is not supported.",
+    };
+  }
+
+  if (targetIndex <= currentIndex) {
+    return {
+      allowed: false,
+      error:
+        "Backward drag moves are disabled so completed production steps are not accidentally undone. Open the production detail page to move a line backward.",
+    };
+  }
+
+  return {
+    allowed: true,
+    error: "",
+  };
+}
+
+function buildInitialKanbanMoveState(existingLine: {
+  millFirstStatus: unknown;
+  leatherOrderedStatus: unknown;
+  millStatus: unknown;
+  frameAssemblyStatus: unknown;
+  leatherArrivedStatus: unknown;
+  leaCutStatus: unknown;
+  sewnStatus: unknown;
+  upholsteryStatus: unknown;
+  upholsteredStatus: unknown;
+  finalAssemblyStatus: unknown;
+  qcStatus: unknown;
+  pickedUp: boolean;
+  pickedUpAt: Date | null;
+}): KanbanMoveState {
+  return {
+    millFirstStatus: existingLine.millFirstStatus as ProductionStageStatus,
+    leatherOrderedStatus:
+      existingLine.leatherOrderedStatus as ProductionStageStatus,
+    millStatus: existingLine.millStatus as ProductionStageStatus,
+    frameAssemblyStatus:
+      existingLine.frameAssemblyStatus as ProductionStageStatus,
+    leatherArrivedStatus:
+      existingLine.leatherArrivedStatus as ProductionStageStatus,
+    leaCutStatus: existingLine.leaCutStatus as ProductionStageStatus,
+    sewnStatus: existingLine.sewnStatus as ProductionStageStatus,
+    upholsteryStatus: existingLine.upholsteryStatus as ProductionStageStatus,
+    upholsteredStatus: existingLine.upholsteredStatus as ProductionStageStatus,
+    finalAssemblyStatus:
+      existingLine.finalAssemblyStatus as ProductionStageStatus,
+    qcStatus: existingLine.qcStatus as ProductionStageStatus,
+    pickedUp: false,
+    pickedUpAt: null,
+  };
+}
+
+function markPreProductionDone(state: KanbanMoveState) {
+  state.millFirstStatus = "DONE";
+  state.leatherOrderedStatus = "DONE";
+  state.millStatus = "DONE";
+  state.frameAssemblyStatus = "DONE";
+  state.leatherArrivedStatus = "DONE";
+}
+
+function markCuttingDone(state: KanbanMoveState) {
+  markPreProductionDone(state);
+  state.leaCutStatus = "DONE";
+}
+
+function markSewingDone(state: KanbanMoveState) {
+  markCuttingDone(state);
+  state.sewnStatus = "DONE";
+}
+
+function markUpholsteryDone(state: KanbanMoveState) {
+  markSewingDone(state);
+  state.upholsteryStatus = "DONE";
+  state.upholsteredStatus = "DONE";
+}
+
+function markFinalAssemblyDone(state: KanbanMoveState) {
+  markUpholsteryDone(state);
+  state.finalAssemblyStatus = "DONE";
+}
+
+function markReadyDone(state: KanbanMoveState) {
+  markFinalAssemblyDone(state);
+  state.qcStatus = "DONE";
+}
+
+function getBlockedStageField(state: KanbanMoveState): StageField {
+  if (isStarted(state.qcStatus)) return "qcStatus";
+  if (isStarted(state.finalAssemblyStatus)) return "finalAssemblyStatus";
+  if (isStarted(state.upholsteryStatus)) return "upholsteryStatus";
+  if (isStarted(state.upholsteredStatus)) return "upholsteredStatus";
+  if (isStarted(state.sewnStatus)) return "sewnStatus";
+  if (isStarted(state.leaCutStatus)) return "leaCutStatus";
+  if (isStarted(state.leatherArrivedStatus)) return "leatherArrivedStatus";
+  if (isStarted(state.frameAssemblyStatus)) return "frameAssemblyStatus";
+  if (isStarted(state.millStatus)) return "millStatus";
+  if (isStarted(state.leatherOrderedStatus)) return "leatherOrderedStatus";
+  if (isStarted(state.millFirstStatus)) return "millFirstStatus";
+
+  return "leaCutStatus";
+}
+
+function applyKanbanMoveState(
+  state: KanbanMoveState,
+  targetStatus: ProductionOverallStatus
+) {
+  switch (targetStatus) {
+    case "WAITING_ON_LEATHER":
+      markPreProductionDone(state);
+      break;
+
+    case "CUTTING":
+      markCuttingDone(state);
+      break;
+
+    case "SEWING":
+      markSewingDone(state);
+      break;
+
+    case "UPHOLSTERY":
+      markUpholsteryDone(state);
+      break;
+
+    case "FINAL_ASSEMBLY":
+      markFinalAssemblyDone(state);
+      break;
+
+    case "QC":
+      markFinalAssemblyDone(state);
+      state.qcStatus = "IN_PROGRESS";
+      break;
+
+    case "READY":
+      markReadyDone(state);
+      break;
+
+    case "PICKED_UP":
+      markReadyDone(state);
+      state.pickedUp = true;
+      state.pickedUpAt = new Date();
+      break;
+
+    case "BLOCKED": {
+      const alreadyBlocked = STAGE_FIELDS.some(
+        (field) => state[field] === "BLOCKED"
+      );
+
+      if (!alreadyBlocked) {
+        state[getBlockedStageField(state)] = "BLOCKED";
+      }
+
+      break;
+    }
+
+    case "NEW":
+    default:
+      break;
+  }
+}
+
+async function updateOrderStatusAndSyncSheets(args: {
+  existingLine: {
+    orderId: string;
+    order: {
+      poNumber: string | null;
+      customerName: string;
+      pickedUpAt: Date | null;
+    };
+  };
+  updatedLine: {
+    partNumber: string;
+    frameNeeded: string;
+    quantity: number;
+    bodyLeather: string | null;
+    dueDate: Date | null;
+    millFirstStatus: unknown;
+    leatherOrderedStatus: unknown;
+    millStatus: unknown;
+    frameAssemblyStatus: unknown;
+    leatherArrivedStatus: unknown;
+    leaCutStatus: unknown;
+    sewnStatus: unknown;
+    upholsteryStatus: unknown;
+    upholsteredStatus: unknown;
+    finalAssemblyStatus: unknown;
+    qcStatus: unknown;
+    leaCutAssignedTo: string | null;
+    upholsteredAssignedTo: string | null;
+    qcAssignedTo: string | null;
+    pickedUp: boolean;
+    pickedUpAt: Date | null;
+  };
+}) {
+  const { existingLine, updatedLine } = args;
+
+  const siblingLines = await prisma.productionLine.findMany({
+    where: { orderId: existingLine.orderId },
+    select: {
+      id: true,
+      currentStatus: true,
+      pickedUp: true,
+    },
+  });
+
+  const orderStatus = deriveOrderOverallStatus(siblingLines);
+  const allPickedUp =
+    siblingLines.length > 0 && siblingLines.every((line) => line.pickedUp);
+
+  await prisma.order.update({
+    where: { id: existingLine.orderId },
+    data: {
+      overallProductionStatus: orderStatus,
+      pickedUp: allPickedUp,
+      pickedUpAt: allPickedUp
+        ? updatedLine.pickedUpAt ?? existingLine.order.pickedUpAt ?? new Date()
+        : null,
+    },
+  });
+
+  try {
+    const syncResult = await updateProductionTrackingRow({
+      poNumber: existingLine.order.poNumber,
+      customerName: existingLine.order.customerName,
+      partNumber: updatedLine.partNumber,
+      frameNeeded: updatedLine.frameNeeded,
+      quantity: updatedLine.quantity,
+      bodyLeather: updatedLine.bodyLeather,
+      dueDate: updatedLine.dueDate,
+
+      millFirstStatus: updatedLine.millFirstStatus as ProductionStageStatus,
+      leatherOrderedStatus:
+        updatedLine.leatherOrderedStatus as ProductionStageStatus,
+      millStatus: updatedLine.millStatus as ProductionStageStatus,
+      frameAssemblyStatus:
+        updatedLine.frameAssemblyStatus as ProductionStageStatus,
+      leatherArrivedStatus:
+        updatedLine.leatherArrivedStatus as ProductionStageStatus,
+      leaCutStatus: updatedLine.leaCutStatus as ProductionStageStatus,
+      sewnStatus: updatedLine.sewnStatus as ProductionStageStatus,
+      upholsteryStatus: updatedLine.upholsteryStatus as ProductionStageStatus,
+      upholsteredStatus:
+        updatedLine.upholsteredStatus as ProductionStageStatus,
+      finalAssemblyStatus:
+        updatedLine.finalAssemblyStatus as ProductionStageStatus,
+      qcStatus: updatedLine.qcStatus as ProductionStageStatus,
+
+      leaCutAssignedTo: updatedLine.leaCutAssignedTo,
+      upholsteredAssignedTo: updatedLine.upholsteredAssignedTo,
+      qcAssignedTo: updatedLine.qcAssignedTo,
+
+      pickedUp: updatedLine.pickedUp,
+      pickedUpAt: updatedLine.pickedUpAt,
+    });
+
+    await prisma.sheetSyncLog.create({
+      data: {
+        orderId: existingLine.orderId,
+        spreadsheetId: process.env.GOOGLE_SHEETS_SPREADSHEET_ID || null,
+        worksheetName: syncResult.worksheetName,
+        spreadsheetRowId: syncResult.rowNumber
+          ? String(syncResult.rowNumber)
+          : "ROW_NOT_FOUND",
+        status: syncResult.updated ? "SYNCED" : "FAILED",
+        errorMessage: syncResult.updated
+          ? null
+          : "No matching Orders sheet row was found for this production line.",
+      },
+    });
+  } catch (error) {
+    console.error("PRODUCTION LINE SHEETS SYNC ERROR:", error);
+
+    await prisma.sheetSyncLog.create({
+      data: {
+        orderId: existingLine.orderId,
+        spreadsheetId: process.env.GOOGLE_SHEETS_SPREADSHEET_ID || null,
+        worksheetName: process.env.GOOGLE_SHEETS_TAB_NAME || "Orders",
+        spreadsheetRowId: "UPDATE_FAILED",
+        status: "FAILED",
+        errorMessage:
+          error instanceof Error ? error.message : "Unknown sheets sync error",
+      },
+    });
+  }
+}
+
 export async function PUT(request: Request, context: RouteContext) {
   try {
     const session = await auth();
@@ -284,6 +676,73 @@ export async function PUT(request: Request, context: RouteContext) {
         { status: 404 }
       );
     }
+
+    if (body.moveToStatus !== undefined) {
+  const targetStatus = normalizeOverallStatus(body.moveToStatus);
+
+  if (!targetStatus) {
+    return NextResponse.json(
+      { error: "Invalid kanban status." },
+      { status: 400 }
+    );
+  }
+
+  const currentStatus = existingLine.currentStatus as ProductionOverallStatus;
+  const moveCheck = canMoveByDrag(currentStatus, targetStatus);
+
+  if (!moveCheck.allowed) {
+    return NextResponse.json(
+      { error: moveCheck.error },
+      { status: 400 }
+    );
+  }
+
+  const nextState = buildInitialKanbanMoveState(existingLine);
+
+  applyKanbanMoveState(nextState, targetStatus);
+
+  const nextCurrentStatus = deriveLineCurrentStatus({
+    pickedUp: nextState.pickedUp,
+    millFirstStatus: nextState.millFirstStatus,
+    leatherOrderedStatus: nextState.leatherOrderedStatus,
+    millStatus: nextState.millStatus,
+    frameAssemblyStatus: nextState.frameAssemblyStatus,
+    leatherArrivedStatus: nextState.leatherArrivedStatus,
+    leaCutStatus: nextState.leaCutStatus,
+    sewnStatus: nextState.sewnStatus,
+    upholsteryStatus: nextState.upholsteryStatus,
+    upholsteredStatus: nextState.upholsteredStatus,
+    finalAssemblyStatus: nextState.finalAssemblyStatus,
+    qcStatus: nextState.qcStatus,
+  });
+
+  const updatedLine = await prisma.productionLine.update({
+    where: { id },
+    data: {
+      millFirstStatus: nextState.millFirstStatus,
+      leatherOrderedStatus: nextState.leatherOrderedStatus,
+      millStatus: nextState.millStatus,
+      frameAssemblyStatus: nextState.frameAssemblyStatus,
+      leatherArrivedStatus: nextState.leatherArrivedStatus,
+      leaCutStatus: nextState.leaCutStatus,
+      sewnStatus: nextState.sewnStatus,
+      upholsteryStatus: nextState.upholsteryStatus,
+      upholsteredStatus: nextState.upholsteredStatus,
+      finalAssemblyStatus: nextState.finalAssemblyStatus,
+      qcStatus: nextState.qcStatus,
+      pickedUp: nextState.pickedUp,
+      pickedUpAt: nextState.pickedUpAt,
+      currentStatus: nextCurrentStatus,
+    },
+  });
+
+  await updateOrderStatusAndSyncSheets({
+    existingLine,
+    updatedLine,
+  });
+
+  return NextResponse.json(updatedLine);
+}
 
     const dueDateInput = parseOptionalDate(body.dueDate);
     const pickedUpAtInput = parseOptionalDate(body.pickedUpAt);
@@ -413,98 +872,12 @@ export async function PUT(request: Request, context: RouteContext) {
       },
     });
 
-    const siblingLines = await prisma.productionLine.findMany({
-      where: { orderId: existingLine.orderId },
-      select: {
-        id: true,
-        currentStatus: true,
-        pickedUp: true,
-      },
-    });
+await updateOrderStatusAndSyncSheets({
+  existingLine,
+  updatedLine,
+});
 
-    const orderStatus = deriveOrderOverallStatus(siblingLines);
-    const allPickedUp =
-      siblingLines.length > 0 && siblingLines.every((line) => line.pickedUp);
-
-    await prisma.order.update({
-      where: { id: existingLine.orderId },
-      data: {
-        overallProductionStatus: orderStatus,
-        pickedUp: allPickedUp,
-        pickedUpAt: allPickedUp
-          ? updatedLine.pickedUpAt ??
-            existingLine.order.pickedUpAt ??
-            new Date()
-          : null,
-      },
-    });
-
-    try {
-      const syncResult = await updateProductionTrackingRow({
-        poNumber: existingLine.order.poNumber,
-        customerName: existingLine.order.customerName,
-        partNumber: updatedLine.partNumber,
-        frameNeeded: updatedLine.frameNeeded,
-        quantity: updatedLine.quantity,
-        bodyLeather: updatedLine.bodyLeather,
-        dueDate: updatedLine.dueDate,
-
-        millFirstStatus: updatedLine.millFirstStatus as ProductionStageStatus,
-        leatherOrderedStatus:
-          updatedLine.leatherOrderedStatus as ProductionStageStatus,
-        millStatus: updatedLine.millStatus as ProductionStageStatus,
-        frameAssemblyStatus:
-          updatedLine.frameAssemblyStatus as ProductionStageStatus,
-        leatherArrivedStatus:
-          updatedLine.leatherArrivedStatus as ProductionStageStatus,
-        leaCutStatus: updatedLine.leaCutStatus as ProductionStageStatus,
-        sewnStatus: updatedLine.sewnStatus as ProductionStageStatus,
-        upholsteryStatus: updatedLine.upholsteryStatus as ProductionStageStatus,
-        upholsteredStatus:
-          updatedLine.upholsteredStatus as ProductionStageStatus,
-        finalAssemblyStatus:
-          updatedLine.finalAssemblyStatus as ProductionStageStatus,
-        qcStatus: updatedLine.qcStatus as ProductionStageStatus,
-
-        leaCutAssignedTo: updatedLine.leaCutAssignedTo,
-        upholsteredAssignedTo: updatedLine.upholsteredAssignedTo,
-        qcAssignedTo: updatedLine.qcAssignedTo,
-
-        pickedUp: updatedLine.pickedUp,
-        pickedUpAt: updatedLine.pickedUpAt,
-      });
-
-      await prisma.sheetSyncLog.create({
-        data: {
-          orderId: existingLine.orderId,
-          spreadsheetId: process.env.GOOGLE_SHEETS_SPREADSHEET_ID || null,
-          worksheetName: syncResult.worksheetName,
-          spreadsheetRowId: syncResult.rowNumber
-            ? String(syncResult.rowNumber)
-            : "ROW_NOT_FOUND",
-          status: syncResult.updated ? "SYNCED" : "FAILED",
-          errorMessage: syncResult.updated
-            ? null
-            : "No matching Orders sheet row was found for this production line.",
-        },
-      });
-    } catch (error) {
-      console.error("PRODUCTION LINE SHEETS SYNC ERROR:", error);
-
-      await prisma.sheetSyncLog.create({
-        data: {
-          orderId: existingLine.orderId,
-          spreadsheetId: process.env.GOOGLE_SHEETS_SPREADSHEET_ID || null,
-          worksheetName: process.env.GOOGLE_SHEETS_TAB_NAME || "Orders",
-          spreadsheetRowId: "UPDATE_FAILED",
-          status: "FAILED",
-          errorMessage:
-            error instanceof Error ? error.message : "Unknown sheets sync error",
-        },
-      });
-    }
-
-    return NextResponse.json(updatedLine);
+return NextResponse.json(updatedLine);
   } catch (error) {
     console.error("UPDATE PRODUCTION LINE ERROR:", error);
     return NextResponse.json(
