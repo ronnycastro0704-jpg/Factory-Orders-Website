@@ -103,6 +103,110 @@ function getOrderNotificationEmails(order: {
   return emails.length > 0 ? emails : [normalizeEmail(order.customerEmail)];
 }
 
+function cleanChoiceLabel(value: string) {
+  return value.replaceAll(SELECTION_META_SEPARATOR, " — ");
+}
+
+function formatOrderStatusLabel(status: OrderStatus) {
+  return status.replaceAll("_", " ");
+}
+
+function getStatusEmailType(status: OrderStatus) {
+  if (status === "COMPLETED") {
+    return "completed";
+  }
+
+  if (status === "SENT_TO_FACTORY") {
+    return "sent_to_factory";
+  }
+
+  return "updated";
+}
+
+function getStatusEmailSubject(status: OrderStatus, orderNumber: string) {
+  if (status === "COMPLETED") {
+    return `Your order is completed: ${orderNumber}`;
+  }
+
+  if (status === "SENT_TO_FACTORY") {
+    return `Your order was sent to the factory: ${orderNumber}`;
+  }
+
+  return `Your order status was updated: ${orderNumber}`;
+}
+
+function buildSnapshotProductName(order: {
+  items: {
+    productNameSnapshot: string;
+  }[];
+}) {
+  const productNames = Array.from(
+    new Set(
+      order.items
+        .map((item) => item.productNameSnapshot)
+        .filter(Boolean)
+    )
+  );
+
+  return productNames.join(", ") || "Order";
+}
+
+function buildSnapshotLineItems(order: {
+  items: {
+    productNameSnapshot: string;
+    basePriceSnapshot: unknown;
+    selections: {
+      optionGroupNameSnapshot: string;
+      optionChoiceNameSnapshot: string;
+      priceDeltaSnapshot: unknown;
+    }[];
+  }[];
+}) {
+  return order.items.flatMap((item) => [
+    {
+      label: `${item.productNameSnapshot} Base Price`,
+      amount: Number(item.basePriceSnapshot || 0),
+    },
+    ...item.selections.map((selection) => ({
+      label: `${selection.optionGroupNameSnapshot}: ${cleanChoiceLabel(
+        selection.optionChoiceNameSnapshot
+      )}`,
+      amount: Number(selection.priceDeltaSnapshot || 0),
+    })),
+  ]);
+}
+
+function buildSnapshotSelections(order: {
+  items: {
+    selections: {
+      optionGroupNameSnapshot: string;
+      optionChoiceNameSnapshot: string;
+      optionChoiceImageUrlSnapshot: string | null;
+      leatherNameSnapshot: string | null;
+      leatherGradeSnapshot: string | null;
+      leatherImageUrlSnapshot: string | null;
+      laseredBrandImageUrlSnapshot: string | null;
+      priceDeltaSnapshot: unknown;
+    }[];
+  }[];
+}) {
+  return order.items.flatMap((item) =>
+    item.selections.map((selection) => ({
+      groupName: selection.optionGroupNameSnapshot,
+      choiceLabel: cleanChoiceLabel(selection.optionChoiceNameSnapshot),
+      leatherName: selection.leatherNameSnapshot || null,
+      leatherGrade: selection.leatherGradeSnapshot || null,
+      baseAmount: Number(selection.priceDeltaSnapshot || 0),
+      leatherSurcharge: 0,
+      imageUrl: selection.optionChoiceImageUrlSnapshot || null,
+      leatherImageUrl: selection.leatherImageUrlSnapshot || null,
+      laseredBrand: Boolean(selection.laseredBrandImageUrlSnapshot),
+      laseredBrandImageUrl: selection.laseredBrandImageUrlSnapshot || null,
+      isBodyLeather: false,
+    }))
+  );
+}
+
 function normalizeText(value?: string | null) {
   return String(value || "").trim().toLowerCase();
 }
@@ -817,7 +921,7 @@ if (invalidAdminNotificationEmails.length > 0) {
               status: order.status,
               customerName: order.customerName,
               customerEmail: order.customerEmail,
-              notificationEmails: adminNotificationEmails,
+              notificationEmails: getOrderNotificationEmails(order),
               customerPhone: order.customerPhone,
               notes: order.notes,
               poNumber: order.poNumber,
@@ -841,7 +945,95 @@ if (invalidAdminNotificationEmails.length > 0) {
         }),
       ]);
 
-      return NextResponse.json(updatedOrder);
+const adminStatusChanged = order.status !== nextAdminStatus;
+
+if (adminStatusChanged) {
+  const emailType = getStatusEmailType(nextAdminStatus);
+  const customerSubject = getStatusEmailSubject(
+    nextAdminStatus,
+    updatedOrder.orderNumber
+  );
+
+  const internalSubject =
+    emailType === "completed"
+      ? `Order Completed: ${updatedOrder.orderNumber}`
+      : emailType === "sent_to_factory"
+      ? `Order Sent to Factory: ${updatedOrder.orderNumber}`
+      : `Order Status Updated: ${updatedOrder.orderNumber}`;
+
+  const statusMessage = `Order status changed from ${formatOrderStatusLabel(
+    order.status
+  )} to ${formatOrderStatusLabel(nextAdminStatus)}.`;
+
+  const emailNotes = [statusMessage, adminNotes ? `Order notes: ${adminNotes}` : ""]
+    .filter(Boolean)
+    .join("\n\n");
+
+  try {
+    await sendOrderNotification({
+      type: emailType,
+      orderNumber: updatedOrder.orderNumber,
+      poNumber: updatedOrder.poNumber,
+      quantity: updatedOrder.quantity,
+      customerName: updatedOrder.customerName,
+      customerEmail: updatedOrder.customerEmail,
+      recipientEmails: adminNotificationEmails,
+      customerPhone: updatedOrder.customerPhone,
+      notes: emailNotes,
+      notesImageUrl: updatedOrder.notesImageUrl,
+      productName: buildSnapshotProductName(order),
+      total: Number(updatedOrder.total || 0),
+      lineItems: buildSnapshotLineItems(order),
+      selections: buildSnapshotSelections(order),
+    });
+
+    await prisma.emailLog.createMany({
+      data: [
+        ...adminNotificationEmails.map((recipient) => ({
+          orderId: id,
+          eventType:
+            emailType === "completed"
+              ? "ORDER_COMPLETED_CUSTOMER"
+              : emailType === "sent_to_factory"
+              ? "ORDER_SENT_TO_FACTORY_CUSTOMER"
+              : "ORDER_STATUS_UPDATED_CUSTOMER",
+          recipient,
+          subject: customerSubject,
+          status: "SENT",
+        })),
+        {
+          orderId: id,
+          eventType:
+            emailType === "completed"
+              ? "ORDER_COMPLETED_INTERNAL"
+              : emailType === "sent_to_factory"
+              ? "ORDER_SENT_TO_FACTORY_INTERNAL"
+              : "ORDER_STATUS_UPDATED_INTERNAL",
+          recipient: process.env.ORDER_NOTIFY_TO || "",
+          subject: internalSubject,
+          status: "SENT",
+        },
+      ],
+    });
+  } catch (error) {
+    console.error("ADMIN STATUS EMAIL ERROR:", error);
+
+    await prisma.emailLog.create({
+      data: {
+        orderId: id,
+        eventType: "ORDER_STATUS_UPDATED",
+        recipient:
+          adminNotificationEmails.join(", ") || updatedOrder.customerEmail,
+        subject: customerSubject,
+        status: "FAILED",
+        errorMessage:
+          error instanceof Error ? error.message : "Unknown email error",
+      },
+    });
+  }
+}
+
+return NextResponse.json(updatedOrder);
     }
 
     if (rawSelections.length === 0) {
