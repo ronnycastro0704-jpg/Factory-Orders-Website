@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { type DragEvent, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 
@@ -259,11 +259,13 @@ function normalizeReturnedLine(original: KanbanLine, returnedLine: any) {
 export default function KanbanBoard({ columns, nowIso }: Props) {
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
-  const [boardColumns, setBoardColumns] = useState(columns);
-  const [draggedLineId, setDraggedLineId] = useState("");
-  const [pendingMove, setPendingMove] = useState<PendingMove | null>(null);
-  const [error, setError] = useState("");
-  const [saving, setSaving] = useState(false);
+const [boardColumns, setBoardColumns] = useState(columns);
+const [draggedLineId, setDraggedLineId] = useState("");
+const [dragOverStatus, setDragOverStatus] =
+  useState<ProductionOverallStatus | "">("");
+const [pendingMove, setPendingMove] = useState<PendingMove | null>(null);
+const [error, setError] = useState("");
+const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     setBoardColumns(columns);
@@ -284,24 +286,135 @@ export default function KanbanBoard({ columns, nowIso }: Props) {
     return allLines.find((line) => line.id === lineId) || null;
   }
 
-  function handleDrop(targetStatus: ProductionOverallStatus) {
-    if (!draggedLineId) return;
+  function createDragPreview(event: DragEvent<HTMLDivElement>) {
+  const source = event.currentTarget;
+  const rect = source.getBoundingClientRect();
 
-    const line = findLine(draggedLineId);
-    setDraggedLineId("");
+  const preview = source.cloneNode(true) as HTMLElement;
 
-    if (!line) return;
+  preview.style.position = "fixed";
+  preview.style.top = "-1000px";
+  preview.style.left = "-1000px";
+  preview.style.width = `${rect.width}px`;
+  preview.style.pointerEvents = "none";
+  preview.style.opacity = "0.96";
+  preview.style.transform = "rotate(2deg)";
+  preview.style.boxShadow =
+    "0 20px 45px rgba(15, 23, 42, 0.28), 0 8px 18px rgba(15, 23, 42, 0.18)";
+  preview.style.zIndex = "999999";
+  preview.style.background = "white";
 
-    const moveCheck = canDragMove(line.currentStatus, targetStatus);
+  document.body.appendChild(preview);
 
-    if (!moveCheck.allowed) {
-      setError(moveCheck.reason);
-      return;
-    }
+  event.dataTransfer.setDragImage(
+    preview,
+    Math.min(40, rect.width / 2),
+    32
+  );
 
-    setError("");
-    setPendingMove({ line, targetStatus });
+  window.setTimeout(() => {
+    preview.remove();
+  }, 0);
+}
+
+function handleDragStart(
+  event: DragEvent<HTMLDivElement>,
+  lineId: string
+) {
+  setDraggedLineId(lineId);
+  setDragOverStatus("");
+  setError("");
+
+  event.dataTransfer.effectAllowed = "move";
+  event.dataTransfer.setData("text/plain", lineId);
+
+  createDragPreview(event);
+}
+
+function handleDragEnd() {
+  setDraggedLineId("");
+  setDragOverStatus("");
+}
+
+function handleDragOver(
+  event: DragEvent<HTMLDivElement>,
+  targetStatus: ProductionOverallStatus
+) {
+  event.preventDefault();
+
+  if (!draggedLineId) return;
+
+  event.dataTransfer.dropEffect = "move";
+  setDragOverStatus(targetStatus);
+}
+
+function handleDragLeave(event: DragEvent<HTMLDivElement>) {
+  const nextTarget = event.relatedTarget;
+
+  if (
+    nextTarget instanceof Node &&
+    event.currentTarget.contains(nextTarget)
+  ) {
+    return;
   }
+
+  setDragOverStatus("");
+}
+
+function getColumnDropClasses(columnKey: ProductionOverallStatus) {
+  if (!draggedLineId) {
+    return "border-slate-200 bg-white/70";
+  }
+
+  const line = findLine(draggedLineId);
+
+  if (!line) {
+    return "border-slate-200 bg-white/70";
+  }
+
+  const isActiveTarget = dragOverStatus === columnKey;
+  const moveCheck = canDragMove(line.currentStatus, columnKey);
+
+  if (isActiveTarget && moveCheck.allowed) {
+    return "border-slate-400 bg-slate-100 ring-2 ring-slate-300 shadow-md";
+  }
+
+  if (isActiveTarget && !moveCheck.allowed) {
+    return "border-red-300 bg-red-50 ring-2 ring-red-200";
+  }
+
+  if (moveCheck.allowed) {
+    return "border-slate-200 bg-white/80";
+  }
+
+  return "border-slate-200 bg-white/50 opacity-80";
+}
+
+function handleDrop(
+  event: DragEvent<HTMLDivElement>,
+  targetStatus: ProductionOverallStatus
+) {
+  event.preventDefault();
+
+  if (!draggedLineId) return;
+
+  const line = findLine(draggedLineId);
+
+  setDraggedLineId("");
+  setDragOverStatus("");
+
+  if (!line) return;
+
+  const moveCheck = canDragMove(line.currentStatus, targetStatus);
+
+  if (!moveCheck.allowed) {
+    setError(moveCheck.reason);
+    return;
+  }
+
+  setError("");
+  setPendingMove({ line, targetStatus });
+}
 
   function updateLineOnBoard(updatedLine: KanbanLine) {
     setBoardColumns((currentColumns) =>
@@ -363,23 +476,32 @@ export default function KanbanBoard({ columns, nowIso }: Props) {
 
   return (
     <>
-      {error ? (
-        <div className="mb-4 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-medium text-red-700">
-          {error}
-        </div>
-      ) : null}
+{error ? (
+  <div className="mb-4 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-medium text-red-700">
+    {error}
+  </div>
+) : null}
 
-      <div className="overflow-x-auto pb-3">
+{draggedLineId ? (
+  <div className="mb-4 rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-600 shadow-sm">
+    <span className="font-semibold text-slate-900">Dragging order:</span>{" "}
+    Drop it into a production column. You will still get a confirmation popup
+    before anything is saved.
+  </div>
+) : null}
+
+<div className="overflow-x-auto pb-3">
         <div className="grid min-w-[1800px] grid-cols-10 gap-4">
           {boardColumns.map((column) => (
-            <div
-              key={column.key}
-              onDragOver={(event) => event.preventDefault()}
-              onDrop={() => handleDrop(column.key)}
-              className={`rounded-2xl border bg-white/70 p-3 transition ${
-                draggedLineId ? "ring-2 ring-slate-200" : ""
-              }`}
-            >
+<div
+  key={column.key}
+  onDragOver={(event) => handleDragOver(event, column.key)}
+  onDragLeave={handleDragLeave}
+  onDrop={(event) => handleDrop(event, column.key)}
+  className={`rounded-2xl border p-3 transition-all duration-150 ${getColumnDropClasses(
+    column.key
+  )}`}
+>
               <div className="mb-3 flex items-center justify-between gap-2">
                 <h3 className="text-sm font-bold uppercase tracking-[0.12em] text-slate-700">
                   {column.label}
@@ -390,11 +512,17 @@ export default function KanbanBoard({ columns, nowIso }: Props) {
               </div>
 
               <div className="min-h-[120px] space-y-3">
-                {column.lines.length === 0 ? (
-                  <div className="rounded-xl border border-dashed bg-white/60 p-4 text-center text-xs text-slate-400">
-                    Drop here
-                  </div>
-                ) : (
+{column.lines.length === 0 ? (
+  <div
+    className={`rounded-xl border border-dashed p-4 text-center text-xs transition ${
+      draggedLineId
+        ? "bg-white text-slate-600"
+        : "bg-white/60 text-slate-400"
+    }`}
+  >
+    {draggedLineId ? "Release to move here" : "Drop here"}
+  </div>
+) : (
                   column.lines.map((line) => {
                     const isOverdue =
                       Boolean(line.dueDate) &&
@@ -404,16 +532,23 @@ export default function KanbanBoard({ columns, nowIso }: Props) {
                         nowTime;
 
                     return (
-                      <div
-                        key={line.id}
-                        draggable
-                        onDragStart={() => {
-                          setDraggedLineId(line.id);
-                          setError("");
-                        }}
-                        onDragEnd={() => setDraggedLineId("")}
-                        className="cursor-grab rounded-xl border bg-white p-3 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md active:cursor-grabbing"
-                      >
+<div
+  key={line.id}
+  draggable={!saving}
+  onDragStart={(event) => handleDragStart(event, line.id)}
+  onDragEnd={handleDragEnd}
+  aria-grabbed={draggedLineId === line.id}
+  className={`select-none rounded-xl border bg-white p-3 shadow-sm transition-all duration-150 ${
+    draggedLineId === line.id
+      ? "scale-[0.98] opacity-40 ring-2 ring-slate-300"
+      : "cursor-grab hover:-translate-y-0.5 hover:shadow-md active:cursor-grabbing"
+  }`}
+>
+
+  <div className="mb-2 flex items-center justify-between text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">
+  <span>Drag to move</span>
+  <span className="text-slate-300">⋮⋮</span>
+</div>
                         <Link
                           href={`/admin/production/${line.order.id}`}
                           className="block"
