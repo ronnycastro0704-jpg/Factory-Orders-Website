@@ -71,8 +71,11 @@ export default function InvoiceBuilder({
   const [selectedOrders, setSelectedOrders] = useState<AvailableOrder[]>([]);
   const [draggedOrderId, setDraggedOrderId] = useState("");
   const [dragOverDraft, setDragOverDraft] = useState(false);
-  const [notes, setNotes] = useState("");
-  const [confirming, setConfirming] = useState(false);
+const [searchQuery, setSearchQuery] = useState("");
+const [notes, setNotes] = useState("");
+const [surchargeLabel, setSurchargeLabel] = useState("Tax / tariff surcharge");
+const [surchargeAmountInput, setSurchargeAmountInput] = useState("");
+const [confirming, setConfirming] = useState(false);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState("");
 
@@ -81,14 +84,34 @@ export default function InvoiceBuilder({
     [selectedOrders]
   );
 
-  const filteredAvailableOrders = availableOrders.filter(
-    (order) => !selectedIds.has(order.id)
-  );
+const normalizedSearchQuery = searchQuery.trim().toLowerCase();
 
-  const selectedTotal = selectedOrders.reduce(
-    (sum, order) => sum + order.total,
-    0
-  );
+const filteredAvailableOrders = availableOrders
+  .filter((order) => !selectedIds.has(order.id))
+  .filter((order) => {
+    if (!normalizedSearchQuery) return true;
+
+    return [
+      order.orderNumber,
+      order.poNumber || "",
+      order.customerName,
+      order.customerEmail,
+      order.productSummary,
+      order.status,
+      order.overallProductionStatus,
+    ]
+      .join(" ")
+      .toLowerCase()
+      .includes(normalizedSearchQuery);
+  });
+
+const selectedSubtotal = selectedOrders.reduce(
+  (sum, order) => sum + order.total,
+  0
+);
+
+const surchargeAmount = Math.max(0, Number(surchargeAmountInput || 0) || 0);
+const selectedTotal = selectedSubtotal + surchargeAmount;
 
   const selectedCustomerEmail = selectedOrders[0]?.customerEmail || "";
   const selectedCustomerName = selectedOrders[0]?.customerName || "";
@@ -186,10 +209,10 @@ export default function InvoiceBuilder({
   }
 
   async function createInvoice() {
-    if (selectedOrders.length < 2) {
-      setError("Please select at least two orders before creating an invoice.");
-      return;
-    }
+if (selectedOrders.length < 1) {
+  setError("Please select at least one order before creating an invoice.");
+  return;
+}
 
     setCreating(true);
     setError("");
@@ -200,10 +223,12 @@ export default function InvoiceBuilder({
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          orderIds: selectedOrders.map((order) => order.id),
-          notes,
-        }),
+ body: JSON.stringify({
+  orderIds: selectedOrders.map((order) => order.id),
+  notes,
+  surchargeLabel,
+  surchargeAmount,
+}),
       });
 
       const data = await response.json();
@@ -249,20 +274,38 @@ export default function InvoiceBuilder({
 
       <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
         <div className="rounded-2xl border bg-white p-4 shadow-sm">
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h3 className="text-xl font-bold">Available Orders</h3>
-              <p className="mt-1 text-sm text-slate-500">
-                Completed or paid orders not already on an active invoice.
-              </p>
-            </div>
+<div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+  <div>
+    <h3 className="text-xl font-bold">Available Orders</h3>
+    <p className="mt-1 text-sm text-slate-500">
+      Completed or paid orders not already on an active invoice.
+    </p>
+  </div>
 
-            <span className="rounded-full border bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
-              {filteredAvailableOrders.length} available
-            </span>
-          </div>
+  <span className="rounded-full border bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
+    {filteredAvailableOrders.length} available
+  </span>
+</div>
 
-          <div className="max-h-[700px] space-y-3 overflow-y-auto pr-2">
+<div className="mb-4 flex gap-3">
+  <input
+    value={searchQuery}
+    onChange={(event) => setSearchQuery(event.target.value)}
+    placeholder="Search order #, PO #, customer, email, product, status..."
+    className="w-full rounded-xl border bg-white px-4 py-3 text-sm outline-none focus:border-slate-400"
+  />
+  {searchQuery ? (
+    <button
+      type="button"
+      onClick={() => setSearchQuery("")}
+      className="button-secondary whitespace-nowrap"
+    >
+      Clear
+    </button>
+  ) : null}
+</div>
+
+<div className="max-h-[700px] space-y-3 overflow-y-auto pr-2">
             {filteredAvailableOrders.length === 0 ? (
               <div className="rounded-2xl border border-dashed bg-slate-50 p-8 text-center text-sm text-slate-500">
                 No completed uninvoiced orders are available.
@@ -425,50 +468,97 @@ export default function InvoiceBuilder({
                 </div>
               ))}
 
-              <div>
-                <label className="mb-1 block text-sm font-medium">
-                  Invoice Notes
-                </label>
-                <textarea
-                  className="w-full rounded-lg border px-3 py-2"
-                  rows={3}
-                  value={notes}
-                  onChange={(event) => setNotes(event.target.value)}
-                  placeholder="Optional notes for this invoice"
-                />
-              </div>
+<div>
+  <label className="mb-1 block text-sm font-medium">
+    Invoice Notes
+  </label>
+  <textarea
+    className="w-full rounded-lg border px-3 py-2"
+    rows={3}
+    value={notes}
+    onChange={(event) => setNotes(event.target.value)}
+    placeholder="Optional notes for this invoice"
+  />
+</div>
 
-              <div className="rounded-2xl border bg-slate-900 p-5 text-white">
-                <div className="flex items-center justify-between gap-4">
-                  <div>
-                    <p className="text-sm uppercase tracking-[0.16em] text-slate-300">
-                      Invoice Total
-                    </p>
-                    <p className="mt-1 text-xs text-slate-300">
-                      Terms: Due upon receipt
-                    </p>
-                  </div>
+<div className="grid gap-3 sm:grid-cols-[1fr_160px]">
+  <div>
+    <label className="mb-1 block text-sm font-medium">
+      Surcharge Label
+    </label>
+    <input
+      className="w-full rounded-lg border px-3 py-2"
+      value={surchargeLabel}
+      onChange={(event) => setSurchargeLabel(event.target.value)}
+      placeholder="Tax / tariff surcharge"
+    />
+  </div>
 
-                  <p className="text-3xl font-bold">
-                    {formatCurrency(selectedTotal)}
-                  </p>
-                </div>
-              </div>
+  <div>
+    <label className="mb-1 block text-sm font-medium">
+      Surcharge Amount
+    </label>
+    <input
+      className="w-full rounded-lg border px-3 py-2"
+      value={surchargeAmountInput}
+      onChange={(event) => setSurchargeAmountInput(event.target.value)}
+      inputMode="decimal"
+      placeholder="0.00"
+    />
+  </div>
+</div>
+
+<div className="rounded-2xl border bg-slate-900 p-5 text-white">
+  <div className="space-y-2">
+    <div className="flex items-center justify-between gap-4 text-sm">
+      <span className="text-slate-300">Subtotal</span>
+      <span className="font-semibold">
+        {formatCurrency(selectedSubtotal)}
+      </span>
+    </div>
+
+    {surchargeAmount > 0 ? (
+      <div className="flex items-center justify-between gap-4 text-sm">
+        <span className="text-slate-300">
+          {surchargeLabel || "Surcharge"}
+        </span>
+        <span className="font-semibold">
+          {formatCurrency(surchargeAmount)}
+        </span>
+      </div>
+    ) : null}
+
+    <div className="flex items-center justify-between gap-4 border-t border-white/20 pt-3">
+      <div>
+        <p className="text-sm uppercase tracking-[0.16em] text-slate-300">
+          Invoice Total
+        </p>
+        <p className="mt-1 text-xs text-slate-300">
+          Terms: Due upon receipt
+        </p>
+      </div>
+
+      <p className="text-3xl font-bold">
+        {formatCurrency(selectedTotal)}
+      </p>
+    </div>
+  </div>
+</div>
 
               <button
                 type="button"
                 onClick={() => setConfirming(true)}
-                disabled={selectedOrders.length < 2 || creating}
+                disabled={selectedOrders.length < 1 || creating}
                 className="w-full rounded-lg bg-slate-900 px-4 py-3 font-semibold text-white hover:bg-slate-800 disabled:opacity-50"
               >
                 Create Invoice
               </button>
 
               {selectedOrders.length === 1 ? (
-                <p className="text-center text-xs text-slate-500">
-                  Add at least one more order to create a grouped invoice.
-                </p>
-              ) : null}
+  <p className="text-center text-xs text-slate-500">
+    This invoice will be created with one order.
+  </p>
+) : null}
             </div>
           )}
         </div>
@@ -545,23 +635,41 @@ export default function InvoiceBuilder({
               Create invoice for {selectedOrders.length} orders?
             </h2>
 
-            <div className="mt-4 rounded-xl border bg-slate-50 p-4">
-              <p className="text-sm text-slate-600">
-                Customer:{" "}
-                <span className="font-semibold text-slate-900">
-                  {selectedCustomerName}
-                </span>
-              </p>
-              <p className="mt-1 text-sm text-slate-600">
-                Terms:{" "}
-                <span className="font-semibold text-slate-900">
-                  Due upon receipt
-                </span>
-              </p>
-              <p className="mt-3 text-3xl font-bold text-slate-900">
-                {formatCurrency(selectedTotal)}
-              </p>
-            </div>
+<div className="mt-4 rounded-xl border bg-slate-50 p-4">
+  <p className="text-sm text-slate-600">
+    Customer:{" "}
+    <span className="font-semibold text-slate-900">
+      {selectedCustomerName}
+    </span>
+  </p>
+
+  <p className="mt-1 text-sm text-slate-600">
+    Terms:{" "}
+    <span className="font-semibold text-slate-900">
+      Due upon receipt
+    </span>
+  </p>
+
+  <p className="mt-3 text-sm text-slate-600">
+    Subtotal:{" "}
+    <span className="font-semibold text-slate-900">
+      {formatCurrency(selectedSubtotal)}
+    </span>
+  </p>
+
+  {surchargeAmount > 0 ? (
+    <p className="mt-1 text-sm text-slate-600">
+      {surchargeLabel || "Surcharge"}:{" "}
+      <span className="font-semibold text-slate-900">
+        {formatCurrency(surchargeAmount)}
+      </span>
+    </p>
+  ) : null}
+
+  <p className="mt-3 text-3xl font-bold text-slate-900">
+    {formatCurrency(selectedTotal)}
+  </p>
+</div>
 
             <div className="mt-4 max-h-48 space-y-2 overflow-y-auto">
               {selectedOrders.map((order) => (

@@ -205,6 +205,8 @@ model Invoice {
   status        InvoiceStatus @default(DRAFT)
 
   subtotal Decimal @default(0) @db.Decimal(10, 2)
+  surchargeLabel  String?
+  surchargeAmount Decimal @default(0) @db.Decimal(10, 2)
   total    Decimal @default(0) @db.Decimal(10, 2)
 
   terms          String    @default("Due upon receipt")

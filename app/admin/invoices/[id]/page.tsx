@@ -4,6 +4,7 @@ import { auth } from "../../../../auth";
 import { isAdminEmail } from "../../../../lib/admin";
 import { prisma } from "../../../../lib/prisma";
 import { formatCurrency } from "../../../../lib/utils";
+import EmailInvoiceButton from "./email-invoice-button";
 import { formatCentralDate } from "../../../../lib/central-time";
 import PrintButton from "./print-button";
 
@@ -130,7 +131,16 @@ export default async function AdminInvoiceDetailPage({ params }: PageProps) {
             </Link>
           </div>
 
-          <PrintButton />
+          <div className="flex flex-wrap items-center gap-3">
+  <a
+    href={`/api/admin/invoices/${invoice.id}/pdf`}
+    className="button-secondary"
+  >
+    Download PDF
+  </a>
+  <EmailInvoiceButton invoiceId={invoice.id} />
+  <PrintButton />
+</div>
         </div>
 
         <section className="rounded-2xl border bg-white p-6 shadow-sm print:border-0 print:shadow-none">
@@ -308,17 +318,28 @@ export default async function AdminInvoiceDetailPage({ params }: PageProps) {
 
           <div className="border-t pt-6">
             <div className="ml-auto max-w-sm space-y-3">
-              <div className="flex justify-between gap-4 text-sm">
-                <span className="text-slate-600">Subtotal</span>
-                <span className="font-semibold">
-                  {formatCurrency(Number(invoice.subtotal))}
-                </span>
-              </div>
+<div className="flex justify-between gap-4 text-sm">
+  <span className="text-slate-600">Subtotal</span>
+  <span className="font-semibold">
+    {formatCurrency(Number(invoice.subtotal))}
+  </span>
+</div>
 
-              <div className="flex justify-between gap-4 border-t pt-3 text-xl font-bold">
-                <span>Total Due</span>
-                <span>{formatCurrency(Number(invoice.total))}</span>
-              </div>
+{Number(invoice.surchargeAmount || 0) > 0 ? (
+  <div className="flex justify-between gap-4 text-sm">
+    <span className="text-slate-600">
+      {invoice.surchargeLabel || "Surcharge"}
+    </span>
+    <span className="font-semibold">
+      {formatCurrency(Number(invoice.surchargeAmount))}
+    </span>
+  </div>
+) : null}
+
+<div className="flex justify-between gap-4 border-t pt-3 text-xl font-bold">
+  <span>Total Due</span>
+  <span>{formatCurrency(Number(invoice.total))}</span>
+</div>
 
               <p className="text-right text-sm text-slate-500">
                 Due upon receipt

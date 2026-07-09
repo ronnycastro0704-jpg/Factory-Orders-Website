@@ -18,6 +18,16 @@ function cleanChoiceLabel(value: string) {
   return value.replaceAll("|||", " — ");
 }
 
+function normalizeMoney(value: unknown) {
+  const parsed = Number(value || 0);
+
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    return 0;
+  }
+
+  return Math.round((parsed + Number.EPSILON) * 100) / 100;
+}
+
 function buildProductSummary(order: {
   items: {
     productNameSnapshot: string;
@@ -117,13 +127,17 @@ export async function POST(request: Request) {
     const body = await request.json();
     const orderIds = normalizeOrderIds(body.orderIds);
     const notes = String(body.notes || "").trim() || null;
+    const surchargeAmount = normalizeMoney(body.surchargeAmount);
+const surchargeLabel =
+  String(body.surchargeLabel || "").trim() ||
+  (surchargeAmount > 0 ? "Tax / tariff surcharge" : null);
 
-    if (orderIds.length < 2) {
-      return NextResponse.json(
-        { error: "Please select at least two orders for an invoice." },
-        { status: 400 }
-      );
-    }
+if (orderIds.length < 1) {
+  return NextResponse.json(
+    { error: "Please select at least one order for an invoice." },
+    { status: 400 }
+  );
+}
 
     const orders = await prisma.order.findMany({
       where: {
@@ -191,10 +205,12 @@ export async function POST(request: Request) {
     }
 
     const invoiceNumber = generateInvoiceNumber();
-    const invoiceTotal = orders.reduce(
-      (sum, order) => sum + Number(order.total || 0),
-      0
-    );
+const invoiceSubtotal = orders.reduce(
+  (sum, order) => sum + Number(order.total || 0),
+  0
+);
+
+const invoiceTotal = invoiceSubtotal + surchargeAmount;
 
     const firstOrder = orders[0];
 
@@ -203,9 +219,11 @@ export async function POST(request: Request) {
         invoiceNumber,
         customerName: firstOrder.customerName,
         customerEmail: firstOrder.customerEmail,
-        subtotal: invoiceTotal,
-        total: invoiceTotal,
-        terms: "Due upon receipt",
+subtotal: invoiceSubtotal,
+surchargeLabel,
+surchargeAmount,
+total: invoiceTotal,
+terms: "Due upon receipt",
         issuedAt: new Date(),
         dueAt: new Date(),
         notes,
