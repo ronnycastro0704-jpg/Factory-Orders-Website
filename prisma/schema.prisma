@@ -63,35 +63,35 @@ model OptionGroup {
 }
 
 model OptionChoice {
-  id                      String      @id @default(cuid())
-  optionGroupId           String
-  optionGroup             OptionGroup @relation(fields: [optionGroupId], references: [id], onDelete: Cascade)
-  label                   String
-  value                   String?
-  description             String?
-  frameNeededCode         String?
-  isBodyLeather           Boolean     @default(false)
-  imageUrl                String?
-  priceDelta              Decimal     @default(0) @db.Decimal(10, 2)
-  leatherInventoryUsage   Decimal?    @db.Decimal(10, 2)
+  id                    String      @id @default(cuid())
+  optionGroupId         String
+  optionGroup           OptionGroup @relation(fields: [optionGroupId], references: [id], onDelete: Cascade)
+  label                 String
+  value                 String?
+  description           String?
+  frameNeededCode       String?
+  isBodyLeather         Boolean     @default(false)
+  imageUrl              String?
+  priceDelta            Decimal     @default(0) @db.Decimal(10, 2)
+  leatherInventoryUsage Decimal?    @db.Decimal(10, 2)
 
-  usesLeatherGrades       Boolean     @default(false)
-  isQuickPick             Boolean     @default(false)
-  allowsLaseredBrand      Boolean     @default(false)
-  isBinaryOption          Boolean     @default(false)
-  appliesLeatherSurcharge Boolean     @default(true)
-  gradeAUpcharge          Decimal?    @db.Decimal(10, 2)
-  gradeBUpcharge          Decimal?    @db.Decimal(10, 2)
-  gradeEMBUpcharge        Decimal?    @db.Decimal(10, 2)
-  gradeHOHUpcharge        Decimal?    @db.Decimal(10, 2)
-  gradeAxisUpcharge       Decimal?    @db.Decimal(10, 2)
-  gradeBuffaloUpcharge    Decimal?    @db.Decimal(10, 2)
-  comUpcharge             Decimal?    @db.Decimal(10, 2)
+  usesLeatherGrades       Boolean  @default(false)
+  isQuickPick             Boolean  @default(false)
+  allowsLaseredBrand      Boolean  @default(false)
+  isBinaryOption          Boolean  @default(false)
+  appliesLeatherSurcharge Boolean  @default(true)
+  gradeAUpcharge          Decimal? @db.Decimal(10, 2)
+  gradeBUpcharge          Decimal? @db.Decimal(10, 2)
+  gradeEMBUpcharge        Decimal? @db.Decimal(10, 2)
+  gradeHOHUpcharge        Decimal? @db.Decimal(10, 2)
+  gradeAxisUpcharge       Decimal? @db.Decimal(10, 2)
+  gradeBuffaloUpcharge    Decimal? @db.Decimal(10, 2)
+  comUpcharge             Decimal? @db.Decimal(10, 2)
 
-  displayOrder            Int         @default(0)
-  active                  Boolean     @default(true)
-  createdAt               DateTime    @default(now())
-  updatedAt               DateTime    @updatedAt
+  displayOrder Int      @default(0)
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   @@index([optionGroupId])
 }
@@ -101,7 +101,7 @@ model Order {
   orderNumber             String                  @unique
   customerName            String
   customerEmail           String
-  notificationEmails String[] @default([])
+  notificationEmails      String[]                @default([])
   customerPhone           String?
   poNumber                String?
   status                  OrderStatus             @default(DRAFT)
@@ -120,7 +120,7 @@ model Order {
   quantity                Int                     @default(1)
 
   userId String?
-  user   User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   items                 OrderItem[]
   revisions             OrderRevision[]
@@ -128,6 +128,7 @@ model Order {
   sheetSyncLogs         SheetSyncLog[]
   productionLines       ProductionLine[]
   quantityLedgerEntries QuantityLedger[]
+  invoiceOrders         InvoiceOrder[]
 
   @@index([userId])
 }
@@ -155,11 +156,11 @@ model OrderItemSelection {
   orderItem                     OrderItem @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
   optionGroupNameSnapshot       String
   optionChoiceNameSnapshot      String
-  optionChoiceImageUrlSnapshot String?
-  leatherNameSnapshot          String?
-  leatherGradeSnapshot         String?
-  leatherImageUrlSnapshot      String?
-  laseredBrandImageUrlSnapshot String?
+  optionChoiceImageUrlSnapshot  String?
+  leatherNameSnapshot           String?
+  leatherGradeSnapshot          String?
+  leatherImageUrlSnapshot       String?
+  laseredBrandImageUrlSnapshot  String?
   priceDeltaSnapshot            Decimal   @default(0) @db.Decimal(10, 2)
   leatherInventoryUsageSnapshot Decimal?  @db.Decimal(10, 2)
   createdAt                     DateTime  @default(now())
@@ -193,6 +194,58 @@ model EmailLog {
   errorMessage String?
   createdAt    DateTime @default(now())
 
+  @@index([orderId])
+}
+
+model Invoice {
+  id            String        @id @default(cuid())
+  invoiceNumber String        @unique
+  customerName  String
+  customerEmail String
+  status        InvoiceStatus @default(DRAFT)
+
+  subtotal Decimal @default(0) @db.Decimal(10, 2)
+  total    Decimal @default(0) @db.Decimal(10, 2)
+
+  terms          String    @default("Due upon receipt")
+  issuedAt       DateTime  @default(now())
+  dueAt          DateTime  @default(now())
+  paidAt         DateTime?
+  notes          String?
+  createdByEmail String?
+
+  orders InvoiceOrder[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([customerEmail])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model InvoiceOrder {
+  id        String @id @default(cuid())
+  invoiceId String
+  orderId   String
+
+  orderNumber   String
+  poNumber      String?
+  customerName  String
+  customerEmail String
+
+  productSummary String
+  itemSummary    Json
+  quantity       Int
+  orderTotal     Decimal @db.Decimal(10, 2)
+
+  createdAt DateTime @default(now())
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  order   Order   @relation(fields: [orderId], references: [id], onDelete: Restrict)
+
+  @@unique([invoiceId, orderId])
+  @@index([invoiceId])
   @@index([orderId])
 }
 
@@ -236,34 +289,34 @@ model ProductionLine {
   lineNotes                String?
   completedPhotoUrl        String?
 
-  millFirstStatus          ProductionStageStatus   @default(NOT_STARTED)
-  leatherOrderedStatus     ProductionStageStatus   @default(NOT_STARTED)
-  millStatus               ProductionStageStatus   @default(NOT_STARTED)
-  frameAssemblyStatus      ProductionStageStatus   @default(NOT_STARTED)
-  leatherArrivedStatus     ProductionStageStatus   @default(NOT_STARTED)
-  leaCutStatus             ProductionStageStatus   @default(NOT_STARTED)
-  sewnStatus               ProductionStageStatus   @default(NOT_STARTED)
-  upholsteryStatus         ProductionStageStatus   @default(NOT_STARTED)
-  upholsteredStatus        ProductionStageStatus   @default(NOT_STARTED)
-  finalAssemblyStatus      ProductionStageStatus   @default(NOT_STARTED)
-  qcStatus                 ProductionStageStatus   @default(NOT_STARTED)
+  millFirstStatus      ProductionStageStatus @default(NOT_STARTED)
+  leatherOrderedStatus ProductionStageStatus @default(NOT_STARTED)
+  millStatus           ProductionStageStatus @default(NOT_STARTED)
+  frameAssemblyStatus  ProductionStageStatus @default(NOT_STARTED)
+  leatherArrivedStatus ProductionStageStatus @default(NOT_STARTED)
+  leaCutStatus         ProductionStageStatus @default(NOT_STARTED)
+  sewnStatus           ProductionStageStatus @default(NOT_STARTED)
+  upholsteryStatus     ProductionStageStatus @default(NOT_STARTED)
+  upholsteredStatus    ProductionStageStatus @default(NOT_STARTED)
+  finalAssemblyStatus  ProductionStageStatus @default(NOT_STARTED)
+  qcStatus             ProductionStageStatus @default(NOT_STARTED)
 
-  leaCutAssignedTo         String?
-  upholsteryAssignedTo     String?
-  upholsteredAssignedTo    String?
-  finalAssemblyAssignedTo  String?
-  qcAssignedTo             String?
+  leaCutAssignedTo        String?
+  upholsteryAssignedTo    String?
+  upholsteredAssignedTo   String?
+  finalAssemblyAssignedTo String?
+  qcAssignedTo            String?
 
-  pickedUp                 Boolean                 @default(false)
-  pickedUpAt               DateTime?
+  pickedUp   Boolean   @default(false)
+  pickedUpAt DateTime?
 
-  createdAt                DateTime                @default(now())
-  updatedAt                DateTime                @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
+  @@unique([orderId, partNumber, frameNeeded])
   @@index([orderId])
   @@index([currentStatus])
   @@index([partNumber, frameNeeded])
-  @@unique([orderId, partNumber, frameNeeded])
 }
 
 model QuantityLedger {
@@ -306,6 +359,13 @@ enum UserRole {
 enum OptionGroupType {
   SINGLE_SELECT
   MULTI_SELECT
+}
+
+enum InvoiceStatus {
+  DRAFT
+  ISSUED
+  PAID
+  VOID
 }
 
 enum OrderStatus {

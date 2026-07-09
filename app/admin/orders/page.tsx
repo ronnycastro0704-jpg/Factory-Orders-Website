@@ -138,6 +138,9 @@ export default async function AdminOrdersPage({ searchParams }: PageProps) {
               <Link href="/admin/production" className="button-secondary">
                 Production
               </Link>
+                <Link href="/admin/invoices" className="button-secondary">
+                  Invoices
+                </Link>
               <Link href="/admin/products" className="button-secondary">
                 Products
               </Link>
