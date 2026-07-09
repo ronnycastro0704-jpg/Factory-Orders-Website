@@ -16,6 +16,7 @@ type OrderRow = {
   orderNumber: string;
   poNumber: string | null;
   status: string;
+  overallProductionStatus: string;
   notesImageUrl: string | null;
   quantity: number;
   total: unknown;
@@ -64,6 +65,29 @@ function getStatusClasses(status: string) {
   }
 }
 
+function getProductionStatusClasses(status: string) {
+  switch (status) {
+    case "BLOCKED":
+      return "bg-red-50 text-red-700 border-red-200";
+    case "READY":
+      return "bg-emerald-50 text-emerald-700 border-emerald-200";
+    case "PICKED_UP":
+      return "bg-purple-50 text-purple-700 border-purple-200";
+    case "CUTTING":
+    case "SEWING":
+    case "UPHOLSTERY":
+    case "FINAL_ASSEMBLY":
+    case "QC":
+      return "bg-blue-50 text-blue-700 border-blue-200";
+    case "WAITING_ON_LEATHER":
+      return "bg-yellow-50 text-yellow-700 border-yellow-200";
+    case "NEW":
+      return "bg-slate-100 text-slate-700 border-slate-200";
+    default:
+      return "bg-slate-100 text-slate-700 border-slate-200";
+  }
+}
+
 export default async function MyOrdersPage({ searchParams }: PageProps) {
   const session = await auth();
 
@@ -89,6 +113,21 @@ export default async function MyOrdersPage({ searchParams }: PageProps) {
     ? normalizedStatusQuery
     : null;
 
+  const validProductionStatusQuery = [
+  "NEW",
+  "WAITING_ON_LEATHER",
+  "CUTTING",
+  "SEWING",
+  "UPHOLSTERY",
+  "FINAL_ASSEMBLY",
+  "QC",
+  "READY",
+  "PICKED_UP",
+  "BLOCKED",
+].includes(normalizedStatusQuery)
+  ? normalizedStatusQuery
+  : null;
+
   const where: Prisma.OrderWhereInput = {
     customerEmail: userEmail,
     ...(query
@@ -106,6 +145,16 @@ export default async function MyOrdersPage({ searchParams }: PageProps) {
                   },
                 ]
               : []),
+              ...(validProductionStatusQuery
+  ? [
+      {
+        overallProductionStatus: {
+          equals:
+            validProductionStatusQuery as Prisma.EnumProductionOverallStatusFilter["equals"],
+        },
+      },
+    ]
+  : []),
             {
               items: {
                 some: {
@@ -124,16 +173,17 @@ export default async function MyOrdersPage({ searchParams }: PageProps) {
 const orders = (await prisma.order.findMany({
   where,
   orderBy: { createdAt: "desc" },
-  select: {
-    id: true,
-    orderNumber: true,
-    poNumber: true,
-    status: true,
-    quantity: true,
-    total: true,
-    notesImageUrl: true,
-    createdAt: true,
-    updatedAt: true,
+select: {
+  id: true,
+  orderNumber: true,
+  poNumber: true,
+  status: true,
+  overallProductionStatus: true,
+  quantity: true,
+  total: true,
+  notesImageUrl: true,
+  createdAt: true,
+  updatedAt: true,
     items: {
       select: {
         id: true,
@@ -285,18 +335,27 @@ const leatherInventoryNotes = order.items.flatMap((item) =>
                     <div className="flex flex-col gap-5">
                       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                         <div>
-                          <div className="flex flex-wrap items-center gap-2">
-                            <p className="text-lg font-semibold">
-                              PO # {order.poNumber || "—"}
-                            </p>
-                            <span
-                              className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${getStatusClasses(
-                                order.status
-                              )}`}
-                            >
-                              {order.status.replaceAll("_", " ")}
-                            </span>
-                          </div>
+<div className="flex flex-wrap items-center gap-2">
+  <p className="text-lg font-semibold">
+    PO # {order.poNumber || "—"}
+  </p>
+
+  <span
+    className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${getStatusClasses(
+      order.status
+    )}`}
+  >
+    Order: {order.status.replaceAll("_", " ")}
+  </span>
+
+  <span
+    className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${getProductionStatusClasses(
+      order.overallProductionStatus
+    )}`}
+  >
+    Production: {order.overallProductionStatus.replaceAll("_", " ")}
+  </span>
+</div>
 
                           <p className="mt-2 text-sm text-slate-500">
                             Order #: {order.orderNumber}

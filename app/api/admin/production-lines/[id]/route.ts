@@ -21,6 +21,15 @@ type ProductionStageStatus =
   | "BLOCKED"
   | "NA";
 
+  type OrderStatus =
+  | "DRAFT"
+  | "SUBMITTED"
+  | "CHANGED"
+  | "SENT_TO_FACTORY"
+  | "COMPLETED"
+  | "PAID"
+  | "CANCELLED";
+
 type ProductionOverallStatus =
   | "NEW"
   | "WAITING_ON_LEATHER"
@@ -250,6 +259,21 @@ function deriveOrderOverallStatus(
   return "NEW";
 }
 
+function deriveNextOrderStatus(
+  currentOrderStatus: OrderStatus,
+  productionStatus: ProductionOverallStatus
+): OrderStatus {
+  if (currentOrderStatus === "PAID" || currentOrderStatus === "CANCELLED") {
+    return currentOrderStatus;
+  }
+
+  if (productionStatus === "READY" || productionStatus === "PICKED_UP") {
+    return "COMPLETED";
+  }
+
+  return currentOrderStatus;
+}
+
 const PRODUCTION_STATUS_ORDER: ProductionOverallStatus[] = [
   "NEW",
   "WAITING_ON_LEATHER",
@@ -382,7 +406,7 @@ function buildInitialKanbanMoveState(existingLine: {
   leaCutStatus: unknown;
   sewnStatus: unknown;
   upholsteryStatus: unknown;
-  upholsteredStatus: unknown;
+  upholsteredStatus: unknown; 
   finalAssemblyStatus: unknown;
   qcStatus: unknown;
   pickedUp: boolean;
@@ -524,11 +548,12 @@ case "WAITING_ON_LEATHER":
 async function updateOrderStatusAndSyncSheets(args: {
   existingLine: {
     orderId: string;
-    order: {
-      poNumber: string | null;
-      customerName: string;
-      pickedUpAt: Date | null;
-    };
+order: {
+  poNumber: string | null;
+  customerName: string;
+  status: OrderStatus;
+  pickedUpAt: Date | null;
+};
   };
   updatedLine: {
     partNumber: string;
@@ -565,20 +590,26 @@ async function updateOrderStatusAndSyncSheets(args: {
     },
   });
 
-  const orderStatus = deriveOrderOverallStatus(siblingLines);
-  const allPickedUp =
-    siblingLines.length > 0 && siblingLines.every((line) => line.pickedUp);
+const orderStatus = deriveOrderOverallStatus(siblingLines);
+const nextOrderStatus = deriveNextOrderStatus(
+  existingLine.order.status,
+  orderStatus
+);
 
-  await prisma.order.update({
-    where: { id: existingLine.orderId },
-    data: {
-      overallProductionStatus: orderStatus,
-      pickedUp: allPickedUp,
-      pickedUpAt: allPickedUp
-        ? updatedLine.pickedUpAt ?? existingLine.order.pickedUpAt ?? new Date()
-        : null,
-    },
-  });
+const allPickedUp =
+  siblingLines.length > 0 && siblingLines.every((line) => line.pickedUp);
+
+await prisma.order.update({
+  where: { id: existingLine.orderId },
+  data: {
+    status: nextOrderStatus,
+    overallProductionStatus: orderStatus,
+    pickedUp: allPickedUp,
+    pickedUpAt: allPickedUp
+      ? updatedLine.pickedUpAt ?? existingLine.order.pickedUpAt ?? new Date()
+      : null,
+  },
+});
 
   try {
     const syncResult = await updateProductionTrackingRow({
@@ -660,19 +691,20 @@ export async function PUT(request: Request, context: RouteContext) {
     const { id } = await context.params;
     const body = await request.json();
 
-    const existingLine = await prisma.productionLine.findUnique({
-      where: { id },
-      include: {
-        order: {
-          select: {
-            id: true,
-            poNumber: true,
-            customerName: true,
-            pickedUpAt: true,
-          },
-        },
+const existingLine = await prisma.productionLine.findUnique({
+  where: { id },
+  include: {
+    order: {
+      select: {
+        id: true,
+        poNumber: true,
+        customerName: true,
+        status: true,
+        pickedUpAt: true,
       },
-    });
+    },
+  },
+});
 
     if (!existingLine) {
       return NextResponse.json(
