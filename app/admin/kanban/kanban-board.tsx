@@ -142,9 +142,10 @@ function getStatusLabel(status: ProductionOverallStatus) {
 }
 
 function getDoneStagesForTarget(targetStatus: ProductionOverallStatus) {
-  const preProduction = [
-    "Mill First",
-    "Leather Ordered",
+  const waitingOnLeatherStages = ["Mill First", "Leather Ordered"];
+
+  const readyForCuttingStages = [
+    ...waitingOnLeatherStages,
     "Mill",
     "Frame Assembly",
     "Leather Arrived",
@@ -152,35 +153,47 @@ function getDoneStagesForTarget(targetStatus: ProductionOverallStatus) {
 
   switch (targetStatus) {
     case "WAITING_ON_LEATHER":
-      return preProduction;
+      return waitingOnLeatherStages;
+
     case "CUTTING":
-      return [...preProduction, "LEA Cut"];
+      return [...readyForCuttingStages, "LEA Cut"];
+
     case "SEWING":
-      return [...preProduction, "LEA Cut", "Sewn"];
+      return [...readyForCuttingStages, "LEA Cut", "Sewn"];
+
     case "UPHOLSTERY":
-      return [...preProduction, "LEA Cut", "Sewn", "Upholstery", "Upholstered"];
+      return [
+        ...readyForCuttingStages,
+        "LEA Cut",
+        "Sewn",
+        "Upholstery",
+        "Upholstered",
+      ];
+
     case "FINAL_ASSEMBLY":
       return [
-        ...preProduction,
+        ...readyForCuttingStages,
         "LEA Cut",
         "Sewn",
         "Upholstery",
         "Upholstered",
         "Final Assembly",
       ];
+
     case "QC":
       return [
-        ...preProduction,
+        ...readyForCuttingStages,
         "LEA Cut",
         "Sewn",
         "Upholstery",
         "Upholstered",
         "Final Assembly",
       ];
+
     case "READY":
     case "PICKED_UP":
       return [
-        ...preProduction,
+        ...readyForCuttingStages,
         "LEA Cut",
         "Sewn",
         "Upholstery",
@@ -188,6 +201,7 @@ function getDoneStagesForTarget(targetStatus: ProductionOverallStatus) {
         "Final Assembly",
         "QC'ED",
       ];
+
     default:
       return [];
   }

@@ -409,16 +409,20 @@ function buildInitialKanbanMoveState(existingLine: {
   };
 }
 
-function markPreProductionDone(state: KanbanMoveState) {
+function markWaitingOnLeatherDone(state: KanbanMoveState) {
   state.millFirstStatus = "DONE";
   state.leatherOrderedStatus = "DONE";
+}
+
+function markReadyForCuttingDone(state: KanbanMoveState) {
+  markWaitingOnLeatherDone(state);
   state.millStatus = "DONE";
   state.frameAssemblyStatus = "DONE";
   state.leatherArrivedStatus = "DONE";
 }
 
 function markCuttingDone(state: KanbanMoveState) {
-  markPreProductionDone(state);
+  markReadyForCuttingDone(state);
   state.leaCutStatus = "DONE";
 }
 
@@ -464,9 +468,9 @@ function applyKanbanMoveState(
   targetStatus: ProductionOverallStatus
 ) {
   switch (targetStatus) {
-    case "WAITING_ON_LEATHER":
-      markPreProductionDone(state);
-      break;
+case "WAITING_ON_LEATHER":
+  markWaitingOnLeatherDone(state);
+  break;
 
     case "CUTTING":
       markCuttingDone(state);
