@@ -47,6 +47,7 @@ type SendOrderEmailInput = {
   customerPhone?: string | null;
   notes?: string | null;
   notesImageUrl?: string | null;
+  productionStatus?: string | null;
   productName: string;
   total: number;
   lineItems?: OrderLineItem[];
@@ -518,6 +519,7 @@ const {
   customerPhone,
   notes,
   notesImageUrl,
+  productionStatus,
   productName,
   total,
   lineItems = [],
@@ -543,16 +545,17 @@ if (customerRecipients.length === 0) {
   const lineItemsText = buildLineItemsText(lineItems);
   const lineItemsHtml = buildLineItemsHtml(lineItems);
 
-  const internalText = [
-    copy.internalSubject,
-    "",
-    `Order Number: ${orderNumber}`,
-    poNumber ? `PO #: ${poNumber}` : "",
-    `Quantity: ${safeQuantity}`,
-    `Customer: ${customerName}`,
-    `Email: ${customerEmail}`,
-    customerPhone ? `Phone: ${customerPhone}` : "",
-    `Product: ${productName}`,
+const internalText = [
+  copy.internalSubject,
+  "",
+  `Order Number: ${orderNumber}`,
+  poNumber ? `PO #: ${poNumber}` : "",
+  `Quantity: ${safeQuantity}`,
+  productionStatus ? `Production Status: ${productionStatus}` : "",
+  `Customer: ${customerName}`,
+  `Email: ${customerEmail}`,
+  customerPhone ? `Phone: ${customerPhone}` : "",
+  `Product: ${productName}`,
     bodyLeatherSummary ? `Body Leather: ${bodyLeatherSummary}` : "",
     `Total: ${formatCurrency(total)}`,
 notes ? `Notes: ${notes}` : "",
@@ -576,8 +579,15 @@ notesImageUrl ? `Notes Image: ${notesImageUrl}` : "",
             <td style="font-size:14px;line-height:1.55;color:#111827;vertical-align:top;">
               <div><strong>Order Number:</strong> ${escapeHtml(orderNumber)}</div>
               ${poNumber ? `<div><strong>PO #:</strong> ${escapeHtml(poNumber)}</div>` : ""}
-              <div><strong>Quantity:</strong> ${safeQuantity}</div>
-              <div><strong>Customer:</strong> ${escapeHtml(customerName)}</div>
+<div><strong>Quantity:</strong> ${safeQuantity}</div>
+${
+  productionStatus
+    ? `<div><strong>Production Status:</strong> ${escapeHtml(
+        productionStatus
+      )}</div>`
+    : ""
+}
+<div><strong>Customer:</strong> ${escapeHtml(customerName)}</div>
               <div><strong>Email:</strong> ${escapeHtml(customerEmail)}</div>
               ${
                 customerPhone
@@ -618,15 +628,17 @@ ${
     html: internalHtml,
   });
 
-  const customerText = [
-    `Hello ${customerName},`,
-    "",
-    copy.customerIntro,
-    "",
-    `Order Number: ${orderNumber}`,
-    poNumber ? `PO #: ${poNumber}` : "",
-    `Quantity: ${safeQuantity}`,
-    `Product: ${productName}`,
+const customerText = [
+  copy.customerSubject,
+  "",
+  `Hello ${customerName},`,
+  copy.customerIntro,
+  "",
+  `Order Number: ${orderNumber}`,
+  poNumber ? `PO #: ${poNumber}` : "",
+  `Quantity: ${safeQuantity}`,
+  productionStatus ? `Production Status: ${productionStatus}` : "",
+  `Product: ${productName}`,
     bodyLeatherSummary ? `Body Leather: ${bodyLeatherSummary}` : "",
     `Total: ${formatCurrency(total)}`,
     lineItemsText ? "" : "",
@@ -655,8 +667,15 @@ notesImageUrl ? `Notes Image: ${notesImageUrl}` : "",
         <p>${escapeHtml(copy.customerIntro)}</p>
         <p><strong>Order Number:</strong> ${escapeHtml(orderNumber)}</p>
         ${poNumber ? `<p><strong>PO #:</strong> ${escapeHtml(poNumber)}</p>` : ""}
-        <p><strong>Quantity:</strong> ${safeQuantity}</p>
-        <p><strong>Product:</strong> ${escapeHtml(productName)}</p>
+<p><strong>Quantity:</strong> ${safeQuantity}</p>
+${
+  productionStatus
+    ? `<p><strong>Production Status:</strong> ${escapeHtml(
+        productionStatus
+      )}</p>`
+    : ""
+}
+<p><strong>Product:</strong> ${escapeHtml(productName)}</p>
         ${
           bodyLeatherSummary
             ? `<p><strong>Body Leather:</strong> ${escapeHtml(bodyLeatherSummary)}</p>`

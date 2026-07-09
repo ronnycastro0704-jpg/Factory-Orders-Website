@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "../../../../../auth";
 import { isAdminEmail } from "../../../../../lib/admin";
 import { prisma } from "../../../../../lib/prisma";
+import { sendOrderNotification } from "../../../../../lib/email";
 import { updateProductionTrackingRow } from "../../../../../lib/sheets";
 
 type RouteContext = {
@@ -272,6 +273,238 @@ function deriveNextOrderStatus(
   }
 
   return currentOrderStatus;
+}
+
+type ProductionEmailOrder = {
+  id: string;
+  orderNumber: string;
+  poNumber: string | null;
+  customerName: string;
+  customerEmail: string;
+  notificationEmails: string[];
+  customerPhone: string | null;
+  notes: string | null;
+  notesImageUrl: string | null;
+  status: OrderStatus;
+  overallProductionStatus: ProductionOverallStatus;
+  total: unknown;
+  quantity: number;
+  pickedUpAt: Date | null;
+  items: {
+    productNameSnapshot: string;
+    basePriceSnapshot: unknown;
+    selections: {
+      optionGroupNameSnapshot: string;
+      optionChoiceNameSnapshot: string;
+      optionChoiceImageUrlSnapshot: string | null;
+      leatherNameSnapshot: string | null;
+      leatherGradeSnapshot: string | null;
+      leatherImageUrlSnapshot: string | null;
+      laseredBrandImageUrlSnapshot: string | null;
+      priceDeltaSnapshot: unknown;
+    }[];
+  }[];
+};
+
+function normalizeEmail(value?: string | null) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function uniqueEmails(values: Array<string | null | undefined>) {
+  return Array.from(
+    new Set(values.map((value) => normalizeEmail(value)).filter(Boolean))
+  );
+}
+
+function getOrderNotificationEmails(order: {
+  customerEmail: string;
+  notificationEmails?: string[] | null;
+}) {
+  return uniqueEmails([
+    order.customerEmail,
+    ...(order.notificationEmails || []),
+  ]);
+}
+
+function cleanChoiceLabel(value: string) {
+  return value.replaceAll("|||", " — ");
+}
+
+function formatProductionStatusLabel(status: ProductionOverallStatus) {
+  switch (status) {
+    case "NEW":
+      return "New";
+    case "WAITING_ON_LEATHER":
+      return "Waiting on Leather";
+    case "CUTTING":
+      return "Cutting";
+    case "SEWING":
+      return "Sewing";
+    case "UPHOLSTERY":
+      return "Upholstery";
+    case "FINAL_ASSEMBLY":
+      return "Final Assembly";
+    case "QC":
+      return "QC";
+    case "READY":
+      return "Ready";
+    case "PICKED_UP":
+      return "Picked Up";
+    case "BLOCKED":
+      return "Blocked";
+    default:
+      return String(status).replaceAll("_", " ");
+  }
+}
+
+function buildEmailProductName(order: ProductionEmailOrder) {
+  const productNames = Array.from(
+    new Set(
+      order.items
+        .map((item) => item.productNameSnapshot)
+        .filter(Boolean)
+    )
+  );
+
+  return productNames.join(", ") || "Order";
+}
+
+function buildEmailLineItems(order: ProductionEmailOrder) {
+  return order.items.flatMap((item) => [
+    {
+      label: `${item.productNameSnapshot} Base Price`,
+      amount: Number(item.basePriceSnapshot || 0),
+    },
+    ...item.selections.map((selection) => ({
+      label: `${selection.optionGroupNameSnapshot}: ${cleanChoiceLabel(
+        selection.optionChoiceNameSnapshot
+      )}`,
+      amount: Number(selection.priceDeltaSnapshot || 0),
+    })),
+  ]);
+}
+
+function buildEmailSelections(order: ProductionEmailOrder) {
+  return order.items.flatMap((item) =>
+    item.selections.map((selection) => ({
+      groupName: selection.optionGroupNameSnapshot,
+      choiceLabel: cleanChoiceLabel(selection.optionChoiceNameSnapshot),
+      leatherName: selection.leatherNameSnapshot || null,
+      leatherGrade: selection.leatherGradeSnapshot || null,
+      baseAmount: Number(selection.priceDeltaSnapshot || 0),
+      leatherSurcharge: 0,
+      imageUrl: selection.optionChoiceImageUrlSnapshot || null,
+      leatherImageUrl: selection.leatherImageUrlSnapshot || null,
+      laseredBrand: Boolean(selection.laseredBrandImageUrlSnapshot),
+      laseredBrandImageUrl: selection.laseredBrandImageUrlSnapshot || null,
+      isBodyLeather: false,
+    }))
+  );
+}
+
+async function sendProductionStatusNotificationIfNeeded(args: {
+  existingLine: {
+    orderId: string;
+    order: ProductionEmailOrder;
+  };
+  nextProductionStatus: ProductionOverallStatus;
+  nextOrderStatus: OrderStatus;
+}) {
+  const { existingLine, nextProductionStatus, nextOrderStatus } = args;
+  const order = existingLine.order;
+
+  const productionStatusChanged =
+    order.overallProductionStatus !== nextProductionStatus;
+
+  const orderStatusChanged = order.status !== nextOrderStatus;
+
+  if (!productionStatusChanged && !orderStatusChanged) {
+    return;
+  }
+
+  const notificationEmails = getOrderNotificationEmails(order);
+  const productionStatusLabel = formatProductionStatusLabel(
+    nextProductionStatus
+  );
+
+  const emailType =
+    nextOrderStatus === "COMPLETED" &&
+    order.status !== "COMPLETED"
+      ? "completed"
+      : "updated";
+
+  const customerSubject =
+    emailType === "completed"
+      ? `Your order is completed: ${order.orderNumber}`
+      : `Your order production status was updated: ${order.orderNumber}`;
+
+  const internalSubject =
+    emailType === "completed"
+      ? `Order Completed: ${order.orderNumber}`
+      : `Production Status Updated: ${order.orderNumber}`;
+
+  try {
+    await sendOrderNotification({
+      type: emailType,
+      orderNumber: order.orderNumber,
+      poNumber: order.poNumber,
+      quantity: order.quantity,
+      customerName: order.customerName,
+      customerEmail: order.customerEmail,
+      recipientEmails: notificationEmails,
+      customerPhone: order.customerPhone,
+      notes: order.notes,
+      notesImageUrl: order.notesImageUrl,
+      productionStatus: productionStatusLabel,
+      productName: buildEmailProductName(order),
+      total: Number(order.total || 0),
+      lineItems: buildEmailLineItems(order),
+      selections: buildEmailSelections(order),
+    });
+
+    await prisma.emailLog.createMany({
+      data: [
+        ...notificationEmails.map((recipient) => ({
+          orderId: existingLine.orderId,
+          eventType:
+            emailType === "completed"
+              ? "PRODUCTION_COMPLETED_CUSTOMER"
+              : "PRODUCTION_STATUS_UPDATED_CUSTOMER",
+          recipient,
+          subject: customerSubject,
+          status: "SENT",
+        })),
+        {
+          orderId: existingLine.orderId,
+          eventType:
+            emailType === "completed"
+              ? "PRODUCTION_COMPLETED_INTERNAL"
+              : "PRODUCTION_STATUS_UPDATED_INTERNAL",
+          recipient: process.env.ORDER_NOTIFY_TO || "",
+          subject: internalSubject,
+          status: "SENT",
+        },
+      ],
+    });
+  } catch (error) {
+    console.error("PRODUCTION STATUS EMAIL ERROR:", error);
+
+    await prisma.emailLog.create({
+      data: {
+        orderId: existingLine.orderId,
+        eventType:
+          emailType === "completed"
+            ? "PRODUCTION_COMPLETED"
+            : "PRODUCTION_STATUS_UPDATED",
+        recipient:
+          notificationEmails.join(", ") || order.customerEmail,
+        subject: customerSubject,
+        status: "FAILED",
+        errorMessage:
+          error instanceof Error ? error.message : "Unknown email error",
+      },
+    });
+  }
 }
 
 const PRODUCTION_STATUS_ORDER: ProductionOverallStatus[] = [
@@ -548,12 +781,7 @@ case "WAITING_ON_LEATHER":
 async function updateOrderStatusAndSyncSheets(args: {
   existingLine: {
     orderId: string;
-order: {
-  poNumber: string | null;
-  customerName: string;
-  status: OrderStatus;
-  pickedUpAt: Date | null;
-};
+    order: ProductionEmailOrder;
   };
   updatedLine: {
     partNumber: string;
@@ -609,6 +837,12 @@ await prisma.order.update({
       ? updatedLine.pickedUpAt ?? existingLine.order.pickedUpAt ?? new Date()
       : null,
   },
+});
+
+await sendProductionStatusNotificationIfNeeded({
+  existingLine,
+  nextProductionStatus: orderStatus,
+  nextOrderStatus,
 });
 
   try {
@@ -690,17 +924,46 @@ export async function PUT(request: Request, context: RouteContext) {
 
     const { id } = await context.params;
     const body = await request.json();
-
 const existingLine = await prisma.productionLine.findUnique({
   where: { id },
   include: {
     order: {
       select: {
         id: true,
+        orderNumber: true,
         poNumber: true,
         customerName: true,
+        customerEmail: true,
+        notificationEmails: true,
+        customerPhone: true,
+        notes: true,
+        notesImageUrl: true,
         status: true,
+        overallProductionStatus: true,
+        total: true,
+        quantity: true,
         pickedUpAt: true,
+        items: {
+          select: {
+            productNameSnapshot: true,
+            basePriceSnapshot: true,
+            selections: {
+              orderBy: {
+                createdAt: "asc",
+              },
+              select: {
+                optionGroupNameSnapshot: true,
+                optionChoiceNameSnapshot: true,
+                optionChoiceImageUrlSnapshot: true,
+                leatherNameSnapshot: true,
+                leatherGradeSnapshot: true,
+                leatherImageUrlSnapshot: true,
+                laseredBrandImageUrlSnapshot: true,
+                priceDeltaSnapshot: true,
+              },
+            },
+          },
+        },
       },
     },
   },
