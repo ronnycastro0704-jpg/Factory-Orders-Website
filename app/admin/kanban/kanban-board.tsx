@@ -2,7 +2,9 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
+
 
 type ProductionOverallStatus =
   | "NEW"
@@ -256,6 +258,7 @@ function normalizeReturnedLine(original: KanbanLine, returnedLine: any) {
 
 export default function KanbanBoard({ columns, nowIso }: Props) {
   const router = useRouter();
+  const [mounted, setMounted] = useState(false);
   const [boardColumns, setBoardColumns] = useState(columns);
   const [draggedLineId, setDraggedLineId] = useState("");
   const [pendingMove, setPendingMove] = useState<PendingMove | null>(null);
@@ -265,6 +268,10 @@ export default function KanbanBoard({ columns, nowIso }: Props) {
   useEffect(() => {
     setBoardColumns(columns);
   }, [columns]);
+
+  useEffect(() => {
+  setMounted(true);
+}, []);
 
   const allLines = useMemo(
     () => boardColumns.flatMap((column) => column.lines),
@@ -458,8 +465,9 @@ export default function KanbanBoard({ columns, nowIso }: Props) {
         </div>
       </div>
 
-      {pendingMove ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
+{mounted && pendingMove
+  ? createPortal(
+      <div className="fixed inset-0 z-[9999] flex items-start justify-center overflow-y-auto bg-slate-900/50 px-4 py-6">
           <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl">
             <p className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">
               Confirm Kanban Move
@@ -537,8 +545,10 @@ export default function KanbanBoard({ columns, nowIso }: Props) {
               </button>
             </div>
           </div>
-        </div>
-      ) : null}
+      </div>,
+      document.body
+    )
+  : null}
     </>
   );
 }
