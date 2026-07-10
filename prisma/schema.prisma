@@ -198,28 +198,28 @@ model EmailLog {
 }
 
 model Invoice {
-  id            String        @id @default(cuid())
-  invoiceNumber String        @unique
-  customerName  String
-  customerEmail String
-  status        InvoiceStatus @default(DRAFT)
+  id              String        @id @default(cuid())
+  invoiceNumber   String        @unique
+  customerName    String
+  customerEmail   String
+  status          InvoiceStatus @default(DRAFT)
 
-  subtotal Decimal @default(0) @db.Decimal(10, 2)
+  subtotal        Decimal       @default(0) @db.Decimal(10, 2)
   surchargeLabel  String?
-  surchargeAmount Decimal @default(0) @db.Decimal(10, 2)
-  total    Decimal @default(0) @db.Decimal(10, 2)
+  surchargeAmount Decimal       @default(0) @db.Decimal(10, 2)
+  total           Decimal       @default(0) @db.Decimal(10, 2)
 
-  terms          String    @default("Due upon receipt")
-  issuedAt       DateTime  @default(now())
-  dueAt          DateTime  @default(now())
-  paidAt         DateTime?
-  notes          String?
-  createdByEmail String?
+  terms           String        @default("Due upon receipt")
+  issuedAt        DateTime      @default(now())
+  dueAt           DateTime      @default(now())
+  paidAt          DateTime?
+  notes           String?
+  createdByEmail  String?
 
-  orders InvoiceOrder[]
+  orders          InvoiceOrder[]
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
 
   @@index([customerEmail])
   @@index([status])
@@ -227,24 +227,24 @@ model Invoice {
 }
 
 model InvoiceOrder {
-  id        String @id @default(cuid())
-  invoiceId String
-  orderId   String
+  id             String   @id @default(cuid())
+  invoiceId      String
+  orderId        String
 
-  orderNumber   String
-  poNumber      String?
-  customerName  String
-  customerEmail String
+  orderNumber    String
+  poNumber       String?
+  customerName   String
+  customerEmail  String
 
   productSummary String
   itemSummary    Json
   quantity       Int
-  orderTotal     Decimal @db.Decimal(10, 2)
+  orderTotal     Decimal  @db.Decimal(10, 2)
 
-  createdAt DateTime @default(now())
+  createdAt      DateTime @default(now())
 
-  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
-  order   Order   @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  invoice        Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  order          Order    @relation(fields: [orderId], references: [id], onDelete: Restrict)
 
   @@unique([invoiceId, orderId])
   @@index([invoiceId])
