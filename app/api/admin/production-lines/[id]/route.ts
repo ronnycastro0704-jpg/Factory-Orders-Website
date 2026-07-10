@@ -837,15 +837,20 @@ const nextOrderStatus = deriveNextOrderStatus(
 const allPickedUp =
   siblingLines.length > 0 && siblingLines.every((line) => line.pickedUp);
 
+const orderPickedUpAt =
+  allPickedUp && updatedLine.pickedUpAt
+    ? updatedLine.pickedUpAt
+    : allPickedUp
+    ? existingLine.order.pickedUpAt ?? getTodayCentralDate()
+    : null;
+
 await prisma.order.update({
   where: { id: existingLine.orderId },
   data: {
     status: nextOrderStatus,
     overallProductionStatus: orderStatus,
     pickedUp: allPickedUp,
-    pickedUpAt: allPickedUp
-      ? updatedLine.pickedUpAt ?? existingLine.order.pickedUpAt ?? new Date()
-      : null,
+    pickedUpAt: orderPickedUpAt,
   },
 });
 
@@ -1025,25 +1030,30 @@ const existingLine = await prisma.productionLine.findUnique({
     qcStatus: nextState.qcStatus,
   });
 
-  const updatedLine = await prisma.productionLine.update({
-    where: { id },
-    data: {
-      millFirstStatus: nextState.millFirstStatus,
-      leatherOrderedStatus: nextState.leatherOrderedStatus,
-      millStatus: nextState.millStatus,
-      frameAssemblyStatus: nextState.frameAssemblyStatus,
-      leatherArrivedStatus: nextState.leatherArrivedStatus,
-      leaCutStatus: nextState.leaCutStatus,
-      sewnStatus: nextState.sewnStatus,
-      upholsteryStatus: nextState.upholsteryStatus,
-      upholsteredStatus: nextState.upholsteredStatus,
-      finalAssemblyStatus: nextState.finalAssemblyStatus,
-      qcStatus: nextState.qcStatus,
-      pickedUp: nextState.pickedUp,
-      pickedUpAt: nextState.pickedUpAt,
-      currentStatus: nextCurrentStatus,
-    },
-  });
+const pickedUpAtForMove =
+  targetStatus === "PICKED_UP"
+    ? nextState.pickedUpAt ?? getTodayCentralDate()
+    : nextState.pickedUpAt;
+
+const updatedLine = await prisma.productionLine.update({
+  where: { id },
+  data: {
+    millFirstStatus: nextState.millFirstStatus,
+    leatherOrderedStatus: nextState.leatherOrderedStatus,
+    millStatus: nextState.millStatus,
+    frameAssemblyStatus: nextState.frameAssemblyStatus,
+    leatherArrivedStatus: nextState.leatherArrivedStatus,
+    leaCutStatus: nextState.leaCutStatus,
+    sewnStatus: nextState.sewnStatus,
+    upholsteryStatus: nextState.upholsteryStatus,
+    upholsteredStatus: nextState.upholsteredStatus,
+    finalAssemblyStatus: nextState.finalAssemblyStatus,
+    qcStatus: nextState.qcStatus,
+    pickedUp: targetStatus === "PICKED_UP" ? true : nextState.pickedUp,
+    pickedUpAt: pickedUpAtForMove,
+    currentStatus: nextCurrentStatus,
+  },
+});
 
   await updateOrderStatusAndSyncSheets({
     existingLine,
