@@ -127,6 +127,19 @@ function parseOptionalDate(value: unknown) {
   };
 }
 
+function getTodayCentralDate() {
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Chicago",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+
+  const centralDate = formatter.format(new Date());
+
+  return new Date(`${centralDate}T12:00:00.000Z`);
+}
+
 function isStarted(status: ProductionStageStatus) {
   return !["NOT_STARTED", "NA"].includes(status);
 }
@@ -667,14 +680,11 @@ function buildInitialKanbanMoveState(existingLine: {
 }
 
 function markWaitingOnLeatherDone(state: KanbanMoveState) {
-  state.millFirstStatus = "DONE";
   state.leatherOrderedStatus = "DONE";
 }
 
 function markReadyForCuttingDone(state: KanbanMoveState) {
   markWaitingOnLeatherDone(state);
-  state.millStatus = "DONE";
-  state.frameAssemblyStatus = "DONE";
   state.leatherArrivedStatus = "DONE";
 }
 
@@ -757,7 +767,7 @@ case "WAITING_ON_LEATHER":
     case "PICKED_UP":
       markReadyDone(state);
       state.pickedUp = true;
-      state.pickedUpAt = new Date();
+      state.pickedUpAt = getTodayCentralDate();
       break;
 
     case "BLOCKED": {
