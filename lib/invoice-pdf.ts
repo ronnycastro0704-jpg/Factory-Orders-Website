@@ -1,4 +1,4 @@
-import PDFDocument from "pdfkit";
+import { jsPDF } from "jspdf";
 
 type InvoiceItemSummary = {
   productName: string;
@@ -83,272 +83,279 @@ function parseItemSummary(value: unknown): InvoiceItemSummary[] {
     .filter(Boolean) as InvoiceItemSummary[];
 }
 
-function ensureSpace(doc: PDFKit.PDFDocument, neededHeight = 80) {
-  if (doc.y + neededHeight > doc.page.height - 80) {
-    doc.addPage();
+function addWrappedText(args: {
+  doc: jsPDF;
+  text: string;
+  x: number;
+  y: number;
+  maxWidth: number;
+  lineHeight?: number;
+}) {
+  const { doc, text, x, y, maxWidth, lineHeight = 5 } = args;
+  const lines = doc.splitTextToSize(text, maxWidth);
+  doc.text(lines, x, y);
+  return y + lines.length * lineHeight;
+}
+
+function ensureSpace(doc: jsPDF, y: number, needed = 25) {
+  if (y + needed <= 270) {
+    return y;
   }
+
+  doc.addPage();
+  return 20;
 }
 
-function addDivider(doc: PDFKit.PDFDocument) {
-  doc
-    .moveTo(50, doc.y)
-    .lineTo(560, doc.y)
-    .strokeColor("#e2e8f0")
-    .stroke();
+function addFooter(doc: jsPDF) {
+  const pageCount = doc.getNumberOfPages();
 
-  doc.moveDown(1);
-}
-
-function addFooter(doc: PDFKit.PDFDocument) {
-  const bottom = doc.page.height - 50;
-
-  doc
-    .fontSize(9)
-    .fillColor("#64748b")
-    .text("Thank you for your business.", 50, bottom, {
+  for (let page = 1; page <= pageCount; page += 1) {
+    doc.setPage(page);
+    doc.setFontSize(9);
+    doc.setTextColor(100, 116, 139);
+    doc.text("Thank you for your business.", 105, 285, {
       align: "center",
-      width: doc.page.width - 100,
     });
+    doc.text(`Page ${page} of ${pageCount}`, 195, 285, {
+      align: "right",
+    });
+  }
 
-  doc.fillColor("#111827");
+  doc.setTextColor(17, 24, 39);
 }
 
 export async function buildInvoicePdfBuffer(invoice: InvoiceForPdf) {
-  return await new Promise<Buffer>((resolve, reject) => {
-    const doc = new PDFDocument({
-      size: "LETTER",
-      margin: 50,
+  const doc = new jsPDF({
+    unit: "mm",
+    format: "letter",
+    orientation: "portrait",
+  });
+
+  const pageWidth = doc.internal.pageSize.getWidth();
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(28);
+  doc.setTextColor(17, 24, 39);
+  doc.text("INVOICE", 15, 20);
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(11);
+  doc.setTextColor(71, 85, 105);
+  doc.text(invoice.invoiceNumber, 15, 28);
+
+  doc.setFontSize(10);
+  doc.text(`Issued: ${formatDate(invoice.issuedAt)}`, pageWidth - 15, 18, {
+    align: "right",
+  });
+  doc.text(`Due Date: ${formatDate(invoice.dueAt)}`, pageWidth - 15, 24, {
+    align: "right",
+  });
+  doc.text(`Terms: ${invoice.terms}`, pageWidth - 15, 30, {
+    align: "right",
+  });
+
+  doc.setDrawColor(226, 232, 240);
+  doc.line(15, 40, pageWidth - 15, 40);
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(9);
+  doc.setTextColor(100, 116, 139);
+  doc.text("BILL TO", 15, 50);
+
+  doc.setFontSize(13);
+  doc.setTextColor(17, 24, 39);
+  doc.text(invoice.customerName, 15, 58);
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(10);
+  doc.setTextColor(71, 85, 105);
+  doc.text(invoice.customerEmail, 15, 64);
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(9);
+  doc.setTextColor(100, 116, 139);
+  doc.text("TOTAL DUE", pageWidth - 15, 50, {
+    align: "right",
+  });
+
+  doc.setFontSize(22);
+  doc.setTextColor(17, 24, 39);
+  doc.text(formatCurrency(Number(invoice.total || 0)), pageWidth - 15, 60, {
+    align: "right",
+  });
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(10);
+  doc.setTextColor(71, 85, 105);
+  doc.text("Due upon receipt", pageWidth - 15, 67, {
+    align: "right",
+  });
+
+  let y = 82;
+
+  for (const invoiceOrder of invoice.orders) {
+    y = ensureSpace(doc, y, 45);
+
+    doc.setDrawColor(226, 232, 240);
+    doc.line(15, y, pageWidth - 15, y);
+    y += 8;
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(13);
+    doc.setTextColor(17, 24, 39);
+    doc.text(invoiceOrder.orderNumber, 15, y);
+
+    doc.text(formatCurrency(Number(invoiceOrder.orderTotal || 0)), pageWidth - 15, y, {
+      align: "right",
     });
 
-    const chunks: Buffer[] = [];
+    y += 7;
 
-    doc.on("data", (chunk) => {
-      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    doc.setTextColor(71, 85, 105);
+    doc.text(`PO #: ${invoiceOrder.poNumber || "—"}`, 15, y);
+    y += 6;
+
+    y = addWrappedText({
+      doc,
+      text: `Items: ${invoiceOrder.productSummary}`,
+      x: 15,
+      y,
+      maxWidth: 130,
+      lineHeight: 5,
     });
 
-    doc.on("end", () => {
-      resolve(Buffer.concat(chunks));
-    });
+    doc.text(`Quantity: ${invoiceOrder.quantity}`, 15, y);
+    y += 8;
 
-    doc.on("error", reject);
+    const items = parseItemSummary(invoiceOrder.itemSummary);
 
-    try {
-      doc.fontSize(26).fillColor("#111827").text("INVOICE", 50, 50);
+    for (const item of items) {
+      y = ensureSpace(doc, y, 35);
 
-      doc
-        .fontSize(12)
-        .fillColor("#475569")
-        .text(invoice.invoiceNumber, 50, 82);
-
-      doc
-        .fontSize(10)
-        .fillColor("#475569")
-        .text(`Issued: ${formatDate(invoice.issuedAt)}`, 360, 50, {
-          align: "right",
-          width: 180,
-        })
-        .text(`Due Date: ${formatDate(invoice.dueAt)}`, 360, 66, {
-          align: "right",
-          width: 180,
-        })
-        .text(`Terms: ${invoice.terms}`, 360, 82, {
-          align: "right",
-          width: 180,
-        });
-
-      doc
-        .fontSize(10)
-        .fillColor("#64748b")
-        .text("BILL TO", 50, 130);
-
-      doc
-        .fontSize(14)
-        .fillColor("#111827")
-        .text(invoice.customerName, 50, 148)
-        .fontSize(10)
-        .fillColor("#475569")
-        .text(invoice.customerEmail, 50, 168);
-
-      doc
-        .fontSize(10)
-        .fillColor("#64748b")
-        .text("TOTAL DUE", 360, 130, {
-          align: "right",
-          width: 180,
-        });
-
-      doc
-        .fontSize(22)
-        .fillColor("#111827")
-        .text(formatCurrency(Number(invoice.total || 0)), 360, 148, {
-          align: "right",
-          width: 180,
-        });
-
-      doc
-        .fontSize(10)
-        .fillColor("#475569")
-        .text("Due upon receipt", 360, 176, {
-          align: "right",
-          width: 180,
-        });
-
-      doc.y = 210;
-      addDivider(doc);
-
-      doc.y = 235;
-
-      for (const invoiceOrder of invoice.orders) {
-        ensureSpace(doc, 130);
-
-        doc
-          .fontSize(14)
-          .fillColor("#111827")
-          .text(invoiceOrder.orderNumber);
-
-        doc
-          .fontSize(10)
-          .fillColor("#475569")
-          .text(`PO #: ${invoiceOrder.poNumber || "—"}`)
-          .text(`Items: ${invoiceOrder.productSummary}`)
-          .text(`Quantity: ${invoiceOrder.quantity}`);
-
-        const orderAmountY = doc.y - 42;
-
-        doc
-          .fontSize(12)
-          .fillColor("#111827")
-          .text(
-            formatCurrency(Number(invoiceOrder.orderTotal || 0)),
-            430,
-            orderAmountY,
-            {
-              align: "right",
-              width: 110,
-            }
-          );
-
-        doc.moveDown(0.8);
-
-        const items = parseItemSummary(invoiceOrder.itemSummary);
-
-        for (const item of items) {
-          ensureSpace(doc, 80);
-
-          doc
-            .fontSize(11)
-            .fillColor("#111827")
-            .text(`${item.productName} — Qty ${item.quantity}`);
-
-          doc
-            .fontSize(9)
-            .fillColor("#64748b")
-            .text(`Base: ${formatCurrency(item.basePrice)}`);
-
-          if (item.selections.length > 0) {
-            doc.fontSize(8).fillColor("#475569");
-
-            for (const selection of item.selections.slice(0, 8)) {
-              const leather = selection.leatherName
-                ? ` • Leather: ${selection.leatherName}${
-                    selection.leatherGrade ? ` (${selection.leatherGrade})` : ""
-                  }`
-                : "";
-
-              doc.text(
-                `• ${selection.groupName}: ${selection.choiceLabel}${leather}`,
-                {
-                  indent: 12,
-                  width: 470,
-                }
-              );
-            }
-
-            if (item.selections.length > 8) {
-              doc.text(`• +${item.selections.length - 8} more selections`, {
-                indent: 12,
-              });
-            }
-          }
-
-          doc.moveDown(0.5);
-        }
-
-        ensureSpace(doc, 30);
-        addDivider(doc);
-      }
-
-      ensureSpace(doc, 150);
-
-      const summaryX = 340;
-      const valueX = 460;
-
-      doc.fontSize(11).fillColor("#475569");
-      doc.text("Subtotal", summaryX, doc.y, { width: 110 });
-      doc.fillColor("#111827").text(
-        formatCurrency(Number(invoice.subtotal || 0)),
-        valueX,
-        doc.y - 13,
-        {
-          align: "right",
-          width: 90,
-        }
-      );
-
-      if (Number(invoice.surchargeAmount || 0) > 0) {
-        doc.moveDown(0.6);
-
-        doc
-          .fillColor("#475569")
-          .text(invoice.surchargeLabel || "Surcharge", summaryX, doc.y, {
-            width: 110,
-          });
-
-        doc.fillColor("#111827").text(
-          formatCurrency(Number(invoice.surchargeAmount || 0)),
-          valueX,
-          doc.y - 13,
-          {
-            align: "right",
-            width: 90,
-          }
-        );
-      }
-
-      doc.moveDown(0.8);
-      doc
-        .moveTo(summaryX, doc.y)
-        .lineTo(550, doc.y)
-        .strokeColor("#e2e8f0")
-        .stroke();
-
-      doc.moveDown(0.8);
-
-      doc
-        .fontSize(15)
-        .fillColor("#111827")
-        .text("Total Due", summaryX, doc.y, {
-          width: 110,
-        });
-
-      doc.text(formatCurrency(Number(invoice.total || 0)), valueX, doc.y - 17, {
-        align: "right",
-        width: 90,
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(10);
+      doc.setTextColor(17, 24, 39);
+      y = addWrappedText({
+        doc,
+        text: `${item.productName} — Qty ${item.quantity}`,
+        x: 20,
+        y,
+        maxWidth: 120,
+        lineHeight: 5,
       });
 
-      if (invoice.notes) {
-        ensureSpace(doc, 80);
-        doc.moveDown(2);
-        doc.fontSize(10).fillColor("#64748b").text("NOTES");
-        doc.fontSize(10).fillColor("#111827").text(invoice.notes, {
-          width: 500,
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9);
+      doc.setTextColor(71, 85, 105);
+      doc.text(`Base: ${formatCurrency(item.basePrice)}`, 20, y);
+      doc.text(formatCurrency(item.lineTotal), pageWidth - 20, y, {
+        align: "right",
+      });
+      y += 6;
+
+      for (const selection of item.selections.slice(0, 8)) {
+        y = ensureSpace(doc, y, 12);
+
+        const leather = selection.leatherName
+          ? ` • Leather: ${selection.leatherName}${
+              selection.leatherGrade ? ` (${selection.leatherGrade})` : ""
+            }`
+          : "";
+
+        doc.setFontSize(8);
+        doc.setTextColor(71, 85, 105);
+
+        y = addWrappedText({
+          doc,
+          text: `• ${selection.groupName}: ${selection.choiceLabel}${leather}`,
+          x: 24,
+          y,
+          maxWidth: 150,
+          lineHeight: 4,
         });
       }
 
-      addFooter(doc);
-      doc.end();
-    } catch (error) {
-      reject(error);
+      if (item.selections.length > 8) {
+        y = ensureSpace(doc, y, 8);
+        doc.text(`• +${item.selections.length - 8} more selections`, 24, y);
+        y += 5;
+      }
+
+      y += 4;
     }
+  }
+
+  y = ensureSpace(doc, y, 55);
+
+  doc.setDrawColor(226, 232, 240);
+  doc.line(120, y, pageWidth - 15, y);
+  y += 8;
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(11);
+  doc.setTextColor(71, 85, 105);
+  doc.text("Subtotal", 120, y);
+  doc.setTextColor(17, 24, 39);
+  doc.text(formatCurrency(Number(invoice.subtotal || 0)), pageWidth - 15, y, {
+    align: "right",
   });
+  y += 7;
+
+  if (Number(invoice.surchargeAmount || 0) > 0) {
+    doc.setTextColor(71, 85, 105);
+    doc.text(invoice.surchargeLabel || "Surcharge", 120, y);
+    doc.setTextColor(17, 24, 39);
+    doc.text(
+      formatCurrency(Number(invoice.surchargeAmount || 0)),
+      pageWidth - 15,
+      y,
+      {
+        align: "right",
+      }
+    );
+    y += 7;
+  }
+
+  doc.setDrawColor(226, 232, 240);
+  doc.line(120, y, pageWidth - 15, y);
+  y += 9;
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(15);
+  doc.setTextColor(17, 24, 39);
+  doc.text("Total Due", 120, y);
+  doc.text(formatCurrency(Number(invoice.total || 0)), pageWidth - 15, y, {
+    align: "right",
+  });
+  y += 12;
+
+  if (invoice.notes) {
+    y = ensureSpace(doc, y, 35);
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9);
+    doc.setTextColor(100, 116, 139);
+    doc.text("NOTES", 15, y);
+    y += 6;
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    doc.setTextColor(17, 24, 39);
+
+    addWrappedText({
+      doc,
+      text: invoice.notes,
+      x: 15,
+      y,
+      maxWidth: pageWidth - 30,
+      lineHeight: 5,
+    });
+  }
+
+  addFooter(doc);
+
+  const arrayBuffer = doc.output("arraybuffer");
+  return Buffer.from(arrayBuffer);
 }
