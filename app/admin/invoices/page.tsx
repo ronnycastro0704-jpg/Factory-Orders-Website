@@ -241,7 +241,8 @@ console.log(
     }),
   ]);
 
- 
+  availableOrders = orders.map(serializeAvailableOrder);
+  recentInvoices = invoices.map(serializeRecentInvoice);
 } catch (error) {
   console.error("ADMIN INVOICES PAGE ERROR:", error);
   invoicePageError =
