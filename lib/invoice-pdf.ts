@@ -133,65 +133,82 @@ export async function buildInvoicePdfBuffer(invoice: InvoiceForPdf) {
 
   const pageWidth = doc.internal.pageSize.getWidth();
 
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(28);
-  doc.setTextColor(17, 24, 39);
-  doc.text("INVOICE", 15, 20);
+doc.setFont("helvetica", "bold");
+doc.setFontSize(14);
+doc.setTextColor(17, 24, 39);
+doc.text("Western Collection", 15, 16);
 
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(11);
-  doc.setTextColor(71, 85, 105);
-  doc.text(invoice.invoiceNumber, 15, 28);
+doc.setFont("helvetica", "normal");
+doc.setFontSize(9);
+doc.setTextColor(71, 85, 105);
+doc.text("51 County Road 4325", 15, 22);
+doc.text("Enlote, TX 75331 US", 15, 27);
+doc.text("+8176006569", 15, 32);
+doc.text("ronnycastro0704@gmail.com", 15, 37);
 
-  doc.setFontSize(10);
-  doc.text(`Issued: ${formatDate(invoice.issuedAt)}`, pageWidth - 15, 18, {
-    align: "right",
-  });
-  doc.text(`Due Date: ${formatDate(invoice.dueAt)}`, pageWidth - 15, 24, {
-    align: "right",
-  });
-  doc.text(`Terms: ${invoice.terms}`, pageWidth - 15, 30, {
-    align: "right",
-  });
+doc.setFont("helvetica", "bold");
+doc.setFontSize(28);
+doc.setTextColor(17, 24, 39);
+doc.text("INVOICE", pageWidth - 15, 18, {
+  align: "right",
+});
+
+doc.setFont("helvetica", "normal");
+doc.setFontSize(11);
+doc.setTextColor(71, 85, 105);
+doc.text(invoice.invoiceNumber, pageWidth - 15, 27, {
+  align: "right",
+});
+
+doc.setFontSize(10);
+doc.text(`Issued: ${formatDate(invoice.issuedAt)}`, pageWidth - 15, 36, {
+  align: "right",
+});
+doc.text(`Due Date: ${formatDate(invoice.dueAt)}`, pageWidth - 15, 42, {
+  align: "right",
+});
+doc.text(`Terms: ${invoice.terms}`, pageWidth - 15, 48, {
+  align: "right",
+});
 
   doc.setDrawColor(226, 232, 240);
-  doc.line(15, 40, pageWidth - 15, 40);
+doc.line(15, 56, pageWidth - 15, 56);
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(9);
   doc.setTextColor(100, 116, 139);
-  doc.text("BILL TO", 15, 50);
+doc.text("BILL TO", 15, 66);
 
   doc.setFontSize(13);
   doc.setTextColor(17, 24, 39);
-  doc.text(invoice.customerName, 15, 58);
+doc.text(invoice.customerName, 15, 74);
 
   doc.setFont("helvetica", "normal");
   doc.setFontSize(10);
   doc.setTextColor(71, 85, 105);
-  doc.text(invoice.customerEmail, 15, 64);
+doc.text(invoice.customerEmail, 15, 80);
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(9);
   doc.setTextColor(100, 116, 139);
-  doc.text("TOTAL DUE", pageWidth - 15, 50, {
+doc.text("TOTAL DUE", pageWidth - 15, 66, {
     align: "right",
   });
 
   doc.setFontSize(22);
   doc.setTextColor(17, 24, 39);
-  doc.text(formatCurrency(Number(invoice.total || 0)), pageWidth - 15, 60, {
+doc.text(formatCurrency(Number(invoice.total || 0)), pageWidth - 15, 76, {
     align: "right",
   });
 
   doc.setFont("helvetica", "normal");
   doc.setFontSize(10);
   doc.setTextColor(71, 85, 105);
-  doc.text("Due upon receipt", pageWidth - 15, 67, {
+doc.text("Due upon receipt", pageWidth - 15, 83, {
     align: "right",
   });
 
-  let y = 82;
+let y = 98;
 
   for (const invoiceOrder of invoice.orders) {
     y = ensureSpace(doc, y, 45);

@@ -12,6 +12,7 @@ type AvailableOrder = {
   poNumber: string | null;
   customerName: string;
   customerEmail: string;
+  adminSubmitted: boolean;
   status: string;
   overallProductionStatus: string;
   quantity: number;
@@ -55,23 +56,28 @@ function serializeAvailableOrder(order: {
   quantity: number;
   total: unknown;
   createdAt: Date;
+  user: {
+    email: string;
+  } | null;
   items: {
     productNameSnapshot: string;
   }[];
 }): AvailableOrder {
-  return {
-    id: order.id,
-    orderNumber: order.orderNumber,
-    poNumber: order.poNumber,
-    customerName: order.customerName,
-    customerEmail: order.customerEmail,
-    status: order.status,
-    overallProductionStatus: order.overallProductionStatus,
-    quantity: order.quantity,
-    total: Number(order.total || 0),
-    productSummary: buildProductSummary(order),
-    createdAt: order.createdAt.toISOString(),
-  };
+return {
+  id: order.id,
+  orderNumber: order.orderNumber,
+  poNumber: order.poNumber,
+  customerName: order.customerName,
+  customerEmail: order.customerEmail,
+  adminSubmitted:
+    isAdminEmail(order.user?.email) || isAdminEmail(order.customerEmail),
+  status: order.status,
+  overallProductionStatus: order.overallProductionStatus,
+  quantity: order.quantity,
+  total: Number(order.total || 0),
+  productSummary: buildProductSummary(order),
+  createdAt: order.createdAt.toISOString(),
+};
 }
 
 function serializeRecentInvoice(invoice: {
@@ -217,6 +223,11 @@ console.log(
         overallProductionStatus: true,
         quantity: true,
         total: true,
+          user: {
+    select: {
+      email: true,
+    },
+  },
         createdAt: true,
         items: {
           select: {

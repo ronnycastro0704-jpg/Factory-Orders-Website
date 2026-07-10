@@ -14,6 +14,15 @@ function generateInvoiceNumber() {
   return `INV-${yyyy}${mm}${dd}-${suffix}`;
 }
 
+function isAdminSubmittedOrder(order: {
+  customerEmail: string;
+  user?: {
+    email: string;
+  } | null;
+}) {
+  return isAdminEmail(order.user?.email) || isAdminEmail(order.customerEmail);
+}
+
 function cleanChoiceLabel(value: string) {
   return value.replaceAll("|||", " — ");
 }
@@ -146,6 +155,11 @@ if (orderIds.length < 1) {
         },
       },
       include: {
+        user: {
+  select: {
+    email: true,
+  },
+},
         invoiceOrders: {
           include: {
             invoice: true,
@@ -173,19 +187,23 @@ if (orderIds.length < 1) {
       );
     }
 
-    const customerEmails = Array.from(
-      new Set(orders.map((order) => order.customerEmail.trim().toLowerCase()))
-    );
+const regularCustomerEmails = Array.from(
+  new Set(
+    orders
+      .filter((order) => !isAdminSubmittedOrder(order))
+      .map((order) => order.customerEmail.trim().toLowerCase())
+  )
+);
 
-    if (customerEmails.length !== 1) {
-      return NextResponse.json(
-        {
-          error:
-            "All selected orders must belong to the same customer email before creating one invoice.",
-        },
-        { status: 400 }
-      );
-    }
+if (regularCustomerEmails.length > 1) {
+  return NextResponse.json(
+    {
+      error:
+        "All non-admin-submitted orders must belong to the same customer email before creating one invoice.",
+    },
+    { status: 400 }
+  );
+}
 
     const alreadyInvoicedOrders = orders.filter((order) =>
       order.invoiceOrders.some(
@@ -212,13 +230,14 @@ const invoiceSubtotal = orders.reduce(
 
 const invoiceTotal = invoiceSubtotal + surchargeAmount;
 
-    const firstOrder = orders[0];
+const invoiceCustomerOrder =
+  orders.find((order) => !isAdminSubmittedOrder(order)) || orders[0];
 
-    const invoice = await prisma.invoice.create({
-      data: {
-        invoiceNumber,
-        customerName: firstOrder.customerName,
-        customerEmail: firstOrder.customerEmail,
+const invoice = await prisma.invoice.create({
+  data: {
+    invoiceNumber,
+    customerName: invoiceCustomerOrder.customerName,
+    customerEmail: invoiceCustomerOrder.customerEmail,
 subtotal: invoiceSubtotal,
 surchargeLabel,
 surchargeAmount,

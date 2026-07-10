@@ -11,6 +11,7 @@ type AvailableOrder = {
   poNumber: string | null;
   customerName: string;
   customerEmail: string;
+  adminSubmitted: boolean;
   status: string;
   overallProductionStatus: string;
   quantity: number;
@@ -113,27 +114,40 @@ const selectedSubtotal = selectedOrders.reduce(
 const surchargeAmount = Math.max(0, Number(surchargeAmountInput || 0) || 0);
 const selectedTotal = selectedSubtotal + surchargeAmount;
 
-  const selectedCustomerEmail = selectedOrders[0]?.customerEmail || "";
-  const selectedCustomerName = selectedOrders[0]?.customerName || "";
+const invoiceCustomerOrder =
+  selectedOrders.find((order) => !order.adminSubmitted) ||
+  selectedOrders[0] ||
+  null;
+
+const selectedCustomerEmail = invoiceCustomerOrder?.customerEmail || "";
+const selectedCustomerName = invoiceCustomerOrder?.customerName || "";
+
+const selectedRegularCustomerEmail =
+  selectedOrders.find((order) => !order.adminSubmitted)?.customerEmail || "";
 
   function getOrderById(orderId: string) {
     return availableOrders.find((order) => order.id === orderId) || null;
   }
 
-  function validateOrderCanBeAdded(order: AvailableOrder) {
-    if (selectedIds.has(order.id)) {
-      return "This order is already in the invoice draft.";
-    }
+function validateOrderCanBeAdded(order: AvailableOrder) {
+  if (selectedIds.has(order.id)) {
+    return "This order is already in the invoice draft.";
+  }
 
-    if (
-      selectedOrders.length > 0 &&
-      normalizeEmail(order.customerEmail) !== normalizeEmail(selectedCustomerEmail)
-    ) {
-      return "All orders on one invoice must belong to the same customer email.";
-    }
-
+  if (order.adminSubmitted) {
     return "";
   }
+
+  if (
+    selectedRegularCustomerEmail &&
+    normalizeEmail(order.customerEmail) !==
+      normalizeEmail(selectedRegularCustomerEmail)
+  ) {
+    return "All non-admin-submitted orders on one invoice must belong to the same customer email.";
+  }
+
+  return "";
+}
 
   function addOrder(order: AvailableOrder) {
     const validationError = validateOrderCanBeAdded(order);
@@ -353,6 +367,12 @@ if (selectedOrders.length < 1) {
                       </p>
 
                       <div className="flex flex-wrap gap-2 lg:justify-end">
+  {order.adminSubmitted ? (
+    <span className="inline-flex rounded-full border border-purple-200 bg-purple-50 px-2 py-1 text-[10px] font-semibold text-purple-700">
+      Admin Submitted
+    </span>
+  ) : null}
+
                         <span
                           className={`inline-flex rounded-full border px-2 py-1 text-[10px] font-semibold ${getStatusClasses(
                             order.status
@@ -447,6 +467,11 @@ if (selectedOrders.length < 1) {
                       <p className="mt-1 text-sm text-slate-600">
                         {order.productSummary}
                       </p>
+                      {order.adminSubmitted ? (
+  <p className="mt-1 text-xs font-semibold text-purple-700">
+    Admin submitted exception
+  </p>
+) : null}
                       <p className="mt-1 text-xs text-slate-500">
                         Qty {order.quantity}
                       </p>
