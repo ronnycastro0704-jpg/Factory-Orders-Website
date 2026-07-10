@@ -111,6 +111,11 @@ export default async function AdminInvoicesPage() {
     redirect("/");
   }
 
+let availableOrders: AvailableOrder[] = [];
+let recentInvoices: RecentInvoice[] = [];
+let invoicePageError = "";
+
+try {
   const [orders, invoices] = await Promise.all([
     prisma.order.findMany({
       where: {
@@ -165,8 +170,12 @@ export default async function AdminInvoicesPage() {
     }),
   ]);
 
-  const availableOrders = orders.map(serializeAvailableOrder);
-  const recentInvoices = invoices.map(serializeRecentInvoice);
+ 
+} catch (error) {
+  console.error("ADMIN INVOICES PAGE ERROR:", error);
+  invoicePageError =
+    "Invoices could not load. The production database may need the latest Prisma migration.";
+}
 
   const availableTotal = availableOrders.reduce(
     (sum, order) => sum + order.total,
@@ -231,10 +240,18 @@ export default async function AdminInvoicesPage() {
           </div>
         </section>
 
-        <InvoiceBuilder
-          availableOrders={availableOrders}
-          recentInvoices={recentInvoices}
-        />
+        {invoicePageError ? (
+  <section className="section-card-strong border-red-200 bg-red-50 text-red-700">
+    <h2 className="text-xl font-bold">Invoices could not load</h2>
+    <p className="mt-2 text-sm">{invoicePageError}</p>
+  </section>
+) : (
+  <InvoiceBuilder
+    availableOrders={availableOrders}
+    recentInvoices={recentInvoices}
+  />
+)}
+ 
       </div>
     </main>
   );

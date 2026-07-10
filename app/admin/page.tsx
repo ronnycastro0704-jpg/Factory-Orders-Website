@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import {
   ClipboardList,
   Factory,
+  FileText,
   LayoutDashboard,
   Package,
   Palette,
@@ -30,6 +31,13 @@ const adminLinks = [
     description: "Search and review customer orders.",
     href: "/admin/orders",
     icon: ClipboardList,
+  },
+    {
+    title: "Invoices",
+    description:
+      "Create grouped invoices with PO numbers, items, surcharges, and due upon receipt terms.",
+    href: "/admin/invoices",
+    icon: FileText,
   },
   {
     title: "Products",

@@ -518,20 +518,23 @@ export default async function AdminProductionPage({
               </p>
             </div>
 
-            <div className="flex flex-wrap gap-3">
-              <Link href="/admin" className="button-secondary">
-                ← Dashboard
-              </Link>
-              <Link href="/admin/orders" className="button-secondary">
-                Orders
-              </Link>
-              <Link href="/admin/products" className="button-secondary">
-                Products
-              </Link>
-              <Link href="/admin/leathers" className="button-secondary">
-                Leathers
-              </Link>
-            </div>
+<div className="flex flex-wrap gap-3">
+  <Link href="/admin" className="button-secondary">
+    ← Dashboard
+  </Link>
+  <Link href="/admin/orders" className="button-secondary">
+    Orders
+  </Link>
+  <Link href="/admin/invoices" className="button-secondary">
+    Invoices
+  </Link>
+  <Link href="/admin/products" className="button-secondary">
+    Products
+  </Link>
+  <Link href="/admin/leathers" className="button-secondary">
+    Leathers
+  </Link>
+</div>
           </div>
         </section>
 
