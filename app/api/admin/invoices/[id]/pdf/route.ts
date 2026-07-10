@@ -48,11 +48,18 @@ export async function GET(_request: Request, context: RouteContext) {
         "Content-Disposition": `attachment; filename="${invoice.invoiceNumber}.pdf"`,
       },
     });
-  } catch (error) {
-    console.error("INVOICE PDF ERROR:", error);
-    return NextResponse.json(
-      { error: "Failed to generate invoice PDF." },
-      { status: 500 }
-    );
-  }
+} catch (error) {
+  const message =
+    error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+
+  console.error("INVOICE PDF ERROR:", error);
+
+  return NextResponse.json(
+    {
+      error: "Failed to generate invoice PDF.",
+      details: message,
+    },
+    { status: 500 }
+  );
+}
 }
