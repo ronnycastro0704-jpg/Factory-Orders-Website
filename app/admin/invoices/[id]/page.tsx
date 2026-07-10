@@ -144,8 +144,7 @@ export default async function AdminInvoiceDetailPage({ params }: PageProps) {
         </div>
 
         <section className="rounded-2xl border bg-white p-6 shadow-sm print:border-0 print:shadow-none">
-          <div className="flex flex-col gap-6 border-b pb-6 lg:flex-row lg:items-start lg:justify-between">
-            <div className="mb-8 flex flex-col gap-6 border-b pb-6 sm:flex-row sm:items-start sm:justify-between">
+<div className="flex flex-col gap-6 border-b pb-6 lg:flex-row lg:items-start lg:justify-between">
   <div>
     <h2 className="text-xl font-bold text-slate-900">Western Collection</h2>
     <div className="mt-2 space-y-1 text-sm text-slate-600">
@@ -156,45 +155,36 @@ export default async function AdminInvoiceDetailPage({ params }: PageProps) {
     </div>
   </div>
 
-  <div className="sm:text-right">
+  <div className="lg:text-right">
     <p className="text-sm uppercase tracking-[0.16em] text-slate-500">
       Invoice
     </p>
     <h1 className="mt-2 text-4xl font-bold">{invoice.invoiceNumber}</h1>
+
+    <span
+      className={`mt-4 inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${getInvoiceStatusClasses(
+        invoice.status
+      )}`}
+    >
+      {invoice.status}
+    </span>
+
+    <div className="mt-4 text-sm text-slate-600">
+      <p>
+        <span className="font-semibold text-slate-900">Issued:</span>{" "}
+        {formatCentralDate(invoice.issuedAt)}
+      </p>
+      <p className="mt-1">
+        <span className="font-semibold text-slate-900">Due Date:</span>{" "}
+        {formatCentralDate(invoice.dueAt)}
+      </p>
+      <p className="mt-1">
+        <span className="font-semibold text-slate-900">Terms:</span>{" "}
+        {invoice.terms}
+      </p>
+    </div>
   </div>
 </div>
-            <div>
-              <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">
-                Invoice
-              </p>
-              <h1 className="mt-2 text-4xl font-bold">
-                {invoice.invoiceNumber}
-              </h1>
-
-              <span
-                className={`mt-4 inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${getInvoiceStatusClasses(
-                  invoice.status
-                )}`}
-              >
-                {invoice.status}
-              </span>
-            </div>
-
-            <div className="text-sm text-slate-600 lg:text-right">
-              <p>
-                <span className="font-semibold text-slate-900">Issued:</span>{" "}
-                {formatCentralDate(invoice.issuedAt)}
-              </p>
-              <p className="mt-1">
-                <span className="font-semibold text-slate-900">Due Date:</span>{" "}
-                {formatCentralDate(invoice.dueAt)}
-              </p>
-              <p className="mt-1">
-                <span className="font-semibold text-slate-900">Terms:</span>{" "}
-                {invoice.terms}
-              </p>
-            </div>
-          </div>
 
           <div className="grid gap-6 border-b py-6 md:grid-cols-2">
             <div>
