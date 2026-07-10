@@ -116,6 +116,77 @@ let recentInvoices: RecentInvoice[] = [];
 let invoicePageError = "";
 
 try {
+    const debugCounts = await prisma.order.groupBy({
+  by: ["status"],
+  _count: {
+    _all: true,
+  },
+});
+
+const completedOrPaidCount = await prisma.order.count({
+  where: {
+    status: {
+      in: ["COMPLETED", "PAID"],
+    },
+  },
+});
+
+const completedOrPaidUninvoicedCount = await prisma.order.count({
+  where: {
+    status: {
+      in: ["COMPLETED", "PAID"],
+    },
+    invoiceOrders: {
+      none: {
+        invoice: {
+          status: {
+            not: "VOID",
+          },
+        },
+      },
+    },
+  },
+});
+
+const completedOrPaidOrdersDebug = await prisma.order.findMany({
+  where: {
+    status: {
+      in: ["COMPLETED", "PAID"],
+    },
+  },
+  take: 10,
+  orderBy: {
+    createdAt: "desc",
+  },
+  select: {
+    orderNumber: true,
+    poNumber: true,
+    status: true,
+    overallProductionStatus: true,
+    customerEmail: true,
+    invoiceOrders: {
+      select: {
+        invoice: {
+          select: {
+            invoiceNumber: true,
+            status: true,
+          },
+        },
+      },
+    },
+  },
+});
+
+console.log("INVOICE DEBUG status counts:", debugCounts);
+console.log("INVOICE DEBUG completed/paid count:", completedOrPaidCount);
+console.log(
+  "INVOICE DEBUG completed/paid uninvoiced count:",
+  completedOrPaidUninvoicedCount
+);
+console.log(
+  "INVOICE DEBUG sample completed/paid orders:",
+  completedOrPaidOrdersDebug
+);
   const [orders, invoices] = await Promise.all([
     prisma.order.findMany({
       where: {
