@@ -70,6 +70,7 @@ type ProductionLineItem = {
   currentStatus: string;
   lineNotes: string | null;
   completedPhotoUrl: string | null;
+  completedPhotoUrls: string[];
 
   millFirstStatus: string;
   leatherOrderedStatus: string;
@@ -316,15 +317,16 @@ export default async function AdminProductionOrderPage({ params }: PageProps) {
                   {typedProductionLines.map((line) => (
                     <ProductionLineEditor
                       key={line.id}
-                      line={{
-                        ...line,
-                        dueDate: line.dueDate
-                          ? line.dueDate.toISOString()
-                          : null,
-                        pickedUpAt: line.pickedUpAt
-                          ? line.pickedUpAt.toISOString()
-                          : null,
-                      }}
+  line={{
+  ...line,
+  dueDate: line.dueDate
+    ? line.dueDate.toISOString()
+    : null,
+  pickedUpAt: line.pickedUpAt
+    ? line.pickedUpAt.toISOString()
+    : null,
+  completedPhotoUrls: line.completedPhotoUrls || [],
+}}
                     />
                   ))}
                 </div>

@@ -111,6 +111,20 @@ function normalizeOptionalText(value: unknown) {
   return raw ? raw : null;
 }
 
+function normalizePhotoUrls(value: unknown) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return Array.from(
+    new Set(
+      value
+        .map((item) => String(item || "").trim())
+        .filter(Boolean)
+    )
+  );
+}
+
 function parseOptionalDate(value: unknown) {
   const raw = String(value || "").trim();
 
@@ -1083,6 +1097,10 @@ const updatedLine = await prisma.productionLine.update({
     const pickedUpAt = pickedUpAtInput.date;
     const pickedUp = Boolean(pickedUpAt);
 
+    const completedPhotoUrls = normalizePhotoUrls(body.completedPhotoUrls);
+    const primaryCompletedPhotoUrl =
+      completedPhotoUrls[0] || normalizeOptionalText(body.completedPhotoUrl);
+
     const millFirstStatus = normalizeStageStatus(
       body.millFirstStatus,
       existingLine.millFirstStatus as ProductionStageStatus,
@@ -1164,7 +1182,8 @@ const updatedLine = await prisma.productionLine.update({
           existingLine.priority as OrderPriority
         ),
         lineNotes: normalizeOptionalText(body.lineNotes),
-        completedPhotoUrl: normalizeOptionalText(body.completedPhotoUrl),
+        completedPhotoUrl: primaryCompletedPhotoUrl,
+        completedPhotoUrls,
 
         millFirstStatus,
         leatherOrderedStatus,

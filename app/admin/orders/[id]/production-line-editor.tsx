@@ -15,6 +15,7 @@ type Props = {
     currentStatus: string;
     lineNotes: string | null;
     completedPhotoUrl: string | null;
+    completedPhotoUrls?: string[] | null;
 
     millFirstStatus: string;
     leatherOrderedStatus: string;
@@ -137,7 +138,7 @@ function getStageToneClasses(value: string) {
     case "FRAME_DONE":
       return "border-sky-200 bg-sky-50 text-sky-700";
     case "THIS_WEEK":
-      return "border-amber-200 bg-amber-50 text-amber-700";
+      return "border-amber-50 bg-amber-50 text-amber-700";
     case "DONE":
       return "border-emerald-300 bg-emerald-100 text-emerald-800";
     case "MISSING_LEATHER":
@@ -165,6 +166,15 @@ function getResolvedOptions(options: StageOption[], value: string) {
   ];
 }
 
+function buildInitialPhotoUrls(line: Props["line"]) {
+  return Array.from(
+    new Set([
+      ...(line.completedPhotoUrls || []),
+      ...(line.completedPhotoUrl ? [line.completedPhotoUrl] : []),
+    ])
+  ).filter(Boolean);
+}
+
 export default function ProductionLineEditor({ line }: Props) {
   const router = useRouter();
 
@@ -173,10 +183,11 @@ export default function ProductionLineEditor({ line }: Props) {
   const [priority, setPriority] = useState(toUiPriority(line.priority));
   const [lineNotes, setLineNotes] = useState(line.lineNotes || "");
   const [pickedUpAt, setPickedUpAt] = useState(toDateInputValue(line.pickedUpAt));
-  const [completedPhotoUrl, setCompletedPhotoUrl] = useState(
-    line.completedPhotoUrl || ""
+  const [completedPhotoUrls, setCompletedPhotoUrls] = useState<string[]>(
+    buildInitialPhotoUrls(line)
   );
-  const [completedPhotoFile, setCompletedPhotoFile] = useState<File | null>(null);
+  const [completedPhotoFiles, setCompletedPhotoFiles] = useState<File[]>([]);
+  const [photoUrlInput, setPhotoUrlInput] = useState("");
 
   const [millFirstStatus, setMillFirstStatus] = useState(line.millFirstStatus);
   const [leatherOrderedStatus, setLeatherOrderedStatus] = useState(
@@ -213,29 +224,38 @@ export default function ProductionLineEditor({ line }: Props) {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
-  async function uploadCompletedPhotoIfNeeded() {
-    if (!completedPhotoFile) {
-      return completedPhotoUrl;
+  async function uploadCompletedPhotosIfNeeded() {
+    if (completedPhotoFiles.length === 0) {
+      return completedPhotoUrls;
     }
 
     setUploading(true);
 
-    const formData = new FormData();
-    formData.append("file", completedPhotoFile);
+    const uploadedUrls: string[] = [];
 
-    const response = await fetch("/api/uploads", {
-      method: "POST",
-      body: formData,
-    });
+    for (const file of completedPhotoFiles) {
+      const formData = new FormData();
+      formData.append("file", file);
 
-    const data = await response.json();
-    setUploading(false);
+      const response = await fetch("/api/uploads", {
+        method: "POST",
+        body: formData,
+      });
 
-    if (!response.ok) {
-      throw new Error(data.error || "Failed to upload completed photo.");
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to upload completed photo.");
+      }
+
+      const url = String(data.url || "").trim();
+
+      if (url) {
+        uploadedUrls.push(url);
+      }
     }
 
-    return String(data.url || "");
+    return Array.from(new Set([...completedPhotoUrls, ...uploadedUrls]));
   }
 
   async function handleSave() {
@@ -244,7 +264,7 @@ export default function ProductionLineEditor({ line }: Props) {
     setSuccess("");
 
     try {
-      const finalCompletedPhotoUrl = await uploadCompletedPhotoIfNeeded();
+      const finalCompletedPhotoUrls = await uploadCompletedPhotosIfNeeded();
 
       const response = await fetch(`/api/admin/production-lines/${line.id}`, {
         method: "PUT",
@@ -257,7 +277,8 @@ export default function ProductionLineEditor({ line }: Props) {
           priority,
           lineNotes,
           pickedUpAt,
-          completedPhotoUrl: finalCompletedPhotoUrl,
+          completedPhotoUrl: finalCompletedPhotoUrls[0] || "",
+          completedPhotoUrls: finalCompletedPhotoUrls,
 
           millFirstStatus,
           leatherOrderedStatus,
@@ -285,8 +306,9 @@ export default function ProductionLineEditor({ line }: Props) {
         return;
       }
 
-      setCompletedPhotoUrl(finalCompletedPhotoUrl);
-      setCompletedPhotoFile(null);
+      setCompletedPhotoUrls(finalCompletedPhotoUrls);
+      setCompletedPhotoFiles([]);
+      setPhotoUrlInput("");
       setSuccess("Production line updated.");
       router.refresh();
     } catch (saveError) {
@@ -303,7 +325,30 @@ export default function ProductionLineEditor({ line }: Props) {
   }
 
   function handleCompletedPhotoFileChange(event: ChangeEvent<HTMLInputElement>) {
-    setCompletedPhotoFile(event.target.files?.[0] || null);
+    setCompletedPhotoFiles(Array.from(event.target.files || []));
+  }
+
+  function addPhotoUrl() {
+    const nextUrl = photoUrlInput.trim();
+
+    if (!nextUrl) {
+      return;
+    }
+
+    setCompletedPhotoUrls((currentUrls) =>
+      Array.from(new Set([...currentUrls, nextUrl]))
+    );
+    setPhotoUrlInput("");
+  }
+
+  function removeCompletedPhoto(urlToRemove: string) {
+    setCompletedPhotoUrls((currentUrls) =>
+      currentUrls.filter((url) => url !== urlToRemove)
+    );
+  }
+
+  function clearSelectedUploadFiles() {
+    setCompletedPhotoFiles([]);
   }
 
   function renderStageField(args: {
@@ -465,66 +510,126 @@ export default function ProductionLineEditor({ line }: Props) {
       </div>
 
       <div className="mt-4 rounded-xl border bg-slate-50 p-4">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
-          <div className="lg:w-64">
+        <div className="flex flex-col gap-4">
+          <div>
             <label className="mb-2 block text-sm font-medium">
-              Completed Furniture Photo
+              Completed Furniture Photos
             </label>
 
-            {completedPhotoUrl ? (
-              <img
-                src={completedPhotoUrl}
-                alt={`${line.partNumber} completed`}
-                className="h-48 w-full rounded-xl border object-cover"
-              />
+            {completedPhotoUrls.length > 0 ? (
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {completedPhotoUrls.map((url, index) => (
+                  <div key={url} className="rounded-xl border bg-white p-3">
+                    <img
+                      src={url}
+                      alt={`${line.partNumber} completed photo ${index + 1}`}
+                      className="h-48 w-full rounded-lg border object-cover"
+                    />
+
+                    <div className="mt-3 flex items-center justify-between gap-3">
+                      <p className="text-xs font-medium text-slate-500">
+                        Photo {index + 1}
+                      </p>
+
+                      <button
+                        type="button"
+                        onClick={() => removeCompletedPhoto(url)}
+                        className="rounded-lg border px-3 py-1 text-xs font-medium text-red-600 hover:bg-red-50"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
             ) : (
               <div className="flex h-48 w-full items-center justify-center rounded-xl border border-dashed bg-white text-sm text-slate-400">
-                No photo uploaded
+                No completed photos uploaded
               </div>
             )}
           </div>
 
-          <div className="flex-1 space-y-4">
+          <div className="grid gap-4 lg:grid-cols-2">
             <div>
               <label className="mb-1 block text-sm font-medium">
-                Upload Photo
+                Upload Photos
               </label>
               <input
                 type="file"
                 accept="image/*"
+                multiple
                 className="w-full rounded-lg border bg-white px-3 py-2"
                 onChange={handleCompletedPhotoFileChange}
               />
-              {completedPhotoFile ? (
-                <p className="mt-2 text-xs text-slate-500">
-                  Selected file: {completedPhotoFile.name}
-                </p>
+
+              {completedPhotoFiles.length > 0 ? (
+                <div className="mt-2 space-y-1 text-xs text-slate-500">
+                  <p>{completedPhotoFiles.length} file(s) selected:</p>
+                  <ul className="list-disc pl-5">
+                    {completedPhotoFiles.map((file) => (
+                      <li key={`${file.name}-${file.lastModified}`}>
+                        {file.name}
+                      </li>
+                    ))}
+                  </ul>
+
+                  <button
+                    type="button"
+                    onClick={clearSelectedUploadFiles}
+                    className="mt-2 rounded-lg border px-3 py-1 text-xs hover:bg-slate-100"
+                  >
+                    Clear selected files
+                  </button>
+                </div>
               ) : null}
+
+              <p className="mt-2 text-xs text-slate-500">
+                You can select multiple photos at once, for example front and
+                back.
+              </p>
             </div>
 
             <div>
               <label className="mb-1 block text-sm font-medium">
                 Or Paste Photo URL
               </label>
-              <input
-                className="w-full rounded-lg border bg-white px-3 py-2"
-                value={completedPhotoUrl}
-                onChange={(event) => setCompletedPhotoUrl(event.target.value)}
-                placeholder="https://..."
-              />
-            </div>
 
+              <div className="flex gap-2">
+                <input
+                  className="w-full rounded-lg border bg-white px-3 py-2"
+                  value={photoUrlInput}
+                  onChange={(event) => setPhotoUrlInput(event.target.value)}
+                  placeholder="https://..."
+                />
+
+                <button
+                  type="button"
+                  onClick={addPhotoUrl}
+                  className="rounded-lg border px-3 py-2 hover:bg-slate-100"
+                >
+                  Add
+                </button>
+              </div>
+
+              <p className="mt-2 text-xs text-slate-500">
+                Pasted URLs are added to the saved photo gallery.
+              </p>
+            </div>
+          </div>
+
+          {completedPhotoUrls.length > 0 ? (
             <button
               type="button"
               onClick={() => {
-                setCompletedPhotoUrl("");
-                setCompletedPhotoFile(null);
+                setCompletedPhotoUrls([]);
+                setCompletedPhotoFiles([]);
+                setPhotoUrlInput("");
               }}
-              className="rounded-lg border px-3 py-2 hover:bg-slate-100"
+              className="w-fit rounded-lg border px-3 py-2 text-sm text-red-600 hover:bg-red-50"
             >
-              Clear Photo
+              Clear All Photos
             </button>
-          </div>
+          ) : null}
         </div>
       </div>
 
@@ -618,7 +723,7 @@ export default function ProductionLineEditor({ line }: Props) {
       </div>
 
       {uploading ? (
-        <p className="mt-4 text-sm text-slate-500">Uploading photo...</p>
+        <p className="mt-4 text-sm text-slate-500">Uploading photos...</p>
       ) : null}
       {error ? <p className="mt-4 text-sm text-red-600">{error}</p> : null}
       {success ? <p className="mt-4 text-sm text-green-600">{success}</p> : null}
@@ -630,7 +735,7 @@ export default function ProductionLineEditor({ line }: Props) {
           disabled={loading || uploading}
           className="rounded-lg bg-slate-900 px-4 py-2 text-white hover:bg-slate-800 disabled:opacity-50"
         >
-          {loading ? "Saving..." : "Save Production Line"}
+          {loading || uploading ? "Saving..." : "Save Production Line"}
         </button>
       </div>
     </div>

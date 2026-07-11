@@ -292,6 +292,7 @@ model ProductionLine {
   currentStatus            ProductionOverallStatus @default(NEW)
   lineNotes                String?
   completedPhotoUrl        String?
+  completedPhotoUrls       String[]                @default([])
 
   millFirstStatus      ProductionStageStatus @default(NOT_STARTED)
   leatherOrderedStatus ProductionStageStatus @default(NOT_STARTED)
