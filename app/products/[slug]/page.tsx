@@ -21,8 +21,9 @@ type ProductChoice = {
   priceDelta: unknown;
   usesLeatherGrades: boolean;
   appliesLeatherSurcharge: boolean;
-  allowsLaseredBrand: boolean;
-  isBinaryOption: boolean;
+allowsLaseredBrand: boolean;
+laseredBrandSurcharge: unknown;
+isBinaryOption: boolean;
   isQuickPick: boolean;
   leatherInventoryUsage: unknown | null;
   isBodyLeather: boolean;
@@ -124,8 +125,9 @@ choices: group.choices.map((choice: ProductChoice) => ({
 
   usesLeatherGrades: choice.usesLeatherGrades,
         appliesLeatherSurcharge: choice.appliesLeatherSurcharge,
-        allowsLaseredBrand: choice.allowsLaseredBrand,
-        isBinaryOption: choice.isBinaryOption,
+allowsLaseredBrand: choice.allowsLaseredBrand,
+laseredBrandSurcharge: Number(choice.laseredBrandSurcharge || 0),
+isBinaryOption: choice.isBinaryOption,
         isQuickPick: choice.isQuickPick,
         isBodyLeather: choice.isBodyLeather,
         frameNeededCode: choice.frameNeededCode,

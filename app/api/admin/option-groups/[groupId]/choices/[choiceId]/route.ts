@@ -43,6 +43,9 @@ export async function PUT(request: Request, context: RouteContext) {
         ? body.appliesLeatherSurcharge
         : true;
     const allowsLaseredBrand = Boolean(body.allowsLaseredBrand);
+    const laseredBrandSurcharge = allowsLaseredBrand
+  ? Number(body.laseredBrandSurcharge || 0)
+  : 0;
     const isBinaryOption = Boolean(body.isBinaryOption);
     const isQuickPick = Boolean(body.isQuickPick);
     const isBodyLeather = Boolean(body.isBodyLeather);
@@ -118,6 +121,13 @@ export async function PUT(request: Request, context: RouteContext) {
       );
     }
 
+    if (!Number.isFinite(laseredBrandSurcharge) || laseredBrandSurcharge < 0) {
+  return NextResponse.json(
+    { error: "Lasered brand surcharge must be 0 or greater." },
+    { status: 400 }
+  );
+}
+
     if (
       leatherInventoryUsage !== null &&
       (!Number.isFinite(leatherInventoryUsage) || leatherInventoryUsage < 0)
@@ -140,8 +150,9 @@ export async function PUT(request: Request, context: RouteContext) {
         frameNeededCode: frameNeededCode || null,
         usesLeatherGrades,
         appliesLeatherSurcharge,
-        allowsLaseredBrand,
-        isBinaryOption,
+allowsLaseredBrand,
+laseredBrandSurcharge,
+isBinaryOption,
         isQuickPick,
         isBodyLeather: usesLeatherGrades ? isBodyLeather : false,
         leatherInventoryUsage:

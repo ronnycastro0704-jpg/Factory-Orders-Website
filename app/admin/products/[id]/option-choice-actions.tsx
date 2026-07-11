@@ -16,6 +16,7 @@ type Choice = {
   usesLeatherGrades: boolean;
   appliesLeatherSurcharge: boolean;
   allowsLaseredBrand: boolean;
+  laseredBrandSurcharge: number;
   isBinaryOption: boolean;
   isQuickPick: boolean;
   gradeAUpcharge: number | null;
@@ -59,6 +60,9 @@ export default function OptionChoiceActions({ groupId, choice }: Props) {
   const [allowsLaseredBrand, setAllowsLaseredBrand] = useState(
     choice.allowsLaseredBrand
   );
+  const [laseredBrandSurcharge, setLaseredBrandSurcharge] = useState(
+  String(choice.laseredBrandSurcharge || 0)
+);
   const [isBinaryOption, setIsBinaryOption] = useState(choice.isBinaryOption);
   const [isQuickPick, setIsQuickPick] = useState(choice.isQuickPick);
   const [isBodyLeather, setIsBodyLeather] = useState(choice.isBodyLeather);
@@ -144,8 +148,11 @@ export default function OptionChoiceActions({ groupId, choice }: Props) {
             frameNeededCode,
             usesLeatherGrades,
             appliesLeatherSurcharge,
-            allowsLaseredBrand,
-            isBinaryOption,
+allowsLaseredBrand,
+laseredBrandSurcharge: allowsLaseredBrand
+  ? Number(laseredBrandSurcharge || 0)
+  : 0,
+isBinaryOption,
             isQuickPick,
             isBodyLeather,
             leatherInventoryUsage,
@@ -379,14 +386,41 @@ export default function OptionChoiceActions({ groupId, choice }: Props) {
         </>
       ) : null}
 
-      <label className="flex items-center gap-2 text-sm font-medium">
-        <input
-          type="checkbox"
-          checked={allowsLaseredBrand}
-          onChange={(e) => setAllowsLaseredBrand(e.target.checked)}
-        />
-        Allows Lasered Brand
-      </label>
+<label className="flex items-center gap-2 text-sm font-medium">
+  <input
+    type="checkbox"
+    checked={allowsLaseredBrand}
+    onChange={(e) => {
+      const checked = e.target.checked;
+      setAllowsLaseredBrand(checked);
+
+      if (!checked) {
+        setLaseredBrandSurcharge("0");
+      }
+    }}
+  />
+  Allows Lasered Brand
+</label>
+
+{allowsLaseredBrand ? (
+  <div>
+    <label className="mb-1 block text-sm font-medium">
+      Lasered Brand Surcharge
+    </label>
+    <input
+      type="number"
+      step="0.01"
+      min="0"
+      className="w-full rounded-lg border px-3 py-2"
+      value={laseredBrandSurcharge}
+      onChange={(e) => setLaseredBrandSurcharge(e.target.value)}
+      placeholder="Example: 75"
+    />
+    <p className="mt-1 text-xs text-slate-500">
+      This amount is added when the customer chooses Lasered Brand: Yes.
+    </p>
+  </div>
+) : null}
 
       <label className="flex items-center gap-2 text-sm font-medium">
         <input
@@ -508,8 +542,9 @@ export default function OptionChoiceActions({ groupId, choice }: Props) {
             setFrameNeededCode(choice.frameNeededCode || "");
             setUsesLeatherGrades(choice.usesLeatherGrades);
             setAppliesLeatherSurcharge(choice.appliesLeatherSurcharge);
-            setAllowsLaseredBrand(choice.allowsLaseredBrand);
-            setIsBinaryOption(choice.isBinaryOption);
+setAllowsLaseredBrand(choice.allowsLaseredBrand);
+setLaseredBrandSurcharge(String(choice.laseredBrandSurcharge || 0));
+setIsBinaryOption(choice.isBinaryOption);
             setIsQuickPick(choice.isQuickPick);
             setIsBodyLeather(choice.isBodyLeather);
             setLeatherInventoryUsage(

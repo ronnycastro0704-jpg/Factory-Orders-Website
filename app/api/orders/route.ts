@@ -18,8 +18,9 @@ type IncomingSelection = {
   leatherSurcharge: number;
   imageUrl?: string | null;
   leatherImageUrl?: string | null;
-  laseredBrand?: boolean;
-  laseredBrandImageUrl?: string | null;
+laseredBrand?: boolean;
+laseredBrandSurcharge?: number | null;
+laseredBrandImageUrl?: string | null;
   quantity?: number | null;
   frameNeededCode?: string | null;
   isBodyLeather?: boolean;
@@ -321,19 +322,19 @@ function buildSelectionRows(selections: ResolvedSelection[]) {
       });
     }
 
-    if (selection.laseredBrand) {
-      rows.push({
-        optionGroupNameSnapshot: `${selection.groupName} Lasered Brand`,
-        optionChoiceNameSnapshot: `${selection.choiceLabel}${SELECTION_META_SEPARATOR}Yes`,
-        optionChoiceImageUrlSnapshot: null,
-        leatherNameSnapshot: null,
-        leatherGradeSnapshot: null,
-        leatherImageUrlSnapshot: null,
-        laseredBrandImageUrlSnapshot: selection.laseredBrandImageUrl || null,
-        priceDeltaSnapshot: 0,
-        leatherInventoryUsageSnapshot: null,
-      });
-    }
+if (selection.laseredBrand) {
+  rows.push({
+    optionGroupNameSnapshot: `${selection.groupName} Lasered Brand`,
+    optionChoiceNameSnapshot: `${selection.choiceLabel}${SELECTION_META_SEPARATOR}Yes`,
+    optionChoiceImageUrlSnapshot: null,
+    leatherNameSnapshot: null,
+    leatherGradeSnapshot: null,
+    leatherImageUrlSnapshot: null,
+    laseredBrandImageUrlSnapshot: selection.laseredBrandImageUrl || null,
+    priceDeltaSnapshot: Number(selection.laseredBrandSurcharge || 0),
+    leatherInventoryUsageSnapshot: null,
+  });
+}
 
     if (selection.laseredBrandImageUrl) {
       rows.push({
@@ -858,8 +859,8 @@ const submittingUser = await prisma.user.findUnique({
           leatherSurcharge: Number(selection.leatherSurcharge || 0),
           imageUrl: selection.imageUrl || null,
           leatherImageUrl: selection.leatherImageUrl || null,
-          laseredBrand: Boolean(selection.laseredBrand),
-          laseredBrandImageUrl: selection.laseredBrandImageUrl || null,
+laseredBrand: Boolean(selection.laseredBrand),
+laseredBrandImageUrl: selection.laseredBrandImageUrl || null,
           isBodyLeather: Boolean(selection.isBodyLeather),
         })),
       });

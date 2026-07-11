@@ -13,8 +13,9 @@ type Choice = {
   priceDelta: number;
   usesLeatherGrades: boolean;
   appliesLeatherSurcharge: boolean;
-  allowsLaseredBrand: boolean;
-  isBinaryOption: boolean;
+allowsLaseredBrand: boolean;
+laseredBrandSurcharge: number;
+isBinaryOption: boolean;
   isQuickPick: boolean;
   isBodyLeather: boolean;
   frameNeededCode?: string | null;
@@ -77,8 +78,9 @@ type SelectedChoiceDetail = {
   selectedLeather?: Leather;
   leatherSurcharge: number;
   imageUrl?: string | null;
-  laseredBrand: boolean;
-  laseredBrandImageUrl?: string | null;
+laseredBrand: boolean;
+laseredBrandSurcharge: number;
+laseredBrandImageUrl?: string | null;
   frameNeededCode: string | null;
   isBodyLeather: boolean;
 };
@@ -555,6 +557,10 @@ function setSingleChoice(groupId: string, choiceId: string) {
             selectedChoice.allowsLaseredBrand &&
             selectedLaseredBrandBySelectionKey[selectionKey] === "yes";
 
+            const laseredBrandSurcharge = laseredBrand
+  ? Number(selectedChoice.laseredBrandSurcharge || 0)
+  : 0;
+
           return {
             groupId: group.id,
             groupName: group.name,
@@ -568,8 +574,9 @@ function setSingleChoice(groupId: string, choiceId: string) {
             selectedLeather,
             leatherSurcharge,
             imageUrl: selectedChoice.imageUrl,
-            laseredBrand,
-            laseredBrandImageUrl: laseredBrand
+laseredBrand,
+laseredBrandSurcharge,
+laseredBrandImageUrl: laseredBrand
               ? selectedLaseredBrandImageUrlBySelectionKey[selectionKey] || null
               : null,
             frameNeededCode: selectedChoice.frameNeededCode || null,
@@ -603,6 +610,14 @@ function setSingleChoice(groupId: string, choiceId: string) {
         amount: item.baseAmount,
       });
     }
+    for (const item of selectedChoiceDetails) {
+  if (item.laseredBrand && item.laseredBrandSurcharge > 0) {
+    lines.push({
+      label: `${item.groupName} - ${item.choiceLabel} Lasered Brand`,
+      amount: item.laseredBrandSurcharge,
+    });
+  }
+}
 
     const repeatingLeatherItems = selectedChoiceDetails.filter((item) => {
       const grade = item.selectedLeather?.grade;
@@ -671,8 +686,9 @@ function setSingleChoice(groupId: string, choiceId: string) {
         leatherSurcharge: item.leatherSurcharge,
         imageUrl: item.imageUrl || null,
         leatherImageUrl: item.selectedLeather?.imageUrl || null,
-        laseredBrand: item.laseredBrand,
-        laseredBrandImageUrl: item.laseredBrand
+laseredBrand: item.laseredBrand,
+laseredBrandSurcharge: item.laseredBrandSurcharge,
+laseredBrandImageUrl: item.laseredBrand
           ? uploadedBrandUrls[selectionKey] || item.laseredBrandImageUrl || null
           : null,
         quantity: orderQuantity,
@@ -1325,6 +1341,13 @@ const finalNotesImageUrl = notesImageFile
                               <option value="no">No</option>
                               <option value="yes">Yes</option>
                             </select>
+
+                            {Number(choice.laseredBrandSurcharge || 0) > 0 ? (
+  <p className="mt-2 text-sm font-medium text-purple-800">
+    Lasered brand surcharge:{" "}
+    {formatCurrency(Number(choice.laseredBrandSurcharge || 0))}
+  </p>
+) : null}
 
                             {selectedLaseredBrandBySelectionKey[selectionKey] === "yes" ? (
                               <div className="mt-4 space-y-3">

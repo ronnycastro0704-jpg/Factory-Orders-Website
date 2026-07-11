@@ -20,8 +20,9 @@ type OptionChoiceItem = {
   priceDelta: unknown;
   usesLeatherGrades: boolean;
   appliesLeatherSurcharge: boolean;
-  allowsLaseredBrand: boolean;
-  isBinaryOption: boolean;
+allowsLaseredBrand: boolean;
+laseredBrandSurcharge: unknown;
+isBinaryOption: boolean;
   isQuickPick: boolean;
   isBodyLeather: boolean;
   frameNeededCode: string | null;
@@ -284,6 +285,12 @@ export default async function AdminProductDetailPage({ params }: PageProps) {
                                     </p>
                                   ) : null}
 
+                                  {choice.allowsLaseredBrand ? (
+  <p className="mt-2 text-sm font-medium text-purple-800">
+    Lasered Brand Surcharge: ${money(choice.laseredBrandSurcharge ?? 0)}
+  </p>
+) : null}
+
                                   <OptionChoiceActions
                                     groupId={group.id}
                                     choice={{
@@ -297,9 +304,10 @@ export default async function AdminProductDetailPage({ params }: PageProps) {
                                         choice.usesLeatherGrades,
                                       appliesLeatherSurcharge:
                                         choice.appliesLeatherSurcharge,
-                                      allowsLaseredBrand:
-                                        choice.allowsLaseredBrand,
-                                      isBinaryOption: choice.isBinaryOption,
+allowsLaseredBrand:
+  choice.allowsLaseredBrand,
+laseredBrandSurcharge: Number(choice.laseredBrandSurcharge || 0),
+isBinaryOption: choice.isBinaryOption,
                                       isQuickPick: choice.isQuickPick,
                                       isBodyLeather: choice.isBodyLeather,
                                       frameNeededCode: choice.frameNeededCode,

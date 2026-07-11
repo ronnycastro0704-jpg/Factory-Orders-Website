@@ -78,6 +78,7 @@ model OptionChoice {
   usesLeatherGrades       Boolean  @default(false)
   isQuickPick             Boolean  @default(false)
   allowsLaseredBrand      Boolean  @default(false)
+  laseredBrandSurcharge   Decimal  @default(0) @db.Decimal(10, 2)
   isBinaryOption          Boolean  @default(false)
   appliesLeatherSurcharge Boolean  @default(true)
   gradeAUpcharge          Decimal? @db.Decimal(10, 2)
