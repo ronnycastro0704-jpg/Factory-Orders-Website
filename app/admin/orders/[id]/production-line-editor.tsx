@@ -183,11 +183,12 @@ export default function ProductionLineEditor({ line }: Props) {
   const [priority, setPriority] = useState(toUiPriority(line.priority));
   const [lineNotes, setLineNotes] = useState(line.lineNotes || "");
   const [pickedUpAt, setPickedUpAt] = useState(toDateInputValue(line.pickedUpAt));
-  const [completedPhotoUrls, setCompletedPhotoUrls] = useState<string[]>(
-    buildInitialPhotoUrls(line)
-  );
-  const [completedPhotoFiles, setCompletedPhotoFiles] = useState<File[]>([]);
-  const [photoUrlInput, setPhotoUrlInput] = useState("");
+const [completedPhotoUrls, setCompletedPhotoUrls] = useState<string[]>(
+  buildInitialPhotoUrls(line)
+);
+const [completedPhotoFiles, setCompletedPhotoFiles] = useState<File[]>([]);
+const [photoUrlInput, setPhotoUrlInput] = useState("");
+const [previewPhotoUrl, setPreviewPhotoUrl] = useState("");
 
   const [millFirstStatus, setMillFirstStatus] = useState(line.millFirstStatus);
   const [leatherOrderedStatus, setLeatherOrderedStatus] = useState(
@@ -577,11 +578,17 @@ export default function ProductionLineEditor({ line }: Props) {
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {completedPhotoUrls.map((url, index) => (
                   <div key={url} className="rounded-xl border bg-white p-3">
-                    <img
-                      src={url}
-                      alt={`${line.partNumber} completed photo ${index + 1}`}
-                      className="h-48 w-full rounded-lg border object-cover"
-                    />
+<button
+  type="button"
+  onClick={() => setPreviewPhotoUrl(url)}
+  className="block w-full overflow-hidden rounded-lg border bg-white text-left"
+>
+  <img
+    src={url}
+    alt={`${line.partNumber} completed photo ${index + 1}`}
+    className="h-48 w-full object-cover transition hover:scale-105"
+  />
+</button>
 
                     <div className="mt-3 flex items-center justify-between gap-3">
                       <p className="text-xs font-medium text-slate-500">
@@ -808,6 +815,44 @@ export default function ProductionLineEditor({ line }: Props) {
           {loading || uploading ? "Saving..." : "Save Production Line"}
         </button>
       </div>
+      {previewPhotoUrl ? (
+  <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-900/80 p-4">
+    <div className="relative max-h-[90vh] w-full max-w-5xl rounded-2xl bg-white p-4 shadow-2xl">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <p className="text-sm font-semibold text-slate-700">
+          Completed Furniture Photo Preview
+        </p>
+
+        <div className="flex gap-2">
+          <a
+            href={previewPhotoUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="rounded-lg border px-3 py-2 text-sm font-medium hover:bg-slate-50"
+          >
+            Open Original
+          </a>
+
+          <button
+            type="button"
+            onClick={() => setPreviewPhotoUrl("")}
+            className="rounded-lg bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+
+      <div className="flex max-h-[78vh] items-center justify-center overflow-auto rounded-xl bg-slate-100">
+        <img
+          src={previewPhotoUrl}
+          alt="Completed furniture preview"
+          className="max-h-[78vh] w-auto max-w-full object-contain"
+        />
+      </div>
+    </div>
+  </div>
+) : null}
     </div>
   );
 }
