@@ -112,6 +112,7 @@ model Order {
   sentToFactoryAt         DateTime?
   dueDate                 DateTime?
   priority                OrderPriority           @default(NORMAL)
+  weeklyScheduleDay WeeklyScheduleDay?
   pickedUp                Boolean                 @default(false)
   pickedUpAt              DateTime?
   overallProductionStatus ProductionOverallStatus @default(NEW)
@@ -131,6 +132,7 @@ model Order {
   invoiceOrders         InvoiceOrder[]
 
   @@index([userId])
+  @@index([weeklyScheduleDay])
 }
 
 model OrderItem {
@@ -356,6 +358,16 @@ enum UserRole {
   ADMIN
   STAFF
   CUSTOMER
+}
+
+enum WeeklyScheduleDay {
+  MONDAY
+  TUESDAY
+  WEDNESDAY
+  THURSDAY
+  FRIDAY
+  SATURDAY
+  SUNDAY
 }
 
 enum OptionGroupType {

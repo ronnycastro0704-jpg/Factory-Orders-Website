@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import {
+  CalendarDays,
   ClipboardList,
   Factory,
   FileText,
@@ -26,6 +27,13 @@ const adminLinks = [
     href: "/admin/kanban",
     icon: LayoutDashboard,
   },
+  {
+  title: "Weekly Schedule",
+  description:
+    "Drag active orders into Monday through Sunday priority buckets.",
+  href: "/admin/schedule",
+  icon: CalendarDays,
+},
   {
     title: "Orders",
     description: "Search and review customer orders.",
