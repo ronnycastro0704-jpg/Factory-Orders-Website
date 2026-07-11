@@ -329,7 +329,7 @@ const [previewPhotoUrl, setPreviewPhotoUrl] = useState("");
     setCompletedPhotoFiles(Array.from(event.target.files || []));
   }
 
-  async function uploadSelectedCompletedPhotos() {
+async function uploadSelectedCompletedPhotos() {
   if (completedPhotoFiles.length === 0) {
     setError("Please choose one or more photos first.");
     return;
@@ -364,16 +364,58 @@ const [previewPhotoUrl, setPreviewPhotoUrl] = useState("");
       }
     }
 
-    setCompletedPhotoUrls((currentUrls) =>
-      Array.from(new Set([...currentUrls, ...uploadedUrls]))
+    const finalCompletedPhotoUrls = Array.from(
+      new Set([...completedPhotoUrls, ...uploadedUrls])
     );
 
+    const saveResponse = await fetch(`/api/admin/production-lines/${line.id}`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        bodyLeather,
+        dueDate,
+        priority,
+        lineNotes,
+        pickedUpAt,
+        completedPhotoUrl: finalCompletedPhotoUrls[0] || "",
+        completedPhotoUrls: finalCompletedPhotoUrls,
+
+        millFirstStatus,
+        leatherOrderedStatus,
+        millStatus,
+        frameAssemblyStatus,
+        leatherArrivedStatus,
+        leaCutStatus,
+        sewnStatus,
+        upholsteryStatus,
+        upholsteredStatus,
+        finalAssemblyStatus,
+        qcStatus,
+
+        leaCutAssignedTo,
+        upholsteredAssignedTo,
+        qcAssignedTo,
+      }),
+    });
+
+    const saveData = await saveResponse.json();
+
+    if (!saveResponse.ok) {
+      throw new Error(
+        saveData.error || "Photos uploaded, but failed to save production line."
+      );
+    }
+
+    setCompletedPhotoUrls(finalCompletedPhotoUrls);
     setCompletedPhotoFiles([]);
     setSuccess(
       uploadedUrls.length === 1
-        ? "Photo added. Click Save Production Line to save it."
-        : "Photos added. Click Save Production Line to save them."
+        ? "Photo uploaded and saved."
+        : "Photos uploaded and saved."
     );
+    router.refresh();
   } catch (uploadError) {
     console.error(uploadError);
     setError(
@@ -399,11 +441,67 @@ const [previewPhotoUrl, setPreviewPhotoUrl] = useState("");
     setPhotoUrlInput("");
   }
 
-  function removeCompletedPhoto(urlToRemove: string) {
-    setCompletedPhotoUrls((currentUrls) =>
-      currentUrls.filter((url) => url !== urlToRemove)
+async function removeCompletedPhoto(urlToRemove: string) {
+  const nextPhotoUrls = completedPhotoUrls.filter((url) => url !== urlToRemove);
+
+  setCompletedPhotoUrls(nextPhotoUrls);
+  setUploading(true);
+  setError("");
+  setSuccess("");
+
+  try {
+    const response = await fetch(`/api/admin/production-lines/${line.id}`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        bodyLeather,
+        dueDate,
+        priority,
+        lineNotes,
+        pickedUpAt,
+        completedPhotoUrl: nextPhotoUrls[0] || "",
+        completedPhotoUrls: nextPhotoUrls,
+
+        millFirstStatus,
+        leatherOrderedStatus,
+        millStatus,
+        frameAssemblyStatus,
+        leatherArrivedStatus,
+        leaCutStatus,
+        sewnStatus,
+        upholsteryStatus,
+        upholsteredStatus,
+        finalAssemblyStatus,
+        qcStatus,
+
+        leaCutAssignedTo,
+        upholsteredAssignedTo,
+        qcAssignedTo,
+      }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || "Failed to remove photo.");
+    }
+
+    setSuccess("Photo removed and saved.");
+    router.refresh();
+  } catch (removeError) {
+    console.error(removeError);
+    setCompletedPhotoUrls(completedPhotoUrls);
+    setError(
+      removeError instanceof Error
+        ? removeError.message
+        : "Failed to remove photo."
     );
+  } finally {
+    setUploading(false);
   }
+}
 
   function clearSelectedUploadFiles() {
     setCompletedPhotoFiles([]);
@@ -645,7 +743,7 @@ const [previewPhotoUrl, setPreviewPhotoUrl] = useState("");
         disabled={uploading}
         className="rounded-lg bg-slate-900 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800 disabled:opacity-50"
       >
-        {uploading ? "Uploading..." : "Upload Selected Photos"}
+        {uploading ? "Uploading and saving..." : "Upload and Save Photos"}
       </button>
 
       <button
@@ -661,8 +759,8 @@ const [previewPhotoUrl, setPreviewPhotoUrl] = useState("");
 ) : null}
 
               <p className="mt-2 text-xs text-slate-500">
-                You can select multiple photos at once, for example front and
-                back.
+You can select multiple photos at once, for example front and back. 
+Click Upload and Save Photos to save them immediately.
               </p>
             </div>
 
@@ -695,17 +793,73 @@ const [previewPhotoUrl, setPreviewPhotoUrl] = useState("");
           </div>
 
           {completedPhotoUrls.length > 0 ? (
-            <button
-              type="button"
-              onClick={() => {
-                setCompletedPhotoUrls([]);
-                setCompletedPhotoFiles([]);
-                setPhotoUrlInput("");
-              }}
-              className="w-fit rounded-lg border px-3 py-2 text-sm text-red-600 hover:bg-red-50"
-            >
-              Clear All Photos
-            </button>
+ <button
+  type="button"
+  onClick={async () => {
+    setUploading(true);
+    setError("");
+    setSuccess("");
+
+    try {
+      const response = await fetch(`/api/admin/production-lines/${line.id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          bodyLeather,
+          dueDate,
+          priority,
+          lineNotes,
+          pickedUpAt,
+          completedPhotoUrl: "",
+          completedPhotoUrls: [],
+
+          millFirstStatus,
+          leatherOrderedStatus,
+          millStatus,
+          frameAssemblyStatus,
+          leatherArrivedStatus,
+          leaCutStatus,
+          sewnStatus,
+          upholsteryStatus,
+          upholsteredStatus,
+          finalAssemblyStatus,
+          qcStatus,
+
+          leaCutAssignedTo,
+          upholsteredAssignedTo,
+          qcAssignedTo,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to clear photos.");
+      }
+
+      setCompletedPhotoUrls([]);
+      setCompletedPhotoFiles([]);
+      setPhotoUrlInput("");
+      setSuccess("All photos cleared and saved.");
+      router.refresh();
+    } catch (clearError) {
+      console.error(clearError);
+      setError(
+        clearError instanceof Error
+          ? clearError.message
+          : "Failed to clear photos."
+      );
+    } finally {
+      setUploading(false);
+    }
+  }}
+  disabled={uploading}
+  className="w-fit rounded-lg border px-3 py-2 text-sm text-red-600 hover:bg-red-50 disabled:opacity-50"
+>
+  Clear All Photos
+</button>
           ) : null}
         </div>
       </div>
