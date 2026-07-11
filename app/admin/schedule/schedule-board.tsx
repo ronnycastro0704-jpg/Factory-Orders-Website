@@ -106,11 +106,12 @@ function normalizeReturnedOrder(
 export default function ScheduleBoard({ columns }: Props) {
   const router = useRouter();
 
-  const [boardColumns, setBoardColumns] = useState(columns);
-  const [draggedOrderId, setDraggedOrderId] = useState("");
-  const [dragOverDay, setDragOverDay] = useState<ScheduleDay | "">("");
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
+const [boardColumns, setBoardColumns] = useState(columns);
+const [draggedOrderId, setDraggedOrderId] = useState("");
+const [dragOverDay, setDragOverDay] = useState<ScheduleDay | "">("");
+const [saving, setSaving] = useState(false);
+const [error, setError] = useState("");
+const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
     setBoardColumns(columns);
@@ -120,6 +121,32 @@ export default function ScheduleBoard({ columns }: Props) {
     () => boardColumns.flatMap((column) => column.orders),
     [boardColumns]
   );
+
+  const normalizedSearchQuery = searchQuery.trim().toLowerCase();
+
+const visibleColumns = useMemo(() => {
+  if (!normalizedSearchQuery) {
+    return boardColumns;
+  }
+
+  return boardColumns.map((column) => ({
+    ...column,
+    orders: column.orders.filter((order) =>
+      [
+        order.orderNumber,
+        order.poNumber || "",
+        order.customerName,
+        order.customerEmail,
+        order.status,
+        order.priority,
+        order.overallProductionStatus,
+      ]
+        .join(" ")
+        .toLowerCase()
+        .includes(normalizedSearchQuery)
+    ),
+  }));
+}, [boardColumns, normalizedSearchQuery]);
 
   function findOrder(orderId: string) {
     return allOrders.find((order) => order.id === orderId) || null;
@@ -301,8 +328,26 @@ export default function ScheduleBoard({ columns }: Props) {
       ) : null}
 
       <div className="overflow-x-auto pb-3">
+        {saving ? (
+  <div className="mb-4 rounded-2xl border border-blue-200 bg-blue-50 p-4 text-sm font-medium text-blue-700">
+    Saving schedule...
+  </div>
+) : null}
+
+<div className="mb-4">
+  <label className="mb-1 block text-sm font-medium">Search Orders</label>
+  <input
+    type="text"
+    value={searchQuery}
+    onChange={(event) => setSearchQuery(event.target.value)}
+    className="w-full rounded-lg border bg-white px-3 py-2"
+    placeholder="Search order #, PO #, customer, email, status, priority..."
+  />
+</div>
+
+<div className="overflow-x-auto pb-3"></div>
         <div className="grid min-w-[1600px] grid-cols-8 gap-4">
-          {boardColumns.map((column) => (
+          {visibleColumns.map((column) => (
             <div
               key={column.key}
               onDragOver={(event) => handleDragOver(event, column.key)}
@@ -356,7 +401,7 @@ export default function ScheduleBoard({ columns }: Props) {
                         href={`/admin/production/${order.id}`}
                         className="block"
                       >
-                        <div className="space-y-2">
+                        <div className="min-w-0 space-y-2">
                           <div className="flex flex-wrap items-center gap-2">
                             <p className="text-sm font-semibold text-slate-900">
                               {order.orderNumber}
@@ -379,10 +424,12 @@ export default function ScheduleBoard({ columns }: Props) {
                             </span>
                           </div>
 
-                          <div className="space-y-1 text-xs text-slate-500">
+                          <div className="min-w-0 space-y-1 text-xs text-slate-500">
                             <p>PO # {order.poNumber || "—"}</p>
                             <p>{order.customerName}</p>
-                            <p>{order.customerEmail}</p>
+                            <p className="break-all">
+  {order.customerEmail}
+</p>
                             <p>Qty {order.quantity}</p>
                             <p>Due {formatDate(order.dueDate)}</p>
                             <p>Production: {order.overallProductionStatus.replaceAll("_", " ")}</p>
