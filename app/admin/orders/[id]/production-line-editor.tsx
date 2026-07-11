@@ -328,6 +328,63 @@ export default function ProductionLineEditor({ line }: Props) {
     setCompletedPhotoFiles(Array.from(event.target.files || []));
   }
 
+  async function uploadSelectedCompletedPhotos() {
+  if (completedPhotoFiles.length === 0) {
+    setError("Please choose one or more photos first.");
+    return;
+  }
+
+  setUploading(true);
+  setError("");
+  setSuccess("");
+
+  try {
+    const uploadedUrls: string[] = [];
+
+    for (const file of completedPhotoFiles) {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const response = await fetch("/api/uploads", {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to upload completed photo.");
+      }
+
+      const url = String(data.url || "").trim();
+
+      if (url) {
+        uploadedUrls.push(url);
+      }
+    }
+
+    setCompletedPhotoUrls((currentUrls) =>
+      Array.from(new Set([...currentUrls, ...uploadedUrls]))
+    );
+
+    setCompletedPhotoFiles([]);
+    setSuccess(
+      uploadedUrls.length === 1
+        ? "Photo added. Click Save Production Line to save it."
+        : "Photos added. Click Save Production Line to save them."
+    );
+  } catch (uploadError) {
+    console.error(uploadError);
+    setError(
+      uploadError instanceof Error
+        ? uploadError.message
+        : "Failed to upload selected photos."
+    );
+  } finally {
+    setUploading(false);
+  }
+}
+
   function addPhotoUrl() {
     const nextUrl = photoUrlInput.trim();
 
@@ -554,34 +611,47 @@ export default function ProductionLineEditor({ line }: Props) {
               <label className="mb-1 block text-sm font-medium">
                 Upload Photos
               </label>
-              <input
-                type="file"
-                accept="image/*"
-                multiple
-                className="w-full rounded-lg border bg-white px-3 py-2"
-                onChange={handleCompletedPhotoFileChange}
-              />
+<input
+  type="file"
+  accept="image/*"
+  multiple
+  className="w-full rounded-lg border bg-white px-3 py-2"
+  onChange={handleCompletedPhotoFileChange}
+/>
 
-              {completedPhotoFiles.length > 0 ? (
-                <div className="mt-2 space-y-1 text-xs text-slate-500">
-                  <p>{completedPhotoFiles.length} file(s) selected:</p>
-                  <ul className="list-disc pl-5">
-                    {completedPhotoFiles.map((file) => (
-                      <li key={`${file.name}-${file.lastModified}`}>
-                        {file.name}
-                      </li>
-                    ))}
-                  </ul>
+{completedPhotoFiles.length > 0 ? (
+  <div className="mt-2 space-y-2 text-xs text-slate-500">
+    <p>{completedPhotoFiles.length} file(s) selected:</p>
 
-                  <button
-                    type="button"
-                    onClick={clearSelectedUploadFiles}
-                    className="mt-2 rounded-lg border px-3 py-1 text-xs hover:bg-slate-100"
-                  >
-                    Clear selected files
-                  </button>
-                </div>
-              ) : null}
+    <ul className="list-disc pl-5">
+      {completedPhotoFiles.map((file) => (
+        <li key={`${file.name}-${file.lastModified}`}>
+          {file.name}
+        </li>
+      ))}
+    </ul>
+
+    <div className="flex flex-wrap gap-2">
+      <button
+        type="button"
+        onClick={uploadSelectedCompletedPhotos}
+        disabled={uploading}
+        className="rounded-lg bg-slate-900 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800 disabled:opacity-50"
+      >
+        {uploading ? "Uploading..." : "Upload Selected Photos"}
+      </button>
+
+      <button
+        type="button"
+        onClick={clearSelectedUploadFiles}
+        disabled={uploading}
+        className="rounded-lg border px-3 py-2 text-xs hover:bg-slate-100 disabled:opacity-50"
+      >
+        Clear selected files
+      </button>
+    </div>
+  </div>
+) : null}
 
               <p className="mt-2 text-xs text-slate-500">
                 You can select multiple photos at once, for example front and
@@ -602,13 +672,13 @@ export default function ProductionLineEditor({ line }: Props) {
                   placeholder="https://..."
                 />
 
-                <button
-                  type="button"
-                  onClick={addPhotoUrl}
-                  className="rounded-lg border px-3 py-2 hover:bg-slate-100"
-                >
-                  Add
-                </button>
+<button
+  type="button"
+  onClick={addPhotoUrl}
+  className="rounded-lg border px-3 py-2 hover:bg-slate-100"
+>
+  Add URL
+</button>
               </div>
 
               <p className="mt-2 text-xs text-slate-500">
