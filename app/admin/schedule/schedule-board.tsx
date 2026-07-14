@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { type DragEvent, useEffect, useMemo, useState } from "react";
+import { type DragEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { formatCurrency } from "../../../lib/utils";
 
@@ -105,6 +105,9 @@ function normalizeReturnedOrder(
 
 export default function ScheduleBoard({ columns }: Props) {
   const router = useRouter();
+
+  const topScrollRef = useRef<HTMLDivElement | null>(null);
+  const boardScrollRef = useRef<HTMLDivElement | null>(null);
 
 const [boardColumns, setBoardColumns] = useState(columns);
 const [draggedOrderId, setDraggedOrderId] = useState("");
@@ -306,6 +309,20 @@ const visibleColumns = useMemo(() => {
     return "border-slate-200 bg-white/80";
   }
 
+    function syncHorizontalScroll(source: "top" | "board") {
+    const topScroll = topScrollRef.current;
+    const boardScroll = boardScrollRef.current;
+
+    if (!topScroll || !boardScroll) return;
+
+    if (source === "top") {
+      boardScroll.scrollLeft = topScroll.scrollLeft;
+      return;
+    }
+
+    topScroll.scrollLeft = boardScroll.scrollLeft;
+  }
+
   return (
     <>
       {error ? (
@@ -327,7 +344,7 @@ const visibleColumns = useMemo(() => {
         </div>
       ) : null}
 
-      <div className="overflow-x-auto pb-3">
+      <div>
         {saving ? (
   <div className="mb-4 rounded-2xl border border-blue-200 bg-blue-50 p-4 text-sm font-medium text-blue-700">
     Saving schedule...
@@ -345,7 +362,19 @@ const visibleColumns = useMemo(() => {
   />
 </div>
 
-<div className="overflow-x-auto pb-3"></div>
+<div
+  ref={topScrollRef}
+  onScroll={() => syncHorizontalScroll("top")}
+  className="mb-3 overflow-x-auto pb-2"
+>
+  <div className="h-1 min-w-[1600px]" />
+</div>
+
+<div
+  ref={boardScrollRef}
+  onScroll={() => syncHorizontalScroll("board")}
+  className="overflow-x-auto pb-3"
+>
         <div className="grid min-w-[1600px] grid-cols-8 gap-4">
           {visibleColumns.map((column) => (
             <div
@@ -446,6 +475,7 @@ const visibleColumns = useMemo(() => {
             </div>
           ))}
         </div>
+</div>
       </div>
     </>
   );
