@@ -883,23 +883,7 @@ const firstSelectedImageHtml = firstSelectedImageUrl
     </div>
   `
   : "";
-  const firstSelectedImageUrl =
-  selectedChoiceDetails.find((selection) => selection.imageUrl)?.imageUrl || "";
-
-const firstSelectedImageHtml = firstSelectedImageUrl
-  ? `
-    <div style="margin: 0 0 28px 0; border: 1px solid #e5e7eb; border-radius: 16px; padding: 18px; text-align: center;">
-      <p style="margin: 0 0 12px 0; color: #64748b; font-size: 13px; text-transform: uppercase; letter-spacing: 0.12em;">
-        Selected Furniture Preview
-      </p>
-      <img
-        src="${firstSelectedImageUrl}"
-        alt="Selected furniture preview"
-        style="max-width: 100%; max-height: 320px; object-fit: contain;"
-      />
-    </div>
-  `
-  : "";
+  
 
     const linesHtml = retailPriceLines
       .map(
