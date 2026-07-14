@@ -22,6 +22,11 @@ type InvoiceForPdf = {
   subtotal: unknown;
   surchargeLabel?: string | null;
   surchargeAmount?: unknown;
+  extraCharges?: {
+    id: string;
+    label: string;
+    amount: unknown;
+  }[];
   total: unknown;
   terms: string;
   issuedAt: Date;
@@ -123,8 +128,29 @@ function addFooter(doc: jsPDF) {
 
   doc.setTextColor(17, 24, 39);
 }
+function getInvoiceExtraCharges(invoice: InvoiceForPdf) {
+  if (Array.isArray(invoice.extraCharges) && invoice.extraCharges.length > 0) {
+    return invoice.extraCharges.map((charge) => ({
+      label: charge.label,
+      amount: Number(charge.amount || 0),
+    }));
+  }
+
+  if (Number(invoice.surchargeAmount || 0) > 0) {
+    return [
+      {
+        label: invoice.surchargeLabel || "Surcharge",
+        amount: Number(invoice.surchargeAmount || 0),
+      },
+    ];
+  }
+
+  return [];
+}
 
 export async function buildInvoicePdfBuffer(invoice: InvoiceForPdf) {
+  const extraCharges = getInvoiceExtraCharges(invoice);
+
   const doc = new jsPDF({
     unit: "mm",
     format: "letter",
@@ -320,18 +346,13 @@ let y = 98;
   });
   y += 7;
 
-  if (Number(invoice.surchargeAmount || 0) > 0) {
+  for (const charge of extraCharges) {
     doc.setTextColor(71, 85, 105);
-    doc.text(invoice.surchargeLabel || "Surcharge", 120, y);
+    doc.text(charge.label || "Extra Charge", 120, y);
     doc.setTextColor(17, 24, 39);
-    doc.text(
-      formatCurrency(Number(invoice.surchargeAmount || 0)),
-      pageWidth - 15,
-      y,
-      {
-        align: "right",
-      }
-    );
+    doc.text(formatCurrency(Number(charge.amount || 0)), pageWidth - 15, y, {
+      align: "right",
+    });
     y += 7;
   }
 

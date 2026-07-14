@@ -244,6 +244,7 @@ model Invoice {
   createdByEmail  String?
 
   orders          InvoiceOrder[]
+  extraCharges    InvoiceExtraCharge[]
 
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
@@ -251,6 +252,20 @@ model Invoice {
   @@index([customerEmail])
   @@index([status])
   @@index([createdAt])
+}
+
+model InvoiceExtraCharge {
+  id        String   @id @default(cuid())
+  invoiceId String
+  invoice   Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  label     String
+  amount    Decimal  @default(0) @db.Decimal(10, 2)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([invoiceId])
 }
 
 model InvoiceOrder {

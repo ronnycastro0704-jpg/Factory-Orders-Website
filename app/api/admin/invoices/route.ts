@@ -37,6 +37,11 @@ function normalizeMoney(value: unknown) {
   return Math.round((parsed + Number.EPSILON) * 100) / 100;
 }
 
+type IncomingExtraCharge = {
+  label?: string;
+  amount?: unknown;
+};
+
 function buildProductSummary(order: {
   items: {
     productNameSnapshot: string;
@@ -93,6 +98,30 @@ function normalizeOrderIds(value: unknown) {
   );
 }
 
+function normalizeExtraCharges(value: unknown) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .map((item) => {
+      const charge = item as IncomingExtraCharge;
+
+      const label = String(charge.label || "").trim();
+      const amount = normalizeMoney(charge.amount);
+
+      if (!label && amount <= 0) {
+        return null;
+      }
+
+      return {
+        label: label || "Extra Charge",
+        amount,
+      };
+    })
+    .filter(Boolean) as { label: string; amount: number }[];
+}
+
 export async function GET() {
   try {
     const session = await auth();
@@ -136,10 +165,21 @@ export async function POST(request: Request) {
     const body = await request.json();
     const orderIds = normalizeOrderIds(body.orderIds);
     const notes = String(body.notes || "").trim() || null;
-    const surchargeAmount = normalizeMoney(body.surchargeAmount);
-const surchargeLabel =
-  String(body.surchargeLabel || "").trim() ||
-  (surchargeAmount > 0 ? "Tax / tariff surcharge" : null);
+    const extraCharges = normalizeExtraCharges(body.extraCharges);
+
+    const extraChargesTotal = extraCharges.reduce(
+      (sum, charge) => sum + charge.amount,
+      0
+    );
+
+    const surchargeAmount = extraChargesTotal;
+
+    const surchargeLabel =
+      extraCharges.length === 1
+        ? extraCharges[0].label
+        : extraCharges.length > 1
+        ? "Extra charges"
+        : null;
 
 if (orderIds.length < 1) {
   return NextResponse.json(
@@ -228,7 +268,7 @@ const invoiceSubtotal = orders.reduce(
   0
 );
 
-const invoiceTotal = invoiceSubtotal + surchargeAmount;
+const invoiceTotal = invoiceSubtotal + extraChargesTotal;
 
 const invoiceCustomerOrder =
   orders.find((order) => !isAdminSubmittedOrder(order)) || orders[0];
@@ -247,6 +287,15 @@ terms: "Due upon receipt",
         dueAt: new Date(),
         notes,
         createdByEmail: session.user.email,
+                extraCharges:
+          extraCharges.length > 0
+            ? {
+                create: extraCharges.map((charge) => ({
+                  label: charge.label,
+                  amount: charge.amount,
+                })),
+              }
+            : undefined,
         orders: {
           create: orders.map((order) => ({
             orderId: order.id,
@@ -262,6 +311,11 @@ terms: "Due upon receipt",
         },
       },
       include: {
+        extraCharges: {
+          orderBy: {
+            createdAt: "asc",
+          },
+        },
         orders: {
           orderBy: {
             createdAt: "asc",

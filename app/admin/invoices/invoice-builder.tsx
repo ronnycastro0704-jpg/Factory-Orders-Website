@@ -32,6 +32,12 @@ type RecentInvoice = {
   orderCount: number;
 };
 
+type ExtraChargeInput = {
+  id: string;
+  label: string;
+  amount: string;
+};
+
 type Props = {
   availableOrders: AvailableOrder[];
   recentInvoices: RecentInvoice[];
@@ -74,8 +80,13 @@ export default function InvoiceBuilder({
   const [dragOverDraft, setDragOverDraft] = useState(false);
 const [searchQuery, setSearchQuery] = useState("");
 const [notes, setNotes] = useState("");
-const [surchargeLabel, setSurchargeLabel] = useState("Tax / tariff surcharge");
-const [surchargeAmountInput, setSurchargeAmountInput] = useState("");
+const [extraCharges, setExtraCharges] = useState<ExtraChargeInput[]>([
+  {
+    id: crypto.randomUUID(),
+    label: "",
+    amount: "",
+  },
+]);
 const [confirming, setConfirming] = useState(false);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState("");
@@ -111,8 +122,14 @@ const selectedSubtotal = selectedOrders.reduce(
   0
 );
 
-const surchargeAmount = Math.max(0, Number(surchargeAmountInput || 0) || 0);
-const selectedTotal = selectedSubtotal + surchargeAmount;
+const normalizedExtraCharges = normalizeExtraChargesForSubmit();
+
+const extraChargesTotal = normalizedExtraCharges.reduce(
+  (sum, charge) => sum + charge.amount,
+  0
+);
+
+const selectedTotal = selectedSubtotal + extraChargesTotal;
 
 const invoiceCustomerOrder =
   selectedOrders.find((order) => !order.adminSubmitted) ||
@@ -149,6 +166,55 @@ function validateOrderCanBeAdded(order: AvailableOrder) {
   return "";
 }
 
+function addExtraChargeRow() {
+  setExtraCharges((current) => [
+    ...current,
+    {
+      id: crypto.randomUUID(),
+      label: "",
+      amount: "",
+    },
+  ]);
+}
+
+function updateExtraCharge(
+  chargeId: string,
+  field: "label" | "amount",
+  value: string
+) {
+  setExtraCharges((current) =>
+    current.map((charge) =>
+      charge.id === chargeId ? { ...charge, [field]: value } : charge
+    )
+  );
+}
+
+function removeExtraChargeRow(chargeId: string) {
+  setExtraCharges((current) =>
+    current.length === 1
+      ? [
+          {
+            id: crypto.randomUUID(),
+            label: "",
+            amount: "",
+          },
+        ]
+      : current.filter((charge) => charge.id !== chargeId)
+  );
+}
+
+function normalizeExtraChargesForSubmit() {
+  return extraCharges
+    .map((charge) => ({
+      label: charge.label.trim(),
+      amount: Math.max(0, Number(charge.amount || 0) || 0),
+    }))
+    .filter((charge) => charge.label || charge.amount > 0)
+    .map((charge) => ({
+      label: charge.label || "Extra Charge",
+      amount: charge.amount,
+    }));
+}
   function addOrder(order: AvailableOrder) {
     const validationError = validateOrderCanBeAdded(order);
 
@@ -237,11 +303,10 @@ if (selectedOrders.length < 1) {
         headers: {
           "Content-Type": "application/json",
         },
- body: JSON.stringify({
+body: JSON.stringify({
   orderIds: selectedOrders.map((order) => order.id),
   notes,
-  surchargeLabel,
-  surchargeAmount,
+  extraCharges: normalizedExtraCharges,
 }),
       });
 
@@ -506,30 +571,74 @@ if (selectedOrders.length < 1) {
   />
 </div>
 
-<div className="grid gap-3 sm:grid-cols-[1fr_160px]">
-  <div>
-    <label className="mb-1 block text-sm font-medium">
-      Surcharge Label
-    </label>
-    <input
-      className="w-full rounded-lg border px-3 py-2"
-      value={surchargeLabel}
-      onChange={(event) => setSurchargeLabel(event.target.value)}
-      placeholder="Tax / tariff surcharge"
-    />
+<div className="rounded-2xl border bg-white p-4">
+  <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+    <div>
+      <h4 className="font-semibold text-slate-900">Extra Charges</h4>
+      <p className="mt-1 text-xs text-slate-500">
+        Add shipping, transportation, handling, tariffs, or any other invoice charge.
+      </p>
+    </div>
+
+    <button
+      type="button"
+      onClick={addExtraChargeRow}
+      className="rounded-lg border px-3 py-2 text-xs font-semibold hover:bg-slate-50"
+    >
+      Add Extra Charge
+    </button>
   </div>
 
-  <div>
-    <label className="mb-1 block text-sm font-medium">
-      Surcharge Amount
-    </label>
-    <input
-      className="w-full rounded-lg border px-3 py-2"
-      value={surchargeAmountInput}
-      onChange={(event) => setSurchargeAmountInput(event.target.value)}
-      inputMode="decimal"
-      placeholder="0.00"
-    />
+  <div className="space-y-3">
+    {extraCharges.map((charge, index) => (
+      <div
+        key={charge.id}
+        className="grid gap-3 rounded-xl border bg-slate-50 p-3 sm:grid-cols-[1fr_160px_auto]"
+      >
+        <div>
+          <label className="mb-1 block text-xs font-medium text-slate-600">
+            Charge Label
+          </label>
+          <input
+            className="w-full rounded-lg border bg-white px-3 py-2"
+            value={charge.label}
+            onChange={(event) =>
+              updateExtraCharge(charge.id, "label", event.target.value)
+            }
+            placeholder={
+              index === 0
+                ? "Transportation / Shipping"
+                : "Handling / Extra Charge"
+            }
+          />
+        </div>
+
+        <div>
+          <label className="mb-1 block text-xs font-medium text-slate-600">
+            Amount
+          </label>
+          <input
+            className="w-full rounded-lg border bg-white px-3 py-2"
+            value={charge.amount}
+            onChange={(event) =>
+              updateExtraCharge(charge.id, "amount", event.target.value)
+            }
+            inputMode="decimal"
+            placeholder="0.00"
+          />
+        </div>
+
+        <div className="flex items-end">
+          <button
+            type="button"
+            onClick={() => removeExtraChargeRow(charge.id)}
+            className="rounded-lg border border-red-200 px-3 py-2 text-xs font-semibold text-red-600 hover:bg-red-50"
+          >
+            Remove
+          </button>
+        </div>
+      </div>
+    ))}
   </div>
 </div>
 
@@ -542,16 +651,17 @@ if (selectedOrders.length < 1) {
       </span>
     </div>
 
-    {surchargeAmount > 0 ? (
-      <div className="flex items-center justify-between gap-4 text-sm">
-        <span className="text-slate-300">
-          {surchargeLabel || "Surcharge"}
-        </span>
-        <span className="font-semibold">
-          {formatCurrency(surchargeAmount)}
-        </span>
-      </div>
-    ) : null}
+{normalizedExtraCharges.map((charge) => (
+  <div
+    key={`${charge.label}-${charge.amount}`}
+    className="flex items-center justify-between gap-4 text-sm"
+  >
+    <span className="text-slate-300">{charge.label}</span>
+    <span className="font-semibold">
+      {formatCurrency(charge.amount)}
+    </span>
+  </div>
+))}
 
     <div className="flex items-center justify-between gap-4 border-t border-white/20 pt-3">
       <div>
@@ -682,14 +792,17 @@ if (selectedOrders.length < 1) {
     </span>
   </p>
 
-  {surchargeAmount > 0 ? (
-    <p className="mt-1 text-sm text-slate-600">
-      {surchargeLabel || "Surcharge"}:{" "}
-      <span className="font-semibold text-slate-900">
-        {formatCurrency(surchargeAmount)}
-      </span>
-    </p>
-  ) : null}
+{normalizedExtraCharges.map((charge) => (
+  <p
+    key={`${charge.label}-${charge.amount}`}
+    className="mt-1 text-sm text-slate-600"
+  >
+    {charge.label}:{" "}
+    <span className="font-semibold text-slate-900">
+      {formatCurrency(charge.amount)}
+    </span>
+  </p>
+))}
 
   <p className="mt-3 text-3xl font-bold text-slate-900">
     {formatCurrency(selectedTotal)}

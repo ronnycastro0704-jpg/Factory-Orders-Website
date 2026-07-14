@@ -95,6 +95,11 @@ export default async function AdminInvoiceDetailPage({ params }: PageProps) {
       id,
     },
     include: {
+      extraCharges: {
+        orderBy: {
+          createdAt: "asc",
+        },
+      },
       orders: {
         orderBy: {
           createdAt: "asc",
@@ -333,7 +338,16 @@ export default async function AdminInvoiceDetailPage({ params }: PageProps) {
   </span>
 </div>
 
-{Number(invoice.surchargeAmount || 0) > 0 ? (
+{invoice.extraCharges.length > 0 ? (
+  invoice.extraCharges.map((charge) => (
+    <div key={charge.id} className="flex justify-between gap-4 text-sm">
+      <span className="text-slate-600">{charge.label}</span>
+      <span className="font-semibold">
+        {formatCurrency(Number(charge.amount))}
+      </span>
+    </div>
+  ))
+) : Number(invoice.surchargeAmount || 0) > 0 ? (
   <div className="flex justify-between gap-4 text-sm">
     <span className="text-slate-600">
       {invoice.surchargeLabel || "Surcharge"}

@@ -24,6 +24,11 @@ export async function GET(_request: Request, context: RouteContext) {
         id,
       },
       include: {
+        extraCharges: {
+          orderBy: {
+            createdAt: "asc",
+          },
+        },
         orders: {
           orderBy: {
             createdAt: "asc",

@@ -25,6 +25,11 @@ export async function GET(_request: Request, context: RouteContext) {
     const invoice = await prisma.invoice.findUnique({
       where: { id },
       include: {
+        extraCharges: {
+          orderBy: {
+            createdAt: "asc",
+          },
+        },
         orders: {
           orderBy: {
             createdAt: "asc",
