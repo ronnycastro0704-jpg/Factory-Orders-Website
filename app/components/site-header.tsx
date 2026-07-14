@@ -27,6 +27,9 @@ export default async function SiteHeader() {
                 <Link href="/my/orders" className="hover:text-slate-900">
                   My Orders
                 </Link>
+                <Link href="/my/settings" className="hover:text-slate-900">
+                  Retail Settings
+                </Link>
 
                 {isAdminUser ? (
                   <>

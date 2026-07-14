@@ -3,10 +3,21 @@ import { prisma } from "./prisma";
 export type ApprovedCustomer = {
   email: string;
   name: string;
+  retailMultiplier: number;
 };
 
 function normalizeEmail(value: string) {
   return value.trim().toLowerCase();
+}
+
+function normalizeRetailMultiplier(value: unknown) {
+  const parsed = Number(value || 1);
+
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return 1;
+  }
+
+  return Math.round((parsed + Number.EPSILON) * 100) / 100;
 }
 
 export async function getApprovedCustomerProfile(email?: string | null) {
@@ -20,6 +31,7 @@ export async function getApprovedCustomerProfile(email?: string | null) {
     select: {
       email: true,
       name: true,
+      retailMultiplier: true,
     },
   });
 
@@ -28,6 +40,7 @@ export async function getApprovedCustomerProfile(email?: string | null) {
   return {
     email: normalizeEmail(customer.email),
     name: customer.name.trim(),
+    retailMultiplier: normalizeRetailMultiplier(customer.retailMultiplier),
   };
 }
 

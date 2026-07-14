@@ -58,6 +58,7 @@ type Props = {
   product: Product;
   leathers: Leather[];
   isAdmin?: boolean;
+  retailMultiplier?: number;
 };
 
 type PriceLine = {
@@ -337,6 +338,7 @@ export default function ProductBuilder({
   product,
   leathers,
   isAdmin = false,
+  retailMultiplier = 1,
 }: Props) {
   const [selectedOptions, setSelectedOptions] = useState<Record<string, string[]>>(
     {}
@@ -424,6 +426,21 @@ if (!cancelled) {
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState("");
   const [saveError, setSaveError] = useState("");
+
+    const displayMultiplier =
+    !isAdmin && Number.isFinite(Number(retailMultiplier)) && retailMultiplier > 0
+      ? Number(retailMultiplier)
+      : 1;
+
+  const showingRetailPrices = displayMultiplier !== 1;
+
+  function toRetailAmount(amount: number) {
+    return Math.round((amount * displayMultiplier + Number.EPSILON) * 100) / 100;
+  }
+
+  function formatDisplayAmount(amount: number) {
+    return formatCurrency(toRetailAmount(amount));
+  }
 
 const activeQuickPick = useMemo(() => {
   return getActiveQuickPickFromSelections(product.optionGroups, selectedOptions);
@@ -668,6 +685,21 @@ laseredBrandImageUrl: laseredBrand
     return unitSubtotal * sanitizeQuantity(quantity);
   }, [unitSubtotal, quantity]);
 
+    const retailPriceLines = useMemo<PriceLine[]>(() => {
+    return allPriceLines.map((line) => ({
+      ...line,
+      amount: toRetailAmount(line.amount),
+    }));
+  }, [allPriceLines, displayMultiplier]);
+
+  const retailUnitSubtotal = useMemo(() => {
+    return toRetailAmount(unitSubtotal);
+  }, [unitSubtotal, displayMultiplier]);
+
+  const retailTotal = useMemo(() => {
+    return toRetailAmount(total);
+  }, [total, displayMultiplier]);
+
   async function buildSelectionPayload() {
     const uploadedBrandUrls = await uploadLaseredBrandImagesIfNeeded();
     const orderQuantity = sanitizeQuantity(quantity);
@@ -827,6 +859,151 @@ const finalNotesImageUrl = notesImageFile
     }
   }
 
+   function handlePrintRetailQuote() {
+    const quoteWindow = window.open("", "_blank", "width=900,height=700");
+
+    if (!quoteWindow) {
+      setSaveError("Popup blocked. Please allow popups to print the retail quote.");
+      return;
+    }
+
+    const linesHtml = retailPriceLines
+      .map(
+        (line) => `
+          <tr>
+            <td style="padding:8px 0;border-bottom:1px solid #e5e7eb;">
+              ${line.label}
+            </td>
+            <td style="padding:8px 0;border-bottom:1px solid #e5e7eb;text-align:right;font-weight:700;">
+              ${line.amount === 0 ? "Included" : `+${formatCurrency(line.amount)}`}
+            </td>
+          </tr>
+        `
+      )
+      .join("");
+
+    const selectionsHtml = selectedChoiceDetails
+      .map((selection) => {
+        const leather = selection.selectedLeather
+          ? ` — Leather: ${selection.selectedLeather.name} (${selection.selectedLeather.grade})`
+          : "";
+
+        const brand = selection.laseredBrand ? " — Lasered Brand: Yes" : "";
+
+        return `<li>${selection.groupName}: ${selection.choiceLabel}${leather}${brand}</li>`;
+      })
+      .join("");
+
+    quoteWindow.document.write(`
+      <!doctype html>
+      <html>
+        <head>
+          <title>Retail Quote</title>
+          <style>
+            body {
+              font-family: Arial, sans-serif;
+              color: #111827;
+              padding: 32px;
+            }
+
+            .header {
+              display: flex;
+              justify-content: space-between;
+              gap: 24px;
+              border-bottom: 1px solid #e5e7eb;
+              padding-bottom: 20px;
+              margin-bottom: 24px;
+            }
+
+            h1, h2, p {
+              margin: 0;
+            }
+
+            .muted {
+              color: #64748b;
+              font-size: 13px;
+            }
+
+            table {
+              width: 100%;
+              border-collapse: collapse;
+              margin-top: 16px;
+            }
+
+            .total {
+              margin-top: 24px;
+              border-top: 2px solid #111827;
+              padding-top: 16px;
+              display: flex;
+              justify-content: space-between;
+              font-size: 24px;
+              font-weight: 700;
+            }
+
+            ul {
+              margin-top: 12px;
+              padding-left: 20px;
+            }
+
+            li {
+              margin-bottom: 6px;
+            }
+
+            @media print {
+              button {
+                display: none;
+              }
+            }
+          </style>
+        </head>
+        <body>
+          <button onclick="window.print()" style="margin-bottom:24px;padding:10px 14px;border:1px solid #111827;background:#111827;color:white;border-radius:8px;">
+            Print Retail Quote
+          </button>
+
+          <div class="header">
+            <div>
+              <p class="muted">Retail Quote</p>
+              <h1>${product.name}</h1>
+              <p class="muted" style="margin-top:8px;">PO # ${poNumber || "—"}</p>
+            </div>
+
+            <div style="text-align:right;">
+              <p class="muted">Customer</p>
+              <h2>${customerName || "Customer"}</h2>
+              <p class="muted">${customerEmail || ""}</p>
+              <p class="muted">Quantity: ${sanitizeQuantity(quantity)}</p>
+            </div>
+          </div>
+
+          <h2>Selections</h2>
+          <ul>
+            ${selectionsHtml || "<li>No selections yet.</li>"}
+          </ul>
+
+          <h2 style="margin-top:28px;">Retail Itemized Price</h2>
+          <table>
+            ${linesHtml}
+          </table>
+
+          <div class="total">
+            <span>Retail Total</span>
+            <span>${formatCurrency(retailTotal)}</span>
+          </div>
+
+          ${
+            notes
+              ? `<div style="margin-top:28px;"><h2>Notes</h2><p style="white-space:pre-wrap;margin-top:8px;">${notes}</p></div>`
+              : ""
+          }
+        </body>
+      </html>
+    `);
+
+    quoteWindow.document.close();
+    quoteWindow.focus();
+  } 
+
   async function handleDownloadPdf() {
     try {
       const payloadSelections = await buildSelectionPayload();
@@ -966,7 +1143,7 @@ const finalNotesImageUrl = notesImageFile
                       <p className="mt-2 text-sm text-slate-500">
                         {binaryChoice.priceDelta === 0
                           ? "Included"
-                          : `+${formatCurrency(binaryChoice.priceDelta)}`}
+                          : `+${formatDisplayAmount(binaryChoice.priceDelta)}`}
                       </p>
                     </button>
 
@@ -1049,7 +1226,7 @@ const finalNotesImageUrl = notesImageFile
                               <div className="whitespace-nowrap text-sm font-medium">
                                 {choice.priceDelta === 0
                                   ? "Included"
-                                  : `+${formatCurrency(choice.priceDelta)}`}
+                                  : `+${formatDisplayAmount(choice.priceDelta)}`}
                               </div>
                             </div>
 
@@ -1122,7 +1299,7 @@ const finalNotesImageUrl = notesImageFile
                               <div className="whitespace-nowrap text-sm font-medium">
                                 {choice.priceDelta === 0
                                   ? "Included"
-                                  : `+${formatCurrency(choice.priceDelta)}`}
+                                  : `+${formatDisplayAmount(choice.priceDelta)}`}
                               </div>
                             </div>
                           </div>
@@ -1345,7 +1522,7 @@ const finalNotesImageUrl = notesImageFile
                             {Number(choice.laseredBrandSurcharge || 0) > 0 ? (
   <p className="mt-2 text-sm font-medium text-purple-800">
     Lasered brand surcharge:{" "}
-    {formatCurrency(Number(choice.laseredBrandSurcharge || 0))}
+    {formatDisplayAmount(Number(choice.laseredBrandSurcharge || 0))}
   </p>
 ) : null}
 
@@ -1593,49 +1770,67 @@ const finalNotesImageUrl = notesImageFile
               >
                 Download PDF
               </button>
+              <button
+  type="button"
+  onClick={handlePrintRetailQuote}
+  className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-2 text-amber-900 hover:bg-amber-100"
+>
+  Print Retail Quote
+</button>
             </div>
           </div>
         </div>
       </div>
 
 <div className="price-panel lg:sticky lg:top-24 self-start">
-  <h2 className="text-2xl font-semibold">Itemized Price</h2>
+  <h2 className="text-2xl font-semibold">
+    {showingRetailPrices ? "Retail Itemized Price" : "Itemized Price"}
+  </h2>
 
-        <div className="mt-2 text-sm text-slate-500">
-          Prices below are per unit.
-        </div>
+  <div className="mt-2 text-sm text-slate-500">
+    {showingRetailPrices
+      ? `Retail display pricing using multiplier x${displayMultiplier.toFixed(2)}.`
+      : "Prices below are per unit."}
+  </div>
 
-        <div className="mt-4 space-y-3">
-          {allPriceLines.map((line) => (
-            <div
-              key={`${line.label}-${line.amount}`}
-              className="flex justify-between border-b pb-2"
-            >
-              <span>{line.label}</span>
-              <span>
-                {line.amount === 0 ? "Included" : `+${formatCurrency(line.amount)}`}
-              </span>
-            </div>
-          ))}
-        </div>
+  {showingRetailPrices ? (
+    <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+      Retail prices are for store display only. Submitted orders are saved at
+      wholesale pricing.
+    </div>
+  ) : null}
 
-        <div className="mt-6 space-y-3 border-t pt-4">
-          <div className="flex justify-between text-sm text-slate-600">
-            <span>Per Unit Subtotal</span>
-            <span>{formatCurrency(unitSubtotal)}</span>
-          </div>
-
-          <div className="flex justify-between text-sm text-slate-600">
-            <span>Quantity</span>
-            <span>x {sanitizeQuantity(quantity)}</span>
-          </div>
-
-          <div className="flex justify-between text-xl font-bold">
-            <span>Total</span>
-            <span>{formatCurrency(total)}</span>
-          </div>
-        </div>
+  <div className="mt-4 space-y-3">
+    {retailPriceLines.map((line) => (
+      <div
+        key={`${line.label}-${line.amount}`}
+        className="flex justify-between border-b pb-2"
+      >
+        <span>{line.label}</span>
+        <span>
+          {line.amount === 0 ? "Included" : `+${formatCurrency(line.amount)}`}
+        </span>
       </div>
+    ))}
+  </div>
+
+  <div className="mt-6 space-y-3 border-t pt-4">
+    <div className="flex justify-between text-sm text-slate-600">
+      <span>Per Unit Subtotal</span>
+      <span>{formatCurrency(retailUnitSubtotal)}</span>
+    </div>
+
+    <div className="flex justify-between text-sm text-slate-600">
+      <span>Quantity</span>
+      <span>x {sanitizeQuantity(quantity)}</span>
+    </div>
+
+    <div className="flex justify-between text-xl font-bold">
+      <span>{showingRetailPrices ? "Retail Total" : "Total"}</span>
+      <span>{formatCurrency(retailTotal)}</span>
+    </div>
+  </div>
+</div>
     </div>
   );
 }

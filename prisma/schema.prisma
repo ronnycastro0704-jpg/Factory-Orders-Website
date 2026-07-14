@@ -23,9 +23,10 @@ model ApprovedCustomer {
   email     String   @unique
   name      String
   active    Boolean  @default(true)
+  retailMultiplier Decimal  @default(1) @db.Decimal(10, 2)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-
+  
   @@index([email])
   @@index([active])
 }

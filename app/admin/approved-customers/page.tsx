@@ -45,13 +45,14 @@ export default async function ApprovedCustomersPage() {
               <th className="px-4 py-3">Name</th>
               <th className="px-4 py-3">Email</th>
               <th className="px-4 py-3">Status</th>
+              <th className="px-4 py-3">Retail Multiplier</th>
               <th className="px-4 py-3 text-right">Actions</th>
             </tr>
           </thead>
           <tbody>
             {approvedCustomers.length === 0 ? (
               <tr>
-                <td colSpan={4} className="px-4 py-8 text-center text-slate-500">
+                <td colSpan={5} className="px-4 py-8 text-center text-slate-500">
                   No approved customers yet.
                 </td>
               </tr>
@@ -65,17 +66,20 @@ export default async function ApprovedCustomersPage() {
                     {customer.email}
                   </td>
                   <td className="px-4 py-3">
-                    {customer.active ? (
-                      <span className="rounded-full bg-green-100 px-2 py-1 text-xs font-medium text-green-700">
-                        Active
-                      </span>
-                    ) : (
-                      <span className="rounded-full bg-slate-100 px-2 py-1 text-xs font-medium text-slate-600">
-                        Inactive
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-right">
+  {customer.active ? (
+    <span className="rounded-full bg-green-100 px-2 py-1 text-xs font-medium text-green-700">
+      Active
+    </span>
+  ) : (
+    <span className="rounded-full bg-slate-100 px-2 py-1 text-xs font-medium text-slate-600">
+      Inactive
+    </span>
+  )}
+</td>
+<td className="px-4 py-3 text-slate-600">
+  x{Number(customer.retailMultiplier || 1).toFixed(2)}
+</td>
+<td className="px-4 py-3 text-right">
                     <ApprovedCustomerRowActions customer={customer} />
                   </td>
                 </tr>

@@ -5,6 +5,7 @@ import { isAdminEmail } from "../../../lib/admin";
 import { prisma } from "../../../lib/prisma";
 import { formatCurrency } from "../../../lib/utils";
 import ProductBuilder from "./product-builder";
+import { getApprovedCustomerProfile } from "../../../lib/approved-customer";
 
 type PageProps = {
   params: Promise<{
@@ -75,6 +76,8 @@ export default async function ProductPage({ params }: PageProps) {
 const { slug } = await params;
 const session = await auth();
 const isAdmin = isAdminEmail(session?.user?.email);
+const approvedCustomer = await getApprovedCustomerProfile(session?.user?.email);
+const retailMultiplier = isAdmin ? 1 : approvedCustomer?.retailMultiplier || 1;
 
   const product = (await prisma.product.findUnique({
     where: { slug },
@@ -266,6 +269,7 @@ const serializedLeathers = leathers.map((leather: LeatherRecord) => ({
   product={serializedProduct}
   leathers={serializedLeathers}
   isAdmin={isAdmin}
+  retailMultiplier={retailMultiplier}
 />
           ) : (
             <div className="rounded-2xl border border-dashed bg-white/70 p-10 text-center">
