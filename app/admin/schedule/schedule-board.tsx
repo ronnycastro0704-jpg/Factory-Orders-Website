@@ -365,7 +365,7 @@ const visibleColumns = useMemo(() => {
 <div
   ref={topScrollRef}
   onScroll={() => syncHorizontalScroll("top")}
-  className="mb-3 overflow-x-auto pb-2"
+  className="schedule-scrollbar mb-3 overflow-x-auto pb-2"
 >
   <div className="h-1 min-w-[1600px]" />
 </div>
@@ -373,7 +373,7 @@ const visibleColumns = useMemo(() => {
 <div
   ref={boardScrollRef}
   onScroll={() => syncHorizontalScroll("board")}
-  className="overflow-x-auto pb-3"
+  className="schedule-scrollbar overflow-x-auto pb-3"
 >
         <div className="grid min-w-[1600px] grid-cols-8 gap-4">
           {visibleColumns.map((column) => (

@@ -372,3 +372,26 @@ select:disabled {
   border-radius: 999px;
   border: 2px solid rgba(255, 255, 255, 0.4);
 }
+.schedule-scrollbar {
+  scrollbar-width: auto;
+  scrollbar-color: #8b5e34 #f3eadf;
+}
+
+.schedule-scrollbar::-webkit-scrollbar {
+  height: 16px;
+}
+
+.schedule-scrollbar::-webkit-scrollbar-track {
+  background: #f3eadf;
+  border-radius: 999px;
+}
+
+.schedule-scrollbar::-webkit-scrollbar-thumb {
+  background: #8b5e34;
+  border: 3px solid #f3eadf;
+  border-radius: 999px;
+}
+
+.schedule-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #6f4725;
+}
