@@ -1,4 +1,7 @@
 import Link from "next/link";
+import { auth } from "../auth";
+import { isAdminEmail } from "../lib/admin";
+import { getApprovedCustomerProfile } from "../lib/approved-customer";
 import { prisma } from "../lib/prisma";
 import { formatCurrency } from "../lib/utils";
 
@@ -22,6 +25,12 @@ type ProductCard = {
 };
 
 export default async function HomePage({ searchParams }: PageProps) {
+  const session = await auth();
+  const isAdmin = isAdminEmail(session?.user?.email);
+  const approvedCustomer = await getApprovedCustomerProfile(session?.user?.email);
+  const retailMultiplier = isAdmin ? 1 : approvedCustomer?.retailMultiplier || 1;
+  const showingRetailPrice = !isAdmin && retailMultiplier !== 1;
+
   const resolvedSearchParams = searchParams ? await searchParams : undefined;
   const query = String(resolvedSearchParams?.q || "").trim();
 
@@ -84,17 +93,29 @@ export default async function HomePage({ searchParams }: PageProps) {
                 the factory to understand.
               </p>
 
-              <div className="mt-8 flex flex-wrap gap-3">
-                <Link href="/admin/products" className="button-primary">
-                  Open Admin
-                </Link>
-                <Link href="/my/orders" className="button-secondary">
-                  View My Orders
-                </Link>
-                <Link href="/admin/orders" className="button-secondary">
-                  Admin Orders
-                </Link>
-              </div>
+<div className="mt-8 flex flex-wrap gap-3">
+  {isAdmin ? (
+    <>
+      <Link href="/admin/products" className="button-primary">
+        Open Admin
+      </Link>
+
+      <Link href="/admin/orders" className="button-secondary">
+        Admin Orders
+      </Link>
+    </>
+  ) : null}
+
+  {session?.user ? (
+    <Link href="/my/orders" className="button-secondary">
+      View My Orders
+    </Link>
+  ) : (
+    <Link href="/login" className="button-primary">
+      Sign In
+    </Link>
+  )}
+</div>
             </div>
 
             <div className="section-card-strong">
@@ -204,12 +225,17 @@ export default async function HomePage({ searchParams }: PageProps) {
 
                     <div className="mt-6 flex items-center justify-between gap-4">
                       <div>
-                        <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
-                          Starting at
-                        </p>
-                        <p className="mt-1 text-2xl font-bold text-slate-900">
-                          {formatCurrency(Number(product.basePrice))}
-                        </p>
+<p className="text-xs uppercase tracking-[0.18em] text-slate-500">
+  {showingRetailPrice ? "Retail starting at" : "Starting at"}
+</p>
+<p className="mt-1 text-2xl font-bold text-slate-900">
+  {formatCurrency(Number(product.basePrice || 0) * retailMultiplier)}
+</p>
+{showingRetailPrice ? (
+  <p className="mt-1 text-xs text-slate-500">
+    Retail display x{retailMultiplier.toFixed(2)}
+  </p>
+) : null}
                       </div>
 
                       <span className="button-primary">Configure</span>

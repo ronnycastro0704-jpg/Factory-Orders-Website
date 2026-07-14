@@ -99,6 +99,9 @@ const retailMultiplier = isAdmin ? 1 : approvedCustomer?.retailMultiplier || 1;
     notFound();
   }
 
+  const displayBasePrice = Number(product.basePrice || 0) * retailMultiplier;
+  const showingRetailPrice = !isAdmin && retailMultiplier !== 1;
+
   const leathers = (await prisma.leather.findMany({
     where: { active: true },
     orderBy: { name: "asc" },
@@ -221,14 +224,19 @@ const serializedLeathers = leathers.map((leather: LeatherRecord) => ({
               </p>
 
               <div className="mt-8 grid gap-4 sm:grid-cols-3">
-                <div className="soft-panel">
-                  <p className="text-xs uppercase tracking-[0.16em] text-slate-500">
-                    Base Price
-                  </p>
-                  <p className="mt-2 text-2xl font-bold text-slate-900">
-                    {formatCurrency(Number(product.basePrice))}
-                  </p>
-                </div>
+<div className="soft-panel">
+  <p className="text-xs uppercase tracking-[0.16em] text-slate-500">
+    {showingRetailPrice ? "Retail Base Price" : "Base Price"}
+  </p>
+  <p className="mt-2 text-2xl font-bold text-slate-900">
+    {formatCurrency(displayBasePrice)}
+  </p>
+  {showingRetailPrice ? (
+    <p className="mt-1 text-xs text-slate-500">
+      Retail display x{retailMultiplier.toFixed(2)}
+    </p>
+  ) : null}
+</div>
 
                 <div className="soft-panel">
                   <p className="text-xs uppercase tracking-[0.16em] text-slate-500">
