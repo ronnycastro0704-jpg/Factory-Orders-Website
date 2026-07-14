@@ -31,6 +31,8 @@ type RecentInvoice = {
   dueAt: string;
   createdAt: string;
   orderCount: number;
+  orderNumbers: string[];
+  poNumbers: string[];
 };
 
 function buildProductSummary(order: {
@@ -91,6 +93,8 @@ function serializeRecentInvoice(invoice: {
   createdAt: Date;
   orders: {
     id: string;
+    orderNumber: string;
+    poNumber: string | null;
   }[];
 }): RecentInvoice {
   return {
@@ -103,6 +107,10 @@ function serializeRecentInvoice(invoice: {
     dueAt: invoice.dueAt.toISOString(),
     createdAt: invoice.createdAt.toISOString(),
     orderCount: invoice.orders.length,
+    orderNumbers: invoice.orders.map((order) => order.orderNumber),
+    poNumbers: invoice.orders
+      .map((order) => order.poNumber)
+      .filter(Boolean) as string[],
   };
 }
 
@@ -241,14 +249,16 @@ console.log(
       orderBy: {
         createdAt: "desc",
       },
-      take: 25,
-      include: {
-        orders: {
-          select: {
-            id: true,
-          },
-        },
-      },
+      take: 50,
+include: {
+  orders: {
+    select: {
+      id: true,
+      orderNumber: true,
+      poNumber: true,
+    },
+  },
+},
     }),
   ]);
 

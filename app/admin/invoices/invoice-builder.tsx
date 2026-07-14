@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { type DragEvent, useMemo, useState } from "react";
+import { type DragEvent, FormEvent, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { formatCurrency } from "../../../lib/utils";
 
@@ -30,6 +30,8 @@ type RecentInvoice = {
   dueAt: string;
   createdAt: string;
   orderCount: number;
+  orderNumbers: string[];
+  poNumbers: string[];
 };
 
 type ExtraChargeInput = {
@@ -79,6 +81,11 @@ export default function InvoiceBuilder({
   const [draggedOrderId, setDraggedOrderId] = useState("");
   const [dragOverDraft, setDragOverDraft] = useState(false);
 const [searchQuery, setSearchQuery] = useState("");
+const [invoiceSearchQuery, setInvoiceSearchQuery] = useState("");
+const [invoiceResults, setInvoiceResults] =
+  useState<RecentInvoice[]>(recentInvoices);
+const [searchingInvoices, setSearchingInvoices] = useState(false);
+const [invoiceSearchError, setInvoiceSearchError] = useState("");
 const [notes, setNotes] = useState("");
 const [extraCharges, setExtraCharges] = useState<ExtraChargeInput[]>([
   {
@@ -287,6 +294,57 @@ function normalizeExtraChargesForSubmit() {
 
     addOrder(order);
   }
+
+  async function searchInvoices(event?: FormEvent<HTMLFormElement>) {
+  event?.preventDefault();
+
+  setSearchingInvoices(true);
+  setInvoiceSearchError("");
+
+  try {
+    const response = await fetch(
+      `/api/admin/invoices/search?q=${encodeURIComponent(invoiceSearchQuery)}`
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      setInvoiceSearchError(data.error || "Failed to search invoices.");
+      return;
+    }
+
+    setInvoiceResults(data.invoices || []);
+  } catch (searchError) {
+    console.error(searchError);
+    setInvoiceSearchError("Failed to search invoices.");
+  } finally {
+    setSearchingInvoices(false);
+  }
+}
+
+async function clearInvoiceSearch() {
+  setInvoiceSearchQuery("");
+  setInvoiceSearchError("");
+  setSearchingInvoices(true);
+
+  try {
+    const response = await fetch("/api/admin/invoices/search");
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      setInvoiceSearchError(data.error || "Failed to load recent invoices.");
+      return;
+    }
+
+    setInvoiceResults(data.invoices || []);
+  } catch (searchError) {
+    console.error(searchError);
+    setInvoiceSearchError("Failed to load recent invoices.");
+  } finally {
+    setSearchingInvoices(false);
+  }
+}
 
   async function createInvoice() {
 if (selectedOrders.length < 1) {
@@ -700,16 +758,55 @@ body: JSON.stringify({
       </div>
 
       <div className="mt-8 rounded-2xl border bg-white p-4 shadow-sm">
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h3 className="text-xl font-bold">Recent Invoices</h3>
-            <p className="mt-1 text-sm text-slate-500">
-              Recently created grouped invoices.
-            </p>
-          </div>
-        </div>
+<div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+  <div>
+    <h3 className="text-xl font-bold">Recent Invoices</h3>
+    <p className="mt-1 text-sm text-slate-500">
+      Search all invoices by invoice #, PO #, order #, customer, email, status, or total.
+    </p>
+  </div>
 
-        {recentInvoices.length === 0 ? (
+  <span className="rounded-full border bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
+    {invoiceResults.length} shown
+  </span>
+</div>
+
+<form onSubmit={searchInvoices} className="mb-4 flex flex-col gap-3 sm:flex-row">
+  <input
+    value={invoiceSearchQuery}
+    onChange={(event) => setInvoiceSearchQuery(event.target.value)}
+    placeholder="Search invoice #, PO #, order #, customer, email, status, total..."
+    className="w-full rounded-xl border bg-white px-4 py-3 text-sm outline-none focus:border-slate-400"
+  />
+
+  <div className="flex gap-3">
+    <button
+      type="submit"
+      disabled={searchingInvoices}
+      className="button-primary whitespace-nowrap disabled:opacity-50"
+    >
+      {searchingInvoices ? "Searching..." : "Search"}
+    </button>
+
+    {invoiceSearchQuery ? (
+      <button
+        type="button"
+        onClick={clearInvoiceSearch}
+        disabled={searchingInvoices}
+        className="button-secondary whitespace-nowrap disabled:opacity-50"
+      >
+        Clear
+      </button>
+    ) : null}
+  </div>
+</form>
+
+{invoiceSearchError ? (
+  <div className="mb-4 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-medium text-red-700">
+    {invoiceSearchError}
+  </div>
+) : null}
+        {invoiceResults.length === 0 ? (
           <div className="rounded-2xl border border-dashed bg-slate-50 p-8 text-center text-sm text-slate-500">
             No invoices created yet.
           </div>
@@ -727,7 +824,7 @@ body: JSON.stringify({
                 </tr>
               </thead>
               <tbody>
-                {recentInvoices.map((invoice) => (
+                {invoiceResults.map((invoice) => (
                   <tr key={invoice.id} className="border-b last:border-0">
                     <td className="py-4 pr-4 font-semibold">
                       {invoice.invoiceNumber}
@@ -738,7 +835,15 @@ body: JSON.stringify({
                         {invoice.customerEmail}
                       </p>
                     </td>
-                    <td className="py-4 pr-4">{invoice.orderCount}</td>
+                    <td className="py-4 pr-4">
+  <p>{invoice.orderCount}</p>
+  {invoice.poNumbers.length > 0 ? (
+    <p className="mt-1 text-xs text-slate-500">
+      PO # {invoice.poNumbers.slice(0, 3).join(", ")}
+      {invoice.poNumbers.length > 3 ? "..." : ""}
+    </p>
+  ) : null}
+</td>
                     <td className="py-4 pr-4">{formatDate(invoice.dueAt)}</td>
                     <td className="py-4 pr-4 text-right font-bold">
                       {formatCurrency(invoice.total)}
