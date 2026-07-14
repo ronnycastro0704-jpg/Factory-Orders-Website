@@ -702,6 +702,7 @@ ${
       </p>
     </div>
   `;
+  
 await transporter.sendMail({
   from,
   to: customerRecipients,
@@ -710,4 +711,61 @@ await transporter.sendMail({
   text: customerText,
   html: customerHtml,
 });
+}
+export async function sendPasswordResetEmail(input: {
+  email: string;
+  resetUrl: string;
+}) {
+  const from = process.env.MAIL_FROM;
+
+  if (!from) {
+    throw new Error("Missing MAIL_FROM env var.");
+  }
+
+  const transporter = getTransporter();
+
+  const safeResetUrl = escapeHtml(input.resetUrl);
+
+  await transporter.sendMail({
+    from,
+    to: input.email,
+    subject: "Reset your Furniture Orders password",
+    text: [
+      "Reset your Furniture Orders password",
+      "",
+      "We received a request to reset your password.",
+      "Use the link below to choose a new password. This link expires in 30 minutes.",
+      "",
+      input.resetUrl,
+      "",
+      "If you did not request this, you can ignore this email.",
+    ].join("\n"),
+    html: `
+      <div style="font-family:Arial,sans-serif;max-width:640px;margin:0 auto;padding:24px;background:#f8fafc;color:#111827;">
+        <div style="background:#ffffff;border:1px solid #e5e7eb;border-radius:14px;padding:24px;">
+          <h1 style="margin:0 0 12px 0;font-size:24px;">Reset your password</h1>
+          <p style="font-size:15px;line-height:1.6;">
+            We received a request to reset your Furniture Orders password.
+          </p>
+          <p style="font-size:15px;line-height:1.6;">
+            This link expires in 30 minutes.
+          </p>
+          <p style="margin:24px 0;">
+            <a href="${safeResetUrl}" style="display:inline-block;background:#0f172a;color:#ffffff;text-decoration:none;border-radius:10px;padding:12px 18px;font-weight:700;">
+              Reset Password
+            </a>
+          </p>
+          <p style="font-size:13px;line-height:1.6;color:#475569;">
+            If the button does not work, copy and paste this link into your browser:
+          </p>
+          <p style="font-size:13px;line-height:1.6;word-break:break-all;color:#475569;">
+            ${safeResetUrl}
+          </p>
+          <p style="font-size:13px;line-height:1.6;color:#475569;">
+            If you did not request this, you can ignore this email.
+          </p>
+        </div>
+      </div>
+    `,
+  });
 }

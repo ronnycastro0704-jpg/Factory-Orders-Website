@@ -21,8 +21,14 @@ export default async function LoginPage({ searchParams }: PageProps) {
         </p>
 
         <div className="mt-6">
-          <LoginForm callbackUrl={callbackUrl} />
-        </div>
+  <LoginForm callbackUrl={callbackUrl} />
+</div>
+
+<div className="mt-4 text-center text-sm">
+  <Link href="/forgot-password" className="font-medium text-slate-900 underline">
+    Forgot your password?
+  </Link>
+</div>
 
         <div className="mt-6 border-t pt-4 text-center text-sm text-slate-600">
           Don&apos;t have an account?{" "}
