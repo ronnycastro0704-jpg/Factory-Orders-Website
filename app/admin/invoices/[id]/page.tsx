@@ -144,7 +144,7 @@ export default async function AdminInvoiceDetailPage({ params }: PageProps) {
     Download PDF
   </a>
   <EmailInvoiceButton invoiceId={invoice.id} />
-  <PrintButton />
+  <PrintButton invoiceId={invoice.id} />
 </div>
         </div>
 
