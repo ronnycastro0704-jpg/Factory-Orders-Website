@@ -38,7 +38,7 @@ export default async function SiteHeader() {
               <Link href="/my/orders" className="button-secondary">
                 My Orders
               </Link>
-              <Link href="/my/settings" className="hover:text-slate-900">
+<Link href="/my/settings" className="button-secondary">
   Retail Settings
 </Link>
 
@@ -78,21 +78,25 @@ export default async function SiteHeader() {
             )}
           </div>
 
-          <nav className="flex flex-wrap items-center gap-2 md:hidden">
-            <Link href="/" className="button-secondary">
-              Customer Side
-            </Link>
+<nav className="flex flex-wrap items-center gap-2 md:hidden">
+  <Link href="/" className="button-secondary">
+    Customer Side
+  </Link>
 
-            <Link href="/my/orders" className="button-secondary">
-              My Orders
-            </Link>
+  <Link href="/my/orders" className="button-secondary">
+    My Orders
+  </Link>
 
-            {showAdmin ? (
-              <Link href="/admin" className="button-primary">
-                Open Admin
-              </Link>
-            ) : null}
-          </nav>
+  <Link href="/my/settings" className="button-secondary">
+    Retail Settings
+  </Link>
+
+  {showAdmin ? (
+    <Link href="/admin" className="button-primary">
+      Open Admin
+    </Link>
+  ) : null}
+</nav>
         </div>
       </div>
     </header>
