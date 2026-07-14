@@ -231,11 +231,6 @@ export default async function HomePage({ searchParams }: PageProps) {
 <p className="mt-1 text-2xl font-bold text-slate-900">
   {formatCurrency(Number(product.basePrice || 0) * retailMultiplier)}
 </p>
-{showingRetailPrice ? (
-  <p className="mt-1 text-xs text-slate-500">
-    Retail display x{retailMultiplier.toFixed(2)}
-  </p>
-) : null}
                       </div>
 
                       <span className="button-primary">Configure</span>

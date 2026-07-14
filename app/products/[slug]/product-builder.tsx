@@ -1807,11 +1807,11 @@ ${firstSelectedImageHtml}
     {showingRetailPrices ? "Retail Itemized Price" : "Itemized Price"}
   </h2>
 
-  <div className="mt-2 text-sm text-slate-500">
-    {showingRetailPrices
-      ? `Retail display pricing using multiplier x${displayMultiplier.toFixed(2)}.`
-      : "Prices below are per unit."}
-  </div>
+<div className="mt-2 text-sm text-slate-500">
+  {showingRetailPrices
+    ? "Retail display pricing."
+    : "Prices below are per unit."}
+</div>
 
   {showingRetailPrices ? (
     <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">

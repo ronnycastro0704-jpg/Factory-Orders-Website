@@ -231,11 +231,6 @@ const serializedLeathers = leathers.map((leather: LeatherRecord) => ({
   <p className="mt-2 text-2xl font-bold text-slate-900">
     {formatCurrency(displayBasePrice)}
   </p>
-  {showingRetailPrice ? (
-    <p className="mt-1 text-xs text-slate-500">
-      Retail display x{retailMultiplier.toFixed(2)}
-    </p>
-  ) : null}
 </div>
 
                 <div className="soft-panel">
