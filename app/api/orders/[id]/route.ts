@@ -1003,18 +1003,20 @@ if (adminStatusChanged) {
           subject: customerSubject,
           status: "SENT",
         })),
-        {
-          orderId: id,
-          eventType:
-            emailType === "completed"
-              ? "ORDER_COMPLETED_INTERNAL"
-              : emailType === "sent_to_factory"
-              ? "ORDER_SENT_TO_FACTORY_INTERNAL"
-              : "ORDER_STATUS_UPDATED_INTERNAL",
-          recipient: process.env.ORDER_NOTIFY_TO || "",
-          subject: internalSubject,
-          status: "SENT",
-        },
+        ...(emailType === "completed" || emailType === "sent_to_factory"
+          ? [
+              {
+                orderId: id,
+                eventType:
+                  emailType === "completed"
+                    ? "ORDER_COMPLETED_INTERNAL"
+                    : "ORDER_SENT_TO_FACTORY_INTERNAL",
+                recipient: process.env.ORDER_NOTIFY_TO || "",
+                subject: internalSubject,
+                status: "SENT",
+              },
+            ]
+          : []),
       ],
     });
   } catch (error) {
@@ -1403,20 +1405,13 @@ if (requiredValidationMessages.length > 0) {
 
       await prisma.emailLog.createMany({
         data: [
-...notificationEmails.map((recipient) => ({
-  orderId: id,
-  eventType: "ORDER_UPDATED_CUSTOMER",
-  recipient,
-  subject: `Your order was updated: ${order.orderNumber}`,
-  status: "SENT",
-})),
-          {
+          ...notificationEmails.map((recipient) => ({
             orderId: id,
-            eventType: "ORDER_UPDATED_INTERNAL",
-            recipient: process.env.ORDER_NOTIFY_TO || "",
-            subject: `Order Updated: ${order.orderNumber}`,
+            eventType: "ORDER_UPDATED_CUSTOMER",
+            recipient,
+            subject: `Your order was updated: ${order.orderNumber}`,
             status: "SENT",
-          },
+          })),
         ],
       });
     } catch (error) {

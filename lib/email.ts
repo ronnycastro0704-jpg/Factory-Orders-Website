@@ -619,14 +619,19 @@ ${
     </div>
   `;
 
-  await transporter.sendMail({
-    from,
-    to: notifyTo,
-    replyTo: customerEmail,
-    subject: copy.internalSubject,
-    text: internalText,
-    html: internalHtml,
-  });
+  const shouldSendFactoryEmail =
+    type === "sent_to_factory" || type === "completed";
+
+  if (shouldSendFactoryEmail) {
+    await transporter.sendMail({
+      from,
+      to: notifyTo,
+      replyTo: customerEmail,
+      subject: copy.internalSubject,
+      text: internalText,
+      html: internalHtml,
+    });
+  }
 
 const customerText = [
   copy.customerSubject,

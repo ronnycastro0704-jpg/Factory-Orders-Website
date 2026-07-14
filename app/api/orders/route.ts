@@ -867,28 +867,28 @@ laseredBrandImageUrl: selection.laseredBrandImageUrl || null,
 
       await prisma.emailLog.createMany({
         data: [
-...notificationEmails.map((recipient) => ({
-  orderId: createdOrder.id,
-  eventType: submitToFactory
-    ? "ORDER_SENT_TO_FACTORY_CUSTOMER"
-    : "ORDER_CREATED_CUSTOMER",
-  recipient,
-  subject: submitToFactory
-    ? `Your order was sent to the factory: ${createdOrder.orderNumber}`
-    : `We received your order draft: ${createdOrder.orderNumber}`,
-  status: "SENT",
-})),
-          {
+          ...notificationEmails.map((recipient) => ({
             orderId: createdOrder.id,
             eventType: submitToFactory
-              ? "ORDER_SENT_TO_FACTORY_INTERNAL"
-              : "ORDER_CREATED_INTERNAL",
-            recipient: process.env.ORDER_NOTIFY_TO || "",
+              ? "ORDER_SENT_TO_FACTORY_CUSTOMER"
+              : "ORDER_CREATED_CUSTOMER",
+            recipient,
             subject: submitToFactory
-              ? `Order Sent to Factory: ${createdOrder.orderNumber}`
-              : `New Order Draft: ${createdOrder.orderNumber}`,
+              ? `Your order was sent to the factory: ${createdOrder.orderNumber}`
+              : `We received your order draft: ${createdOrder.orderNumber}`,
             status: "SENT",
-          },
+          })),
+          ...(submitToFactory
+            ? [
+                {
+                  orderId: createdOrder.id,
+                  eventType: "ORDER_SENT_TO_FACTORY_INTERNAL",
+                  recipient: process.env.ORDER_NOTIFY_TO || "",
+                  subject: `Order Sent to Factory: ${createdOrder.orderNumber}`,
+                  status: "SENT",
+                },
+              ]
+            : []),
         ],
       });
     } catch (error) {
