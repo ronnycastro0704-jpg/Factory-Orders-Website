@@ -8,6 +8,21 @@ type Props = {
   callbackUrl: string;
 };
 
+function getLoginErrorMessage(result: {
+  error?: string | null;
+  code?: string | null;
+} | null) {
+  if (result?.code === "login_blocked") {
+    return "Too many failed login attempts. Please wait 15 minutes and try again, or reset your password.";
+  }
+
+  if (result?.error === "login_blocked") {
+    return "Too many failed login attempts. Please wait 15 minutes and try again, or reset your password.";
+  }
+
+  return "Invalid email or password.";
+}
+
 export default function LoginForm({ callbackUrl }: Props) {
   const router = useRouter();
 
@@ -28,7 +43,7 @@ export default function LoginForm({ callbackUrl }: Props) {
     });
 
     if (!result || result.error) {
-      setError("Invalid email or password.");
+      setError(getLoginErrorMessage(result));
       setLoading(false);
       return;
     }
@@ -61,7 +76,11 @@ export default function LoginForm({ callbackUrl }: Props) {
         />
       </div>
 
-      {error ? <p className="text-sm text-red-600">{error}</p> : null}
+      {error ? (
+        <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+          <p>{error}</p>
+        </div>
+      ) : null}
 
       <button
         type="submit"

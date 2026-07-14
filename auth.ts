@@ -1,4 +1,4 @@
-import NextAuth from "next-auth";
+import NextAuth, { CredentialsSignin } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { compare } from "bcryptjs";
 import { prisma } from "./lib/prisma";
@@ -10,6 +10,10 @@ import {
 
 function normalizeEmail(value: string) {
   return value.trim().toLowerCase();
+}
+
+class LoginBlockedError extends CredentialsSignin {
+  code = "login_blocked";
 }
 
 function getAdminEmails() {
@@ -49,7 +53,7 @@ function minutesAgo(minutes: number) {
 }
 
 async function isLoginTemporarilyBlocked(email: string, ipAddress: string | null) {
-  const since = minutesAgo(LOGIN_WINDOW_MINUTES);
+  const since = minutesAgo(LOGIN_LOCK_MINUTES);
 
   const emailFailures = await prisma.loginAttempt.count({
     where: {
@@ -99,6 +103,50 @@ async function clearFailedLoginAttempts(email: string) {
   });
 }
 
+async function getRecentFailedLoginCount(email: string, ipAddress: string | null) {
+  const since = minutesAgo(LOGIN_WINDOW_MINUTES);
+
+  const emailFailures = await prisma.loginAttempt.count({
+    where: {
+      email,
+      success: false,
+      createdAt: {
+        gte: since,
+      },
+    },
+  });
+
+  const ipFailures = ipAddress
+    ? await prisma.loginAttempt.count({
+        where: {
+          ipAddress,
+          success: false,
+          createdAt: {
+            gte: since,
+          },
+        },
+      })
+    : 0;
+
+  return Math.max(emailFailures, ipFailures);
+}
+
+async function recordFailedLoginOrBlock(email: string, ipAddress: string | null) {
+  await recordLoginAttempt({
+    email,
+    ipAddress,
+    success: false,
+  });
+
+  const failedCount = await getRecentFailedLoginCount(email, ipAddress);
+
+  if (failedCount >= FAILED_LOGIN_LIMIT) {
+    throw new LoginBlockedError();
+  }
+
+  return null;
+}
+
 export const { handlers, auth, signIn, signOut } = NextAuth({
   trustHost: true,
   secret: process.env.AUTH_SECRET,
@@ -129,13 +177,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         if (!email || !password) {
           return null;
         }
-        if (await isLoginTemporarilyBlocked(email, ipAddress)) {
-  return null;
+if (await isLoginTemporarilyBlocked(email, ipAddress)) {
+  throw new LoginBlockedError();
 }
 
         if (!(await isEmailAllowed(email))) {
-  await recordLoginAttempt({ email, ipAddress, success: false });
-  return null;
+return await recordFailedLoginOrBlock(email, ipAddress);
 }
 
         const rawUser = (await prisma.user.findUnique({
@@ -143,8 +190,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         })) as Record<string, unknown> | null;
 
         if (!rawUser) {
-  await recordLoginAttempt({ email, ipAddress, success: false });
-  return null;
+return await recordFailedLoginOrBlock(email, ipAddress);
 }
 
         const passwordHash =
@@ -155,15 +201,13 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             : null;
 
         if (!passwordHash) {
-  await recordLoginAttempt({ email, ipAddress, success: false });
-  return null;
+return await recordFailedLoginOrBlock(email, ipAddress);
 }
 
         const passwordMatches = await compare(password, passwordHash);
 
         if (!passwordMatches) {
-  await recordLoginAttempt({ email, ipAddress, success: false });
-  return null;
+return await recordFailedLoginOrBlock(email, ipAddress);
 }
 
       await recordLoginAttempt({ email, ipAddress, success: true });
