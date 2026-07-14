@@ -76,16 +76,21 @@ export async function POST(_request: Request, context: RouteContext) {
 
     const { id } = await context.params;
 
-    const invoice = await prisma.invoice.findUnique({
-      where: { id },
-      include: {
-        orders: {
-          orderBy: {
-            createdAt: "asc",
-          },
-        },
+const invoice = await prisma.invoice.findUnique({
+  where: { id },
+  include: {
+    extraCharges: {
+      orderBy: {
+        createdAt: "asc",
       },
-    });
+    },
+    orders: {
+      orderBy: {
+        createdAt: "asc",
+      },
+    },
+  },
+});
 
     if (!invoice) {
       return NextResponse.json(
