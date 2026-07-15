@@ -1795,7 +1795,7 @@ ${firstSelectedImageHtml}
   onClick={handlePrintRetailQuote}
   className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-2 text-amber-900 hover:bg-amber-100"
 >
-  Print Retail Quote
+  View Retail Quote
 </button>
             </div>
           </div>
@@ -1815,8 +1815,7 @@ ${firstSelectedImageHtml}
 
   {showingRetailPrices ? (
     <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
-      Retail prices are for store display only. Submitted orders are saved at
-      wholesale pricing.
+      Retail prices are for store display only. 
     </div>
   ) : null}
 

@@ -3,7 +3,14 @@
 import { useRouter } from "next/navigation";
 import { ChangeEvent, useState } from "react";
 
+type EmployeeOption = {
+  id: string;
+  name: string;
+  department: string;
+};
+
 type Props = {
+  employees: EmployeeOption[];
   line: {
     id: string;
     partNumber: string;
@@ -175,7 +182,7 @@ function buildInitialPhotoUrls(line: Props["line"]) {
   ).filter(Boolean);
 }
 
-export default function ProductionLineEditor({ line }: Props) {
+export default function ProductionLineEditor({ line, employees }: Props) {
   const router = useRouter();
 
   const [bodyLeather, setBodyLeather] = useState(line.bodyLeather || "");
@@ -211,6 +218,18 @@ const [previewPhotoUrl, setPreviewPhotoUrl] = useState("");
     line.finalAssemblyStatus
   );
   const [qcStatus, setQcStatus] = useState(line.qcStatus);
+
+    const cuttingEmployees = employees.filter(
+    (employee) => employee.department === "CUTTING"
+  );
+
+  const upholsteryEmployees = employees.filter(
+    (employee) => employee.department === "UPHOLSTERY"
+  );
+
+  const qcEmployees = employees.filter(
+    (employee) => employee.department === "QC"
+  );
 
   const [leaCutAssignedTo, setLeaCutAssignedTo] = useState(
     line.leaCutAssignedTo || ""
@@ -515,6 +534,7 @@ async function removeCompletedPhoto(urlToRemove: string) {
     assignedTo?: string;
     onAssignedToChange?: (value: string) => void;
     assignedToPlaceholder?: string;
+    employeeOptions?: EmployeeOption[];
   }) {
     const resolvedOptions = getResolvedOptions(args.options, args.value);
 
@@ -550,12 +570,42 @@ async function removeCompletedPhoto(urlToRemove: string) {
             <label className="mb-1 block text-xs font-medium uppercase tracking-[0.14em] text-slate-500">
               Assigned To
             </label>
-            <input
-              className="w-full rounded-lg border bg-white px-3 py-2"
-              value={args.assignedTo || ""}
-              onChange={(event) => args.onAssignedToChange?.(event.target.value)}
-              placeholder={args.assignedToPlaceholder || "Employee name"}
-            />
+
+            {args.employeeOptions && args.employeeOptions.length > 0 ? (
+              <select
+                className="w-full rounded-lg border bg-white px-3 py-2"
+                value={args.assignedTo || ""}
+                onChange={(event) =>
+                  args.onAssignedToChange?.(event.target.value)
+                }
+              >
+                <option value="">Unassigned</option>
+
+                {args.assignedTo &&
+                !args.employeeOptions.some(
+                  (employee) => employee.name === args.assignedTo
+                ) ? (
+                  <option value={args.assignedTo}>
+                    {args.assignedTo} - old value
+                  </option>
+                ) : null}
+
+                {args.employeeOptions.map((employee) => (
+                  <option key={employee.id} value={employee.name}>
+                    {employee.name}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <input
+                className="w-full rounded-lg border bg-white px-3 py-2"
+                value={args.assignedTo || ""}
+                onChange={(event) =>
+                  args.onAssignedToChange?.(event.target.value)
+                }
+                placeholder={args.assignedToPlaceholder || "Employee name"}
+              />
+            )}
           </div>
         ) : null}
       </div>
@@ -910,6 +960,7 @@ Click Upload and Save Photos to save them immediately.
             options: LEA_CUT_OPTIONS,
             assignedTo: leaCutAssignedTo,
             onAssignedToChange: setLeaCutAssignedTo,
+            employeeOptions: cuttingEmployees,
           })}
 
           {renderStageField({
@@ -933,6 +984,7 @@ Click Upload and Save Photos to save them immediately.
             options: GENERIC_STAGE_OPTIONS,
             assignedTo: upholsteredAssignedTo,
             onAssignedToChange: setUpholsteredAssignedTo,
+            employeeOptions: upholsteryEmployees,
           })}
 
           {renderStageField({
@@ -949,6 +1001,7 @@ Click Upload and Save Photos to save them immediately.
             options: GENERIC_STAGE_OPTIONS,
             assignedTo: qcAssignedTo,
             onAssignedToChange: setQcAssignedTo,
+            employeeOptions: qcEmployees,
           })}
         </div>
       </div>

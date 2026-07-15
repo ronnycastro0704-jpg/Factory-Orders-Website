@@ -9,6 +9,7 @@ import {
   Package,
   Palette,
   UserCheck,
+  Users,
 } from "lucide-react";
 import { auth } from "../../auth";
 import { isAdminEmail } from "../../lib/admin";
@@ -58,6 +59,12 @@ const adminLinks = [
     description: "Manage leather options and inventory.",
     href: "/admin/leathers",
     icon: Palette,
+  },
+  {
+    title: "Employees",
+    description: "Add production employees and assign them to departments.",
+    href: "/admin/employees",
+    icon: Users,
   },
   {
     title: "Approved Customers",

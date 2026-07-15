@@ -123,7 +123,8 @@ function formatStatusBadge(status: string) {
 export default async function AdminProductionOrderPage({ params }: PageProps) {
   const { id } = await params;
 
-  const order = await prisma.order.findUnique({
+    const [order, employees] = await Promise.all([
+    prisma.order.findUnique({
     where: { id },
     include: {
       items: {
@@ -144,7 +145,19 @@ export default async function AdminProductionOrderPage({ params }: PageProps) {
         orderBy: [{ partNumber: "asc" }, { frameNeeded: "asc" }],
       },
     },
-  });
+    }),
+    prisma.employee.findMany({
+      where: {
+        active: true,
+      },
+      orderBy: [{ department: "asc" }, { name: "asc" }],
+      select: {
+        id: true,
+        name: true,
+        department: true,
+      },
+    }),
+  ]);
 
   if (!order) {
     notFound();
@@ -315,8 +328,9 @@ export default async function AdminProductionOrderPage({ params }: PageProps) {
               ) : (
                 <div className="mt-6 space-y-6">
                   {typedProductionLines.map((line) => (
-                    <ProductionLineEditor
-                      key={line.id}
+<ProductionLineEditor
+  key={line.id}
+  employees={employees}
   line={{
   ...line,
   dueDate: line.dueDate
