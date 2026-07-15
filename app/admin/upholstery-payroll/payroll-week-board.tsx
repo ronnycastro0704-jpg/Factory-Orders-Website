@@ -158,7 +158,7 @@ export default function PayrollWeekBoard({
 
         <div>
           <label className="mb-1 block text-sm font-medium">
-            Payroll Week Start
+            Payroll Friday
           </label>
           <input
             type="date"
@@ -170,7 +170,7 @@ export default function PayrollWeekBoard({
 
         <div className="flex items-end">
           <button type="submit" className="button-secondary">
-            Load Week
+            Load Payroll Week
           </button>
         </div>
 
@@ -181,7 +181,7 @@ export default function PayrollWeekBoard({
             disabled={generating || !selectedEmployeeName || !selectedWeekStart}
             className="button-primary disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {generating ? "Generating..." : "Generate Rows"}
+            {generating ? "Generating..." : "Generate Unchecked Rows"}
           </button>
         </div>
       </form>
@@ -221,7 +221,7 @@ export default function PayrollWeekBoard({
         </div>
       ) : entries.length === 0 ? (
         <div className="rounded-2xl border border-dashed bg-white/70 p-8 text-center text-sm text-slate-500">
-          No payroll rows yet. Click Generate Rows after frame rates are set.
+          No payroll rows for this payroll week yet. Click Generate Unpaid Rows to pull completed upholstered work that has not been checked/paid yet.
         </div>
       ) : (
         <div className="overflow-x-auto">

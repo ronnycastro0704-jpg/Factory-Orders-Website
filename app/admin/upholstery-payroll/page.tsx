@@ -23,15 +23,26 @@ type FrameChoiceRow = {
   rate: number;
 };
 
-function getTodayDateInputValue() {
+function getCurrentPayrollFridayInputValue() {
   const now = new Date();
 
-  return new Intl.DateTimeFormat("en-CA", {
+  const centralDateString = new Intl.DateTimeFormat("en-CA", {
     timeZone: "America/Chicago",
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
   }).format(now);
+
+  const centralDate = new Date(`${centralDateString}T12:00:00.000Z`);
+  const day = centralDate.getUTCDay();
+
+  // Payroll week runs Friday through Thursday.
+  // JS day: Sunday 0, Monday 1, Tuesday 2, Wednesday 3, Thursday 4, Friday 5, Saturday 6.
+  const daysSinceFriday = (day + 2) % 7;
+
+  centralDate.setUTCDate(centralDate.getUTCDate() - daysSinceFriday);
+
+  return centralDate.toISOString().slice(0, 10);
 }
 
 function parseWeekStartForQuery(value: string) {
@@ -66,8 +77,8 @@ export default async function UpholsteryPayrollPage({
   const params = await searchParams;
 
   const selectedEmployeeName = String(params.employee || "").trim();
-  const selectedWeekStart =
-    String(params.weekStart || "").trim() || getTodayDateInputValue();
+const selectedWeekStart =
+  String(params.weekStart || "").trim() || getCurrentPayrollFridayInputValue();
 
   const selectedWeekStartDate = parseWeekStartForQuery(selectedWeekStart);
 
@@ -192,9 +203,9 @@ export default async function UpholsteryPayrollPage({
               </h1>
 
               <p className="mt-4 max-w-3xl text-base text-slate-600 sm:text-lg">
-                Set a payroll rate for each frame, generate weekly payroll rows
-                from completed upholstery work, check the rows against the
-                employee paper sheet, and print payroll totals.
+                Set a payroll rate for each frame, generate unpaid completed upholstery
+                work for the selected employee, check the rows against the employee
+                paper sheet, and print Friday-through-Thursday payroll totals.
               </p>
             </div>
 
@@ -234,8 +245,8 @@ export default async function UpholsteryPayrollPage({
             </p>
             <h2 className="mt-2 text-3xl font-bold">Employee payroll week</h2>
             <p className="mt-2 text-sm text-slate-500">
-              Generate rows, then check only the frames confirmed by the
-              employee paperwork.
+              Load a Friday-through-Thursday payroll week, then generate unpaid completed
+              upholstery work. Check only the frames confirmed by the employee paperwork.
             </p>
           </div>
 

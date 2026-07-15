@@ -64,28 +64,48 @@ export async function POST(request: Request) {
       );
     }
 
-    const lines = await prisma.productionLine.findMany({
-      where: {
-        upholsteredAssignedTo: employeeName,
-        upholsteredStatus: "DONE",
-        order: {
-          status: {
-            notIn: ["CANCELLED"],
-          },
-        },
+const checkedPayrollEntries = await prisma.upholsteryPayrollEntry.findMany({
+  where: {
+    employeeName,
+    checked: true,
+  },
+  select: {
+    productionLineId: true,
+  },
+});
+
+const checkedProductionLineIds = checkedPayrollEntries.map(
+  (entry) => entry.productionLineId
+);
+
+const lines = await prisma.productionLine.findMany({
+  where: {
+    upholsteredAssignedTo: employeeName,
+    upholsteredStatus: "DONE",
+    id:
+      checkedProductionLineIds.length > 0
+        ? {
+            notIn: checkedProductionLineIds,
+          }
+        : undefined,
+    order: {
+      status: {
+        notIn: ["CANCELLED"],
       },
-      include: {
-        order: {
-          select: {
-            id: true,
-            orderNumber: true,
-            poNumber: true,
-            customerName: true,
-          },
-        },
+    },
+  },
+  include: {
+    order: {
+      select: {
+        id: true,
+        orderNumber: true,
+        poNumber: true,
+        customerName: true,
       },
-      orderBy: [{ updatedAt: "desc" }],
-    });
+    },
+  },
+  orderBy: [{ updatedAt: "desc" }],
+});
 
     const frameRates = await prisma.upholsteryFrameRate.findMany({
       where: {
@@ -121,38 +141,37 @@ export async function POST(request: Request) {
       const rate = Number(frameRate.rate || 0);
       const total = rate * Number(line.quantity || 0);
 
-      const existing = await prisma.upholsteryPayrollEntry.findUnique({
-        where: {
-          employeeName_productionLineId_weekStart: {
-            employeeName,
-            productionLineId: line.id,
-            weekStart,
-          },
-        },
-      });
+const existing = await prisma.upholsteryPayrollEntry.findFirst({
+  where: {
+    employeeName,
+    productionLineId: line.id,
+    checked: false,
+  },
+});
 
-      if (existing) {
-        await prisma.upholsteryPayrollEntry.update({
-          where: {
-            id: existing.id,
-          },
-          data: {
-            orderId: line.orderId,
-            orderNumber: line.order.orderNumber,
-            poNumber: line.order.poNumber,
-            customerName: line.order.customerName,
-            productName: line.productNameSnapshot,
-            partNumber: line.partNumber,
-            frameName: line.frameNeeded,
-            frameImageUrl: frameRate.frameImageUrl,
-            quantity: line.quantity,
-            rate,
-            total,
-          },
-        });
+if (existing) {
+  await prisma.upholsteryPayrollEntry.update({
+    where: {
+      id: existing.id,
+    },
+    data: {
+      orderId: line.orderId,
+      orderNumber: line.order.orderNumber,
+      poNumber: line.order.poNumber,
+      customerName: line.order.customerName,
+      productName: line.productNameSnapshot,
+      partNumber: line.partNumber,
+      frameName: line.frameNeeded,
+      frameImageUrl: frameRate.frameImageUrl,
+      quantity: line.quantity,
+      rate,
+      total,
+      weekStart,
+    },
+  });
 
-        updatedCount += 1;
-      } else {
+  updatedCount += 1;
+} else {
         await prisma.upholsteryPayrollEntry.create({
           data: {
             employeeName,
