@@ -317,6 +317,52 @@ model Employee {
   updatedAt  DateTime           @updatedAt
 }
 
+model UpholsteryFrameRate {
+  id             String   @id @default(cuid())
+  productId      String
+  optionChoiceId String
+  productName    String
+  frameName      String
+  frameImageUrl  String?
+  rate           Decimal  @default(0) @db.Decimal(10, 2)
+  active         Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([productId, optionChoiceId])
+  @@index([productId])
+  @@index([optionChoiceId])
+  @@index([active])
+}
+
+model UpholsteryPayrollEntry {
+  id               String   @id @default(cuid())
+  employeeName     String
+  productionLineId String
+  orderId          String
+  orderNumber      String
+  poNumber         String?
+  customerName     String
+  productName      String
+  partNumber       String
+  frameName        String
+  frameImageUrl    String?
+  quantity         Int
+  rate             Decimal  @default(0) @db.Decimal(10, 2)
+  total            Decimal  @default(0) @db.Decimal(10, 2)
+  weekStart        DateTime
+  checked          Boolean  @default(false)
+  checkedAt        DateTime?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@unique([employeeName, productionLineId, weekStart])
+  @@index([employeeName])
+  @@index([weekStart])
+  @@index([checked])
+  @@index([productionLineId])
+}
+
 model ProductionLine {
   id                       String                  @id @default(cuid())
   orderId                  String

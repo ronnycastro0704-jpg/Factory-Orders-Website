@@ -10,6 +10,7 @@ import {
   Palette,
   UserCheck,
   Users,
+  WalletCards,
 } from "lucide-react";
 import { auth } from "../../auth";
 import { isAdminEmail } from "../../lib/admin";
@@ -65,6 +66,12 @@ const adminLinks = [
     description: "Add production employees and assign them to departments.",
     href: "/admin/employees",
     icon: Users,
+  },
+  {
+    title: "Upholstery Payroll",
+    description: "Set frame rates, verify completed upholstery work, and print weekly payroll.",
+    href: "/admin/upholstery-payroll",
+    icon: WalletCards,
   },
   {
     title: "Approved Customers",
