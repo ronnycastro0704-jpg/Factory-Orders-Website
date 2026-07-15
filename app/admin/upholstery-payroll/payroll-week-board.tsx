@@ -80,7 +80,7 @@ export default function PayrollWeekBoard({
       }
 
       setMessage(
-        `Generated payroll: ${data.createdCount} new, ${data.updatedCount} updated, ${data.skippedCount} skipped without frame rates.`
+        `Generated payroll: ${data.createdCount} new, ${data.updatedCount} updated, ${data.skippedCount} skipped without frame rates, ${data.duplicateCleanupCount || 0} duplicate pending rows cleaned up.`
       );
 
       router.refresh();
