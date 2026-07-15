@@ -17,6 +17,7 @@ type FrameChoiceRow = {
   productId: string;
   optionChoiceId: string;
   productName: string;
+  partNumber: string;
   frameName: string;
   frameImageUrl: string | null;
   rate: number;
@@ -144,18 +145,20 @@ export default async function UpholsteryPayrollPage({
     }
 
     return frameGroup.choices.map((choice) => {
+      const partNumber = String(choice.value || "").trim();
       const frameName = choice.frameNeededCode || choice.label;
       const rate =
         savedFrameRateMap.get(`${product.id}|||${choice.id}`) ?? 0;
 
       return {
-        productId: product.id,
-        optionChoiceId: choice.id,
-        productName: product.name,
-        frameName,
-        frameImageUrl: choice.imageUrl,
-        rate,
-      };
+  productId: product.id,
+  optionChoiceId: choice.id,
+  productName: product.name,
+  partNumber,
+  frameName,
+  frameImageUrl: choice.imageUrl,
+  rate,
+};
     });
   });
 

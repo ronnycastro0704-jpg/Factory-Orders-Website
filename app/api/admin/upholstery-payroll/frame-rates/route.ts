@@ -44,11 +44,12 @@ export async function POST(request: Request) {
     const productId = normalizeText(body.productId);
     const optionChoiceId = normalizeText(body.optionChoiceId);
     const productName = normalizeText(body.productName);
+    const partNumber = normalizeText(body.partNumber);
     const frameName = normalizeText(body.frameName);
     const frameImageUrl = normalizeText(body.frameImageUrl);
     const rate = normalizeMoney(body.rate);
 
-    if (!productId || !optionChoiceId || !productName || !frameName) {
+    if (!productId || !optionChoiceId || !productName || !partNumber || !frameName) {
       return NextResponse.json(
         { error: "Missing required frame rate fields." },
         { status: 400 }
@@ -63,21 +64,23 @@ export async function POST(request: Request) {
         },
       },
       update: {
-        productName,
-        frameName,
-        frameImageUrl: frameImageUrl || null,
-        rate,
-        active: true,
-      },
+  productName,
+  partNumber,
+  frameName,
+  frameImageUrl: frameImageUrl || null,
+  rate,
+  active: true,
+},
       create: {
-        productId,
-        optionChoiceId,
-        productName,
-        frameName,
-        frameImageUrl: frameImageUrl || null,
-        rate,
-        active: true,
-      },
+  productId,
+  optionChoiceId,
+  productName,
+  partNumber,
+  frameName,
+  frameImageUrl: frameImageUrl || null,
+  rate,
+  active: true,
+},
     });
 
     return NextResponse.json(frameRate);

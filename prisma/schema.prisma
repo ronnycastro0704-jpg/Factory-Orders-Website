@@ -19,14 +19,14 @@ model User {
 }
 
 model ApprovedCustomer {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  name      String
-  active    Boolean  @default(true)
+  id               String   @id @default(cuid())
+  email            String   @unique
+  name             String
+  active           Boolean  @default(true)
   retailMultiplier Decimal  @default(1) @db.Decimal(10, 2)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
   @@index([email])
   @@index([active])
 }
@@ -138,7 +138,7 @@ model Order {
   sentToFactoryAt         DateTime?
   dueDate                 DateTime?
   priority                OrderPriority           @default(NORMAL)
-  weeklyScheduleDay WeeklyScheduleDay?
+  weeklyScheduleDay       WeeklyScheduleDay?
   pickedUp                Boolean                 @default(false)
   pickedUpAt              DateTime?
   overallProductionStatus ProductionOverallStatus @default(NEW)
@@ -226,29 +226,29 @@ model EmailLog {
 }
 
 model Invoice {
-  id              String        @id @default(cuid())
-  invoiceNumber   String        @unique
-  customerName    String
-  customerEmail   String
-  status          InvoiceStatus @default(DRAFT)
+  id            String        @id @default(cuid())
+  invoiceNumber String        @unique
+  customerName  String
+  customerEmail String
+  status        InvoiceStatus @default(DRAFT)
 
-  subtotal        Decimal       @default(0) @db.Decimal(10, 2)
+  subtotal        Decimal @default(0) @db.Decimal(10, 2)
   surchargeLabel  String?
-  surchargeAmount Decimal       @default(0) @db.Decimal(10, 2)
-  total           Decimal       @default(0) @db.Decimal(10, 2)
+  surchargeAmount Decimal @default(0) @db.Decimal(10, 2)
+  total           Decimal @default(0) @db.Decimal(10, 2)
 
-  terms           String        @default("Due upon receipt")
-  issuedAt        DateTime      @default(now())
-  dueAt           DateTime      @default(now())
-  paidAt          DateTime?
-  notes           String?
-  createdByEmail  String?
+  terms          String    @default("Due upon receipt")
+  issuedAt       DateTime  @default(now())
+  dueAt          DateTime  @default(now())
+  paidAt         DateTime?
+  notes          String?
+  createdByEmail String?
 
-  orders          InvoiceOrder[]
-  extraCharges    InvoiceExtraCharge[]
+  orders       InvoiceOrder[]
+  extraCharges InvoiceExtraCharge[]
 
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([customerEmail])
   @@index([status])
@@ -256,12 +256,12 @@ model Invoice {
 }
 
 model InvoiceExtraCharge {
-  id        String   @id @default(cuid())
+  id        String  @id @default(cuid())
   invoiceId String
-  invoice   Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  invoice   Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
 
-  label     String
-  amount    Decimal  @default(0) @db.Decimal(10, 2)
+  label  String
+  amount Decimal @default(0) @db.Decimal(10, 2)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -270,24 +270,24 @@ model InvoiceExtraCharge {
 }
 
 model InvoiceOrder {
-  id             String   @id @default(cuid())
-  invoiceId      String
-  orderId        String
+  id        String @id @default(cuid())
+  invoiceId String
+  orderId   String
 
-  orderNumber    String
-  poNumber       String?
-  customerName   String
-  customerEmail  String
+  orderNumber   String
+  poNumber      String?
+  customerName  String
+  customerEmail String
 
   productSummary String
   itemSummary    Json
   quantity       Int
-  orderTotal     Decimal  @db.Decimal(10, 2)
+  orderTotal     Decimal @db.Decimal(10, 2)
 
-  createdAt      DateTime @default(now())
+  createdAt DateTime @default(now())
 
-  invoice        Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
-  order          Order    @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  order   Order   @relation(fields: [orderId], references: [id], onDelete: Restrict)
 
   @@unique([invoiceId, orderId])
   @@index([invoiceId])
@@ -322,6 +322,7 @@ model UpholsteryFrameRate {
   productId      String
   optionChoiceId String
   productName    String
+  partNumber     String   @default("")
   frameName      String
   frameImageUrl  String?
   rate           Decimal  @default(0) @db.Decimal(10, 2)
@@ -332,11 +333,12 @@ model UpholsteryFrameRate {
   @@unique([productId, optionChoiceId])
   @@index([productId])
   @@index([optionChoiceId])
+  @@index([partNumber, frameName])
   @@index([active])
 }
 
 model UpholsteryPayrollEntry {
-  id               String   @id @default(cuid())
+  id               String    @id @default(cuid())
   employeeName     String
   productionLineId String
   orderId          String
@@ -348,13 +350,13 @@ model UpholsteryPayrollEntry {
   frameName        String
   frameImageUrl    String?
   quantity         Int
-  rate             Decimal  @default(0) @db.Decimal(10, 2)
-  total            Decimal  @default(0) @db.Decimal(10, 2)
+  rate             Decimal   @default(0) @db.Decimal(10, 2)
+  total            Decimal   @default(0) @db.Decimal(10, 2)
   weekStart        DateTime
-  checked          Boolean  @default(false)
+  checked          Boolean   @default(false)
   checkedAt        DateTime?
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
   @@unique([employeeName, productionLineId, weekStart])
   @@index([employeeName])

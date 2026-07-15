@@ -8,6 +8,7 @@ type FrameRateRow = {
   productId: string;
   optionChoiceId: string;
   productName: string;
+  partNumber: string;
   frameName: string;
   frameImageUrl: string | null;
   rate: number;
@@ -46,13 +47,14 @@ export default function FrameRateTable({ rows }: Props) {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          productId: row.productId,
-          optionChoiceId: row.optionChoiceId,
-          productName: row.productName,
-          frameName: row.frameName,
-          frameImageUrl: row.frameImageUrl,
-          rate: Number(rates[row.optionChoiceId] || 0),
-        }),
+  productId: row.productId,
+  optionChoiceId: row.optionChoiceId,
+  productName: row.productName,
+  partNumber: row.partNumber,
+  frameName: row.frameName,
+  frameImageUrl: row.frameImageUrl,
+  rate: Number(rates[row.optionChoiceId] || 0),
+}),
       });
 
       const data = await response.json();
@@ -99,7 +101,8 @@ export default function FrameRateTable({ rows }: Props) {
             <thead>
               <tr className="border-b text-xs uppercase tracking-[0.12em] text-slate-500">
                 <th className="py-3 pr-4">Frame</th>
-                <th className="py-3 pr-4">Product</th>
+<th className="py-3 pr-4">Part #</th>
+<th className="py-3 pr-4">Product</th>
                 <th className="py-3 pr-4">Image</th>
                 <th className="py-3 pr-4">Current Rate</th>
                 <th className="py-3 pr-4">New Rate</th>
@@ -114,7 +117,8 @@ export default function FrameRateTable({ rows }: Props) {
                   className="border-b last:border-0"
                 >
                   <td className="py-4 pr-4 font-semibold">{row.frameName}</td>
-                  <td className="py-4 pr-4">{row.productName}</td>
+<td className="py-4 pr-4 font-mono text-xs">{row.partNumber}</td>
+<td className="py-4 pr-4">{row.productName}</td>
                   <td className="py-4 pr-4">
                     {row.frameImageUrl ? (
                       <img

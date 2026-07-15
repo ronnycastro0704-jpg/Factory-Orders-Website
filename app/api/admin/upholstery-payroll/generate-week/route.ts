@@ -94,22 +94,22 @@ export async function POST(request: Request) {
     });
 
     const frameRateMap = new Map(
-      frameRates.map((rate) => [
-        `${rate.productName.trim().toLowerCase()}|||${rate.frameName
-          .trim()
-          .toLowerCase()}`,
-        rate,
-      ])
-    );
+  frameRates.map((rate) => [
+    `${rate.partNumber.trim().toLowerCase()}|||${rate.frameName
+      .trim()
+      .toLowerCase()}`,
+    rate,
+  ])
+);
 
     let createdCount = 0;
     let updatedCount = 0;
     let skippedCount = 0;
 
     for (const line of lines) {
-      const rateKey = `${line.productNameSnapshot.trim().toLowerCase()}|||${line.frameNeeded
-        .trim()
-        .toLowerCase()}`;
+      const rateKey = `${line.partNumber.trim().toLowerCase()}|||${line.frameNeeded
+  .trim()
+  .toLowerCase()}`;
 
       const frameRate = frameRateMap.get(rateKey);
 
